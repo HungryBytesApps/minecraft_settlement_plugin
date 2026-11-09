@@ -183,6 +183,7 @@ final class Social {
         }
 
         static void glance(Worker w) {
+            if (w.watched()) return; // looking back at a player
             float yaw = w.body.getLocation().getYaw() + w.random.nextInt(120) - 60;
             w.body.setRotation(yaw, w.random.nextInt(30) - 15);
         }

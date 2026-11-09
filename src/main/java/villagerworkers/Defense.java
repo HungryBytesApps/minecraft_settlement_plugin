@@ -205,15 +205,37 @@ final class Defense {
         public String label() {
             return "Taking cover";
         }
+
+        @Override
+        public boolean interruptible() {
+            return false;
+        }
     }
 
-    /** A spot with a roof, near the gathering spot (or bell), close to the settler. */
+    /** Indoor spots (just inside a door) per settlement, found by scanning for doors. Cached. */
+    private static final Map<String, java.util.List<Location>> indoors = new HashMap<>();
+    private static final Map<String, Integer> indoorsAt = new HashMap<>();
+
+    /**
+     * Where to hide: inside the nearest building with a door (the settler closes the door behind
+     * it, like villagers). No such building: under a roof near the gathering spot, else the bell.
+     */
     static Location shelter(Worker w, Town t) {
+        Location best = null;
+        double bestD = Double.MAX_VALUE;
+        for (Location in : indoorSpots(w.plugin, t)) {
+            if (in.getWorld() != w.body.getWorld()) continue;
+            double d = in.distanceSquared(w.body.getLocation());
+            if (d < bestD) {
+                bestD = d;
+                best = in;
+            }
+        }
+        if (best != null) return spreadInside(w, best);
+
         Location c = Seats.gatheringSpot(t, w.plugin.settings().socialRadius());
         if (c == null || c.getWorld() != w.body.getWorld()) c = t.bell;
         World world = c.getWorld();
-        Location best = null;
-        double bestD = Double.MAX_VALUE;
         for (int i = 0; i < 80; i++) {
             int x = c.getBlockX() + w.random.nextInt(25) - 12, z = c.getBlockZ() + w.random.nextInt(25) - 12;
             for (int y = c.getBlockY() + 4; y >= c.getBlockY() - 4; y--) {
@@ -230,6 +252,68 @@ final class Defense {
             }
         }
         return best != null ? best : c.clone().add(0.5, 1, 0.5);
+    }
+
+    /** A free spot a little further into the room, so not everyone stands on one block. */
+    private static Location spreadInside(Worker w, Location in) {
+        World world = in.getWorld();
+        for (int i = 0; i < 12; i++) {
+            int x = in.getBlockX() + w.random.nextInt(5) - 2, z = in.getBlockZ() + w.random.nextInt(5) - 2;
+            int y = in.getBlockY();
+            if (PathFinder.walkable(world, x, y, z) && indoor(world, x, y, z)) return new Location(world, x + 0.5, y, z + 0.5);
+        }
+        return in;
+    }
+
+    private static java.util.List<Location> indoorSpots(VillagerWorkersPlugin plugin, Town t) {
+        int now = Bukkit.getCurrentTick();
+        Integer at = indoorsAt.get(t.id);
+        if (at != null && now - at < 1200 && indoors.containsKey(t.id)) return indoors.get(t.id);
+        java.util.List<Location> out = new java.util.ArrayList<>();
+        World world = t.world();
+        int r = plugin.settings().townRadius();
+        int bx = t.bell.getBlockX(), by = t.bell.getBlockY(), bz = t.bell.getBlockZ();
+        for (int x = bx - r; x <= bx + r; x++) {
+            for (int z = bz - r; z <= bz + r; z++) {
+                if ((x - bx) * (x - bx) + (z - bz) * (z - bz) > r * r) continue;
+                if (!world.isChunkLoaded(x >> 4, z >> 4)) continue;
+                for (int y = by - 8; y <= by + 8; y++) {
+                    Block b = world.getBlockAt(x, y, z);
+                    if (!org.bukkit.Tag.WOODEN_DOORS.isTagged(b.getType())) continue;
+                    if (!(b.getBlockData() instanceof org.bukkit.block.data.type.Door door)
+                            || door.getHalf() != org.bukkit.block.data.Bisected.Half.BOTTOM) continue;
+                    org.bukkit.block.BlockFace f = door.getFacing();
+                    // The inside is the side that is roofed and walled in.
+                    for (org.bukkit.block.BlockFace side : new org.bukkit.block.BlockFace[]{f, f.getOppositeFace()}) {
+                        int ix = x + side.getModX() * 2, iz = z + side.getModZ() * 2;
+                        if (PathFinder.walkable(world, ix, y, iz) && indoor(world, ix, y, iz)) {
+                            out.add(new Location(world, ix + 0.5, y, iz + 0.5));
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        indoors.put(t.id, out);
+        indoorsAt.put(t.id, now);
+        return out;
+    }
+
+    /** Under a roof with walls on (at least) three sides. */
+    private static boolean indoor(World world, int x, int y, int z) {
+        if (!roofed(world, x, y, z)) return false;
+        int walls = 0;
+        for (org.bukkit.block.BlockFace f : new org.bukkit.block.BlockFace[]{org.bukkit.block.BlockFace.NORTH,
+                org.bukkit.block.BlockFace.SOUTH, org.bukkit.block.BlockFace.EAST, org.bukkit.block.BlockFace.WEST}) {
+            for (int d = 1; d <= 8; d++) {
+                Block b = world.getBlockAt(x + f.getModX() * d, y + 1, z + f.getModZ() * d);
+                if (b.getType().isOccluding() || org.bukkit.Tag.DOORS.isTagged(b.getType()) || b.getType().name().contains("GLASS")) {
+                    walls++;
+                    break;
+                }
+            }
+        }
+        return walls >= 3;
     }
 
     private static boolean roofed(World world, int x, int y, int z) {

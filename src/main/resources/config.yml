@@ -14,6 +14,12 @@ recruit-cost:
   - emerald:5
   - bread:10
 
+# Particles for the settlement border and work areas (Show border). Any particle without extra
+# data works, e.g. FLAME, SMALL_FLAME, SOUL_FIRE_FLAME, END_ROD, HAPPY_VILLAGER, COMPOSTER, WAX_ON,
+# ELECTRIC_SPARK, GLOW, CRIT. Resource packs can change how they look.
+border-particle: FLAME
+work-area-particle: HAPPY_VILLAGER
+
 # ---- Settlers ----
 # Show "Name (Job)" above each settler.
 show-names: true

@@ -317,6 +317,11 @@ final class Guard implements Activity {
         return best;
     }
 
+    /** Not fighting or fetching anything (may look at a player). */
+    boolean idle() {
+        return target == null && sub == null;
+    }
+
     @Override
     public void stop() {
         if (sub != null) sub.stop();

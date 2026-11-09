@@ -219,8 +219,64 @@ final class Worker {
             body.getEquipment().setItemInMainHand(wpn == null ? null : wpn.clone());
             return;
         }
-        Material tool = job().tool;
-        body.getEquipment().setItemInMainHand(tool.isAir() ? null : new ItemStack(tool));
+        // Only a tool it really carries (a farmer with a hoe from storage), nothing made up.
+        Material kind = job().tool;
+        ItemStack held = null;
+        if (!kind.isAir()) {
+            String suffix = kind.name().substring(kind.name().lastIndexOf('_'));
+            for (ItemStack it : pockets.getContents()) {
+                if (it != null && it.getType().name().endsWith(suffix)) {
+                    held = it.asOne();
+                    break;
+                }
+            }
+        }
+        body.getEquipment().setItemInMainHand(held);
+    }
+
+    // ---- Noticing players ----
+
+    private org.bukkit.entity.Player watcher;
+    private int watchUntil, watchCheck;
+
+    /** Is a player looking at this settler (and it's looking back)? */
+    boolean watched() {
+        return watcher != null && Bukkit.getCurrentTick() < watchUntil;
+    }
+
+    /** A player close by looks at the settler: it looks back (and sometimes waves). */
+    private void noticePlayers() {
+        if (--watchCheck > 0) return;
+        watchCheck = 5;
+        boolean free = activity == null || activity.freeTime() || activity.interruptible()
+                || activity instanceof Social.LookAround || (activity instanceof Guard g && g.idle());
+        if (!free || mover.moving()) {
+            watcher = null;
+            return;
+        }
+        Location eye = body.getEyeLocation();
+        org.bukkit.entity.Player found = null;
+        for (org.bukkit.entity.Player p : body.getWorld().getPlayers()) {
+            if (p.getGameMode() == org.bukkit.GameMode.SPECTATOR) continue;
+            Location pe = p.getEyeLocation();
+            double d2 = pe.distanceSquared(eye);
+            if (d2 > 10 * 10 || d2 < 0.01) continue;
+            org.bukkit.util.Vector to = eye.toVector().subtract(pe.toVector()).normalize();
+            if (pe.getDirection().dot(to) < 0.96 || !p.hasLineOfSight(body)) continue;
+            found = p;
+            break;
+        }
+        int now = Bukkit.getCurrentTick();
+        if (found != null) {
+            if (watcher == null && random.nextInt(4) == 0) body.swingMainHand(); // a little wave
+            watcher = found;
+            watchUntil = now + 40; // keep looking a moment after they look away
+        }
+        if (watched() && watcher.isValid() && watcher.getWorld() == body.getWorld()) {
+            Mover.lookAt(body, watcher.getEyeLocation());
+        } else {
+            watcher = null;
+        }
     }
 
     void hold(Material m) {
@@ -328,6 +384,7 @@ final class Worker {
         }
         mover.tick();
         healthTick();
+        noticePlayers();
         if (--defenseCheck <= 0) {
             defenseCheck = 20;
             Town t = town();

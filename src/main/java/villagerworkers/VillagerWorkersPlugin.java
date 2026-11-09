@@ -39,7 +39,6 @@ public final class VillagerWorkersPlugin extends JavaPlugin {
         towns = new Towns(this);
         workers = new Workers(this);
         getServer().getPluginManager().registerEvents(new WorkerListener(this), this);
-        getServer().getPluginManager().registerEvents(new TargetsMenu.Events(), this);
 
         for (World w : getServer().getWorlds()) {
             for (Mannequin m : w.getEntitiesByClass(Mannequin.class)) {

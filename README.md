@@ -7,7 +7,7 @@ Build a settlement with settlers who work and live their own lives. Server-side 
 Right-click a **bell** → create a settlement. You get the **Settlement Ledger** (one per player).
 - **Bell menu**: recruit, show border, get a ledger, rename, disband.
 - **Ledger menu** (right-click with the ledger): storage targets, use all chests, settlers, when attacked, settlers may eat, guards use potions.
-The settlement border (orange) and work areas (green) are shown as see-through colored bands (only for you; no particles, so resource packs don't change them and they don't cost FPS).
+The settlement border and work areas are shown with particles, only for you and only near you (`border-particle`, `work-area-particle` in the config).
 Bell menu → **Show border**: When holding ledger / On / Off.
 
 ## Settlers
@@ -32,14 +32,13 @@ Settlers use the chests and barrels in the settlement (on by default, `chests-al
 
 ## Storage targets
 
-Ledger menu → **Storage targets**: a chest window with one row per job and its products. Each item shows what's in storage
-and the target. Left/right-click +16/−16, shift ±64, Q = no limit. Settlers stop making a product once storage holds that much
-(farmers keep replanting).
+Ledger menu → **Storage targets**: one row per product with its item icon, how much is in storage, and a field for the target.
+Empty = no limit (keep producing). Settlers stop making a product once storage holds the target (farmers keep replanting).
 
 ## Settlers
 
 Settlers are player-like (Mannequins): their own skin (`skins` in the config), their job under their name,
-and their tool in hand (farmers carry a hoe). Old villager settlers are converted automatically.
+and only tools they really carry in hand. Look at a settler and it looks back at you. Old villager settlers are converted automatically.
 Hiring a wild villager turns it into a settler; dismissing a settler turns it back into a villager.
 
 ## Free time
@@ -62,7 +61,7 @@ settlers may take from. No weapon there → a warning, and "no weapon!" in the s
 - A guard that gets hit goes after its attacker. Guards keep guarding at night.
 
 Hostile mobs in the settlement ring the bell and you get a message. Other settlers react as set in the ledger:
-**Take cover** (hide under a roof near the gathering spot) or **Call to arms** (borrow a weapon from storage, fight, bring it back;
+**Take cover** (run into the nearest building with a door and close it behind them; otherwise under a roof near the gathering spot) or **Call to arms** (borrow a weapon from storage, fight, bring it back;
 no weapon → take cover).
 
 All settlers can be hurt and die, but never by players. They heal slowly (`regen-seconds`) and eat food from storage

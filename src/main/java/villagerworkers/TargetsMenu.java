@@ -1,153 +1,81 @@
 package villagerworkers;
 
+import io.papermc.paper.registry.data.dialog.ActionButton;
+import io.papermc.paper.registry.data.dialog.body.DialogBody;
+import io.papermc.paper.registry.data.dialog.input.DialogInput;
+import io.papermc.paper.registry.data.dialog.type.DialogType;
+import net.kyori.adventure.key.Key;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
-import net.kyori.adventure.text.format.TextDecoration;
-import org.bukkit.Bukkit;
+import net.kyori.adventure.text.object.ObjectContents;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
-import org.bukkit.event.EventHandler;
-import org.bukkit.event.Listener;
-import org.bukkit.event.inventory.ClickType;
-import org.bukkit.event.inventory.InventoryClickEvent;
-import org.bukkit.event.inventory.InventoryCloseEvent;
-import org.bukkit.event.inventory.InventoryDragEvent;
-import org.bukkit.inventory.Inventory;
-import org.bukkit.inventory.InventoryHolder;
-import org.bukkit.inventory.ItemFlag;
-import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.ItemMeta;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
- * Storage targets as a chest window: one row per job, its products as items showing what's in
- * storage and the target. Click to change, nothing to type.
+ * Storage targets: one row per product with its item icon, what's in storage and a number field.
+ * Empty = no limit (keep producing).
  */
-final class TargetsMenu implements InventoryHolder {
-    /** A job and the products it makes (one row each). New jobs add a row here. */
-    private record Row(String job, Material icon, List<Material> products) {}
+final class TargetsMenu {
+    private TargetsMenu() {}
 
-    private static final List<Row> ROWS = List.of(
-            new Row("Farmer", Material.IRON_HOE, FarmerJob.TARGET_ITEMS));
-
-    private final VillagerWorkersPlugin plugin;
-    private final Town t;
-    private final Inventory inv;
-    private final Map<Integer, Material> slots = new HashMap<>();
-
-    private TargetsMenu(VillagerWorkersPlugin plugin, Town t) {
-        this.plugin = plugin;
-        this.t = t;
-        this.inv = Bukkit.createInventory(this, Math.max(27, 9 * (ROWS.size() + 2)), Component.text("Storage targets"));
-        fill();
+    /** Everything settlers can produce, in menu order. New jobs add their products here. */
+    static List<Material> products() {
+        return FarmerJob.TARGET_ITEMS;
     }
 
     static void open(VillagerWorkersPlugin plugin, Player p, Town t) {
-        Menus.markShown(p);
-        p.openInventory(new TargetsMenu(plugin, t).inv);
-    }
-
-    @Override
-    public Inventory getInventory() {
-        return inv;
-    }
-
-    private void fill() {
         int radius = plugin.settings().townRadius();
-        for (int r = 0; r < ROWS.size(); r++) {
-            Row row = ROWS.get(r);
-            inv.setItem(r * 9, named(new ItemStack(row.icon()), Component.text(row.job(), NamedTextColor.GOLD), List.of()));
-            for (int i = 0; i < row.products().size() && i < 8; i++) {
-                int slot = r * 9 + 1 + i;
-                slots.put(slot, row.products().get(i));
-                draw(slot, radius);
-            }
+        List<DialogInput> inputs = new ArrayList<>();
+        for (Material m : products()) {
+            int target = t.targets.getOrDefault(m, 0);
+            Component label = icon(m)
+                    .append(Component.text(" " + nice(m), NamedTextColor.WHITE))
+                    .append(Component.text("  (" + t.count(m, radius) + " in storage)", NamedTextColor.GRAY));
+            inputs.add(DialogInput.text(key(m), label)
+                    .initial(target > 0 ? String.valueOf(target) : "").maxLength(6).width(80).build());
         }
-        int back = inv.getSize() - 1;
-        inv.setItem(back, named(new ItemStack(Material.ARROW), Component.text("Back", NamedTextColor.GRAY), List.of()));
+        List<DialogBody> body = List.of(Menus.line("Empty = no limit", NamedTextColor.GRAY));
+        ActionButton save = ActionButton.create(Component.text("Save", NamedTextColor.GREEN), null, 100,
+                Menus.click(plugin, (view, audience) -> {
+                    Map<Material, String> values = new HashMap<>();
+                    for (Material m : products()) values.put(m, view.getText(key(m)));
+                    if (!(audience instanceof Player pl)) return;
+                    org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
+                        for (Map.Entry<Material, String> e : values.entrySet()) {
+                            String v = e.getValue() == null ? "" : e.getValue().trim();
+                            if (v.isEmpty()) {
+                                t.targets.remove(e.getKey());
+                                continue;
+                            }
+                            try {
+                                t.targets.put(e.getKey(), Math.max(0, Integer.parseInt(v)));
+                            } catch (NumberFormatException ignored) {
+                                // not a number: keep the old value
+                            }
+                        }
+                        plugin.towns().save();
+                        pl.sendActionBar(Component.text("Storage targets saved.", NamedTextColor.GREEN));
+                        Menus.ledger(plugin, pl, t);
+                    });
+                }, Menus.ONCE));
+        ActionButton back = Menus.button(plugin, "Back", NamedTextColor.GRAY, null, 100, pl -> Menus.ledger(plugin, pl, t));
+        Menus.show(p, "Storage targets", body, inputs, DialogType.confirmation(save, back));
     }
 
-    private void draw(int slot, int radius) {
-        Material m = slots.get(slot);
-        int target = t.targets.getOrDefault(m, 0);
-        int stored = t.count(m, radius);
-        boolean reached = target > 0 && stored >= target;
-        List<Component> lore = new ArrayList<>();
-        lore.add(gray("In storage: " + stored));
-        lore.add(target > 0
-                ? Component.text("Target: " + target, reached ? NamedTextColor.GREEN : NamedTextColor.WHITE).decoration(TextDecoration.ITALIC, false)
-                : gray("Target: no limit"));
-        lore.add(Component.empty());
-        lore.add(Component.text("Left / right-click: +16 / −16", NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false));
-        lore.add(Component.text("Shift: ±64  ·  Q: no limit", NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false));
-        String name = FarmerJob.nice(m);
-        ItemStack it = named(new ItemStack(m),
-                Component.text(Character.toUpperCase(name.charAt(0)) + name.substring(1), NamedTextColor.WHITE), lore);
-        if (reached) {
-            ItemMeta meta = it.getItemMeta();
-            meta.setEnchantmentGlintOverride(true);
-            it.setItemMeta(meta);
-        }
-        inv.setItem(slot, it);
+    /** The item's own icon inside the text (uses the player's resource pack). */
+    private static Component icon(Material m) {
+        // Since 1.21.11 item textures live in their own "items" atlas.
+        return Component.object(ObjectContents.sprite(Key.key("minecraft", "items"), Key.key("minecraft", "item/" + m.getKey().getKey())));
     }
 
-    private static Component gray(String s) {
-        return Component.text(s, NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false);
+    private static String key(Material m) {
+        return m.name().toLowerCase(Locale.ROOT);
     }
 
-    private static ItemStack named(ItemStack it, Component name, List<Component> lore) {
-        ItemMeta meta = it.getItemMeta();
-        meta.displayName(name.decoration(TextDecoration.ITALIC, false));
-        meta.lore(lore);
-        meta.addItemFlags(ItemFlag.values());
-        it.setItemMeta(meta);
-        return it;
-    }
-
-    private void click(Player p, int slot, ClickType type) {
-        if (slot == inv.getSize() - 1) {
-            Bukkit.getScheduler().runTask(plugin, () -> Menus.ledger(plugin, p, t));
-            return;
-        }
-        Material m = slots.get(slot);
-        if (m == null) return;
-        int cur = t.targets.getOrDefault(m, 0);
-        int next = switch (type) {
-            case LEFT -> cur + 16;
-            case RIGHT -> cur - 16;
-            case SHIFT_LEFT -> cur + 64;
-            case SHIFT_RIGHT -> cur - 64;
-            case DROP, CONTROL_DROP -> 0;
-            default -> cur;
-        };
-        next = Math.max(0, Math.min(100000, next));
-        if (next == cur) return;
-        t.targets.put(m, next);
-        draw(slot, plugin.settings().townRadius());
-        p.playSound(p.getLocation(), "minecraft:ui.button.click", 0.4f, next > cur ? 1.4f : 1.0f);
-    }
-
-    /** Clicks and closing for all targets windows. */
-    static final class Events implements Listener {
-        @EventHandler
-        public void onClick(InventoryClickEvent e) {
-            if (!(e.getView().getTopInventory().getHolder(false) instanceof TargetsMenu menu)) return;
-            e.setCancelled(true);
-            if (e.getClickedInventory() == menu.inv && e.getWhoClicked() instanceof Player p) menu.click(p, e.getSlot(), e.getClick());
-        }
-
-        @EventHandler
-        public void onDrag(InventoryDragEvent e) {
-            if (e.getView().getTopInventory().getHolder(false) instanceof TargetsMenu) e.setCancelled(true);
-        }
-
-        @EventHandler
-        public void onClose(InventoryCloseEvent e) {
-            if (e.getInventory().getHolder(false) instanceof TargetsMenu menu) menu.plugin.towns().save();
-        }
+    private static String nice(Material m) {
+        String s = FarmerJob.nice(m);
+        return Character.toUpperCase(s.charAt(0)) + s.substring(1);
     }
 }

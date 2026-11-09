@@ -140,12 +140,31 @@ final class WorkerListener implements Listener {
 
     // ---- Villagers ----
 
+    private final java.util.Map<java.util.UUID, Integer> lastClick = new java.util.HashMap<>();
+
+    /** Player-like entities (settlers) get an "interact at" click; handle it the same way. */
+    @EventHandler(priority = EventPriority.HIGH)
+    public void onClickAt(org.bukkit.event.player.PlayerInteractAtEntityEvent e) {
+        if (Worker.isWorker(e.getRightClicked())) onClickVillager(e);
+    }
+
     @EventHandler(priority = EventPriority.HIGH)
     public void onClickVillager(PlayerInteractEntityEvent e) {
         if (e.getHand() != EquipmentSlot.HAND) return;
         Player p = e.getPlayer();
+        if (Worker.isWorker(e.getRightClicked())) {
+            e.setCancelled(true);
+            // Both click events can come for one click: handle it once.
+            int now = Bukkit.getCurrentTick();
+            Integer last = lastClick.put(p.getUniqueId(), now);
+            if (last != null && now - last < 4) return;
+        }
         boolean ledger = Ledger.is(p.getInventory().getItemInMainHand());
         Worker w = plugin.workers().get(e.getRightClicked().getUniqueId());
+        if (w == null && e.getRightClicked() instanceof org.bukkit.entity.Mannequin m && Worker.isWorker(m)) {
+            plugin.load(m); // somehow not running: start it now
+            w = plugin.workers().get(m.getUniqueId());
+        }
         if (w != null) {
             e.setCancelled(true);
             if (ledger && w.canManage(p)) {

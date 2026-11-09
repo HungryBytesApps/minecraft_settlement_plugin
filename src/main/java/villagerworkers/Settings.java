@@ -27,6 +27,8 @@ record Settings(
         int guardRadius,
         int regenSeconds,
         int eatBelowPercent,
+        org.bukkit.Particle borderParticle,
+        org.bukkit.Particle workParticle,
         List<String> skins,
         List<String> names,
         List<String> chatLines
@@ -69,6 +71,8 @@ record Settings(
                 (int) clamp(c.getInt("guard-radius", 16), 4, 48),
                 (int) clamp(c.getInt("regen-seconds", 4), 1, 600),
                 (int) clamp(c.getInt("eat-below-health-percent", 60), 1, 99),
+                Borders.particle(c.getString("border-particle", "FLAME"), org.bukkit.Particle.FLAME),
+                Borders.particle(c.getString("work-area-particle", "HAPPY_VILLAGER"), org.bukkit.Particle.HAPPY_VILLAGER),
                 skins.isEmpty() ? List.of("steve", "alex") : skins,
                 names,
                 lines

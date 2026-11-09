@@ -26,7 +26,7 @@ import java.util.function.Consumer;
 final class Menus {
     private Menus() {}
 
-    private static final ClickCallback.Options ONCE = ClickCallback.Options.builder()
+    static final ClickCallback.Options ONCE = ClickCallback.Options.builder()
             .uses(1).lifetime(Duration.ofMinutes(10)).build();
 
     /** Times a dialog was shown per player: tells whether a click opened a new window. */
@@ -41,7 +41,7 @@ final class Menus {
      * Dialogs wait for the server after a click, so a new window replaces the old one directly
      * (no flicker, the mouse stays put). A click that opens nothing new closes the dialog.
      */
-    private static DialogAction click(VillagerWorkersPlugin plugin, DialogActionCallback cb, ClickCallback.Options options) {
+    static DialogAction click(VillagerWorkersPlugin plugin, DialogActionCallback cb, ClickCallback.Options options) {
         return DialogAction.customClick((view, audience) -> {
             if (!(audience instanceof Player p)) {
                 cb.accept(view, audience);
@@ -50,12 +50,16 @@ final class Menus {
             Integer before = shown.get(p.getUniqueId());
             cb.accept(view, audience);
             Bukkit.getScheduler().runTask(plugin, () -> {
-                if (p.isOnline() && Objects.equals(before, shown.get(p.getUniqueId()))) p.closeDialog();
+                if (p.isOnline() && Objects.equals(before, shown.get(p.getUniqueId()))) {
+                    // Nothing new opened: close the "waiting for server" screen.
+                    p.closeDialog();
+                    p.closeInventory();
+                }
             });
         }, options);
     }
 
-    private static ActionButton button(VillagerWorkersPlugin plugin, String text, NamedTextColor color, String tip,
+    static ActionButton button(VillagerWorkersPlugin plugin, String text, NamedTextColor color, String tip,
                                        int width, Consumer<Player> onClick) {
         return ActionButton.create(Component.text(text, color), tip == null ? null : Component.text(tip), width,
                 click(plugin, (view, audience) -> {
@@ -67,11 +71,11 @@ final class Menus {
         return button(plugin, "Close", null, null, 100, pl -> {});
     }
 
-    private static DialogBody line(String text, NamedTextColor color) {
+    static DialogBody line(String text, NamedTextColor color) {
         return DialogBody.plainMessage(Component.text(text, color));
     }
 
-    private static void show(Player p, String title, List<DialogBody> body, List<DialogInput> inputs, DialogType type) {
+    static void show(Player p, String title, List<DialogBody> body, List<DialogInput> inputs, DialogType type) {
         Dialog d = Dialog.create(b -> b.empty()
                 .base(DialogBase.builder(Component.text(title)).body(body).inputs(inputs).canCloseWithEscape(true)
                         .afterAction(DialogBase.DialogAfterAction.WAIT_FOR_RESPONSE).build())
@@ -178,7 +182,7 @@ final class Menus {
         head(body, "Settlement");
         text(body, "Your settlement is everything within " + s.townRadius() + " blocks of this bell. Settlers live, work and sleep here.");
         text(body, "Bell: recruit settlers (" + costText(s.recruitCost()) + "), show the border, get a ledger, rename or disband.");
-        text(body, "Show border: an orange band marks the settlement, green bands mark work areas. When holding ledger / On / Off.");
+        text(body, "Show border: particles mark the settlement and the work areas. When holding ledger / On / Off.");
         head(body, "Settlement Ledger");
         text(body, "One per player. Right-click with it:");
         text(body, "• a chest or barrel: may settlers put things in / take things out?");
@@ -197,7 +201,7 @@ final class Menus {
         text(body, "Stance: Defensive guards stay at their post (Set post here) and fight mobs within their radius (default " + s.guardRadius()
                 + "). Patrol guards walk along the border and through the settlement. Escort guards follow you inside the settlement.");
         text(body, "Weapon: Auto (bow at range, melee up close), Melee or Archer. Archers fetch arrows as soon as they run out; others refill after the fight.");
-        text(body, "Hostile mobs in the settlement ring the bell. Other settlers then take cover, or with Call to arms grab a weapon from storage and fight (and bring it back after).");
+        text(body, "Hostile mobs in the settlement ring the bell. Other settlers then hide in a building with a door (and close it), or with Call to arms grab a weapon from storage and fight (and bring it back after).");
         text(body, "Everyone can be hurt and die, but never by players. They heal slowly, and eat food from storage when hurt (Settlers may eat). Guards eat first.");
         text(body, "Guards use potions: guards carry and drink healing potions from storage in a fight. Off by default.");
         text(body, "When they die, they drop what they carried and wore.");

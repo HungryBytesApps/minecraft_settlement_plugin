@@ -17,8 +17,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Walks a worker along a path by giving it velocity each tick (so the client shows the normal
- * walking animation), jumping up steps, opening and closing doors, and getting unstuck.
+ * Walks a worker along a path in small steps each tick (the client shows them walking),
+ * up and down steps, opening and closing doors, and getting unstuck.
  */
 final class Mover {
     private final Worker w;
@@ -103,15 +103,20 @@ final class Mover {
         openDoor(v.getWorld(), n);
         double dx = n[0] + 0.5 - loc.getX(), dz = n[2] + 0.5 - loc.getZ();
         double dist = Math.sqrt(dx * dx + dz * dz);
-        Vector vel = v.getVelocity();
+        // Step by step (Mannequins don't walk by themselves); the client smooths it into a walk.
+        double nx = loc.getX(), nz = loc.getZ(), ny = loc.getY();
+        float yaw = loc.getYaw();
         if (dist > 0.01) {
             double sp = Math.min(speed, dist);
-            vel.setX(dx / dist * sp);
-            vel.setZ(dz / dist * sp);
-            face(v, dx, dz);
+            nx += dx / dist * sp;
+            nz += dz / dist * sp;
+            yaw = (float) Math.toDegrees(Math.atan2(-dx, dz));
         }
-        if (n[1] > loc.getY() + 0.6 && v.isOnGround()) vel.setY(0.42); // jump up a step
-        v.setVelocity(vel);
+        if (n[1] > ny) ny = Math.min(n[1], ny + 0.2);       // up a step
+        else if (n[1] < ny) ny = Math.max(n[1], ny - 0.35); // down
+        v.setVelocity(new Vector());
+        v.teleport(new Location(v.getWorld(), nx, ny, nz, yaw, 0),
+                io.papermc.paper.entity.TeleportFlag.EntityState.RETAIN_PASSENGERS);
 
         // Stuck? Try a new path twice, then hop to the next spot.
         if (++stuckTicks >= 30) {
@@ -119,7 +124,8 @@ final class Mover {
                 if (repaths++ < 2) {
                     repath();
                 } else {
-                    v.teleport(new Location(v.getWorld(), n[0] + 0.5, n[1], n[2] + 0.5, loc.getYaw(), 0));
+                    v.teleport(new Location(v.getWorld(), n[0] + 0.5, n[1], n[2] + 0.5, loc.getYaw(), 0),
+                            io.papermc.paper.entity.TeleportFlag.EntityState.RETAIN_PASSENGERS);
                     repaths = 0;
                 }
             }
