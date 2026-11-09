@@ -7,7 +7,7 @@ Build a settlement with settlers who work and live their own lives. Server-side 
 Right-click a **bell** → create a settlement. You get the **Settlement Ledger** (one per player).
 - **Bell menu**: recruit, show border, get a ledger, rename, disband.
 - **Ledger menu** (right-click with the ledger): storage targets, use all chests, settlers, when attacked, settlers may eat, guards use potions.
-The settlement border and work areas are shown with particles, only for you and only near you (`border-particle`, `work-area-particle` in the config).
+The settlement border is shown with particles, only for you and only near you (`border-particle`, `work-area-particle` in the config).
 Bell menu → **Show border**: When holding ledger / On / Off.
 
 ## Settlers
@@ -18,13 +18,13 @@ Bell menu → **Show border**: When holding ledger / On / Off.
 
 ## Workplaces
 
-Place a workplace block in the settlement and choose who works there (ledger on it → Choose settler), or turn on "Free settlers take jobs" at the bell. Ledger on it: its settings (sliders apply when you close the window).
-- **Composter** – farmer: harvests, replants and plants the farmland in its work area.
+Place a workplace block in the settlement and add as many settlers as you like (they all work in the whole settlement and share the work) (ledger on it → Choose settler), or turn on "Free settlers take jobs" at the bell. Ledger on it: its settings (sliders apply when you close the window).
+- **Composter** – farmer: harvests (all ripe crops first), then plants all farmland in the settlement.
 - **Smoker** – cook, **Blast furnace** – smelter, **Furnace** – furnace worker (choose: food, ores, stone & building, other):
   fetch things to cook/smelt and fuel (coal, charcoal, wood) from storage, collect the results.
-- **Loom** – herder: keeps each kind of animal in its area at the herd size: breeds with food from storage, slaughters the extra adults,
-  shears sheep (shears from storage), throws eggs for chicks, brings meat, wool, leather, eggs and feathers to storage.
-- **Fletching table** – lumberjack: fells real trees (logs on dirt with natural leaves) with an axe from storage, replants saplings.
+- **Loom** – herder (shuts gates right behind it; can climb over a fence with a carpet on top): keeps each kind of animal in its area at its own herd size (set per kind; 0 = leave alone): breeds with food from storage, slaughters the extra adults,
+  shears sheep (shears from storage), throws eggs into the chickens' pen for chicks, brings meat, wool, leather, eggs and feathers to storage.
+- **Fletching table** – lumberjack: fells real trees (logs on dirt with natural leaves) inside the settlement or just outside it (toggle), with an axe from storage, replants saplings.
 - **Smithing table** – smith: makes weapons, armor, bows and arrows from storage materials, only what you ask for
   (What to make: how many to keep in stock, 0 = don't make).
 

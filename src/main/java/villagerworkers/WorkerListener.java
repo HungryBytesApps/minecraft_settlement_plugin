@@ -130,10 +130,14 @@ final class WorkerListener implements Listener {
         if (Worker.Job.forBlock(b.getType()) != Worker.Job.NONE) {
             Town.Workplace wp = t.workplace(b.getLocation());
             if (wp != null) {
-                Worker w = wp.worker == null ? null : plugin.workers().get(wp.worker);
+                List<Worker> staff = new java.util.ArrayList<>();
+                for (java.util.UUID id : wp.workers) {
+                    Worker w = plugin.workers().get(id);
+                    if (w != null) staff.add(w);
+                }
                 t.workplaces.remove(Keys.ser(b.getLocation()));
                 plugin.towns().save();
-                if (w != null) Bukkit.getScheduler().runTask(plugin, w::leaveWorkplace);
+                for (Worker w : staff) Bukkit.getScheduler().runTask(plugin, w::leaveWorkplace);
             }
         } else if (Town.isStorage(b)) {
             t.setRule(b, null);

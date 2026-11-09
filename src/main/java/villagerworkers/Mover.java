@@ -31,6 +31,7 @@ final class Mover {
     private Location lastPos;
     private boolean arrived, failed;
     private final Map<Block, Integer> openedDoors = new HashMap<>();
+    private final java.util.Set<Block> passingGate = new java.util.HashSet<>();
 
     Mover(Worker w) {
         this.w = w;
@@ -207,17 +208,27 @@ final class Mover {
         Iterator<Map.Entry<Block, Integer>> it = openedDoors.entrySet().iterator();
         while (it.hasNext()) {
             Map.Entry<Block, Integer> e = it.next();
-            if (!now && tick < e.getValue()) continue;
             Block b = e.getKey();
             if (!(b.getBlockData() instanceof Openable o) || !o.isOpen()) {
                 it.remove();
                 continue;
             }
-            boolean blocked = !b.getWorld().getNearbyEntities(BoundingBox.of(b), en -> en instanceof LivingEntity).isEmpty();
-            if (blocked && !now) {
+            // Gates: shut right behind it, so no animal slips out (an animal in the way gets pushed back).
+            boolean gate = Tag.FENCE_GATES.isTagged(b.getType());
+            Location me = w.body.getLocation();
+            double gx = b.getX() + 0.5 - me.getX(), gz = b.getZ() + 0.5 - me.getZ();
+            double d2 = me.getWorld() != b.getWorld() ? 1e9 : gx * gx + gz * gz;
+            if (d2 < 0.7 * 0.7) passingGate.add(b);           // it's in the gate now
+            boolean through = passingGate.contains(b) && d2 > 1.3 * 1.3; // ...and out the other side
+            boolean shut = now || (gate && through);
+            if (!shut && tick < e.getValue()) continue;
+            boolean blocked = !b.getWorld().getNearbyEntities(BoundingBox.of(b), en -> en instanceof LivingEntity
+                    && (!gate || en.equals(w.body) || en instanceof org.bukkit.entity.Player)).isEmpty();
+            if (blocked && !shut) {
                 e.setValue(tick + 20);
                 continue;
             }
+            passingGate.remove(b);
             o.setOpen(false);
             b.setBlockData(o, true);
             boolean door = Tag.WOODEN_DOORS.isTagged(b.getType());

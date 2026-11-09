@@ -38,8 +38,10 @@ final class LumberjackJob {
             if (d != null) return d;
         }
         // Replant spots where a tree stood.
-        Block spot = Work.nearest(w, wp, 4, 4, b -> b.getType().isAir() && plantable(b.getRelative(BlockFace.DOWN))
-                && Replant.wanted(b) != null);
+        int radius = w.plugin.settings().townRadius();
+        boolean outside = wp.isOn("OUTSIDE");
+        Block spot = Work.nearestOf(w, Replant.all(), b -> b.getType().isAir() && plantable(b.getRelative(BlockFace.DOWN))
+                && b.getWorld() == t.world() && b.getLocation().distanceSquared(t.bell) <= (radius + 30.0) * (radius + 30.0));
         if (spot != null) {
             Material sapling = Replant.wanted(spot);
             if (w.count(sapling) > 0) {
@@ -54,8 +56,10 @@ final class LumberjackJob {
             if (f != null) return f;
             Replant.done(spot); // none anywhere: forget it
         }
-        Block base = Work.nearest(w, wp, 4, 4, b -> isTreeBase(b) && t.wants(b.getType(), w.plugin.settings().townRadius()));
+        // Real trees only (a log on the ground with natural leaves), inside or just outside the settlement.
+        Block base = Work.nearestOf(w, Fields.trees(t, radius, outside), b -> isTreeBase(b) && t.wants(b.getType(), radius));
         if (base != null) {
+            Work.claim(w, base);
             if (!Work.hasTool(w, "_AXE")) {
                 Activity f = Work.fetchTool(w, t, "_AXE", "an axe");
                 if (f != null) return f;
@@ -73,7 +77,7 @@ final class LumberjackJob {
             Activity d = Work.deposit(w, t, keep);
             if (d != null) return d;
         }
-        w.workStatus = base == null ? "Waiting for trees to grow" : "The settlement has enough wood";
+        w.workStatus = base == null ? (outside ? "No trees just outside the settlement" : "No trees in the settlement") : "The settlement has enough wood";
         return null;
     }
 
@@ -136,6 +140,10 @@ final class LumberjackJob {
 
         static void done(Block b) {
             spots.remove(b);
+        }
+
+        static List<Block> all() {
+            return new ArrayList<>(spots.keySet());
         }
     }
 

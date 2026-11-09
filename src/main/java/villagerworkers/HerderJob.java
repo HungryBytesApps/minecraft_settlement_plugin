@@ -40,6 +40,17 @@ final class HerderJob {
         return mayKill.contains(e.getUniqueId());
     }
 
+    static String kindName(EntityType kind) {
+        return switch (kind) {
+            case COW -> "Cows";
+            case SHEEP -> "Sheep";
+            case PIG -> "Pigs";
+            case CHICKEN -> "Chickens";
+            case RABBIT -> "Rabbits";
+            default -> kind.name();
+        };
+    }
+
     static boolean wanted(Material m) {
         return PRODUCTS.contains(m) || m.name().endsWith("_WOOL") || m == Material.RABBIT_FOOT;
     }
@@ -50,37 +61,44 @@ final class HerderJob {
             Activity d = Work.deposit(w, t, keep);
             if (d != null) return d;
         }
-        Map<EntityType, List<Animals>> herd = herd(wp);
-        int size = wp.herd;
+        Map<EntityType, List<Animals>> herd = herd(t, w.plugin.settings().townRadius());
 
         // Too many adults of a kind: slaughter one.
         for (Map.Entry<EntityType, List<Animals>> e : herd.entrySet()) {
+            int size = wp.herdSize(e.getKey());
+            if (size <= 0) continue; // leave this kind alone
             List<Animals> adults = adults(e.getValue());
             if (adults.size() > size) {
-                Animals a = adults.get(w.random.nextInt(adults.size()));
+                List<Animals> free = new ArrayList<>();
+                for (Animals a : adults) if (!Work.taken(w, a.getUniqueId())) free.add(a);
+                if (free.isEmpty()) continue;
+                Animals a = free.get(w.random.nextInt(free.size()));
+                Work.claim(w, a.getUniqueId());
                 return slaughter(w, a);
             }
         }
         // Sheep with wool: shear (needs shears).
         for (Animals a : herd.getOrDefault(EntityType.SHEEP, List.of())) {
-            if (a instanceof Sheep s && s.isAdult() && !s.isSheared()) {
+            if (a instanceof Sheep s && s.isAdult() && !s.isSheared() && !Work.taken(w, s.getUniqueId())) {
                 if (!Work.hasTool(w, "SHEARS")) {
                     Activity f = Work.fetchTool(w, t, "SHEARS", "shears");
                     if (f != null) return f;
                     break; // no shears in storage: no shearing
                 }
                 w.hold(Material.SHEARS);
+                Work.claim(w, s.getUniqueId());
                 return new Work.GoToEntity(w, s, 2.0, "Shearing a sheep", en -> shear(w, (Sheep) en));
             }
         }
         // Too few: breed (a pair that can), or throw eggs for chicks.
         String missingFood = null;
         for (Map.Entry<EntityType, List<Animals>> e : herd.entrySet()) {
+            int size = wp.herdSize(e.getKey());
             List<Animals> adults = adults(e.getValue());
-            if (adults.size() >= size || adults.size() < 2) continue;
+            if (size <= 0 || adults.size() >= size || adults.size() < 2) continue;
             if (e.getValue().size() - adults.size() >= size - adults.size()) continue; // enough young ones growing up
             List<Animals> ready = new ArrayList<>();
-            for (Animals a : adults) if (a.canBreed() && !a.isLoveMode()) ready.add(a);
+            for (Animals a : adults) if (a.canBreed() && !a.isLoveMode() && !Work.taken(w, a.getUniqueId())) ready.add(a);
             long inLove = adults.stream().filter(Animals::isLoveMode).count();
             if (ready.isEmpty() || (ready.size() < 2 && inLove == 0)) continue;
             List<Material> foods = FOOD.get(e.getKey());
@@ -92,32 +110,44 @@ final class HerderJob {
                 continue;
             }
             Animals a = ready.get(0);
+            Work.claim(w, a.getUniqueId());
             Material feed = food;
             w.workStatus = "Breeding";
             return new Work.GoToEntity(w, a, 2.0, "Feeding the " + e.getKey().name().toLowerCase(Locale.ROOT) + "s",
                     en -> feed(w, (Animals) en, feed));
         }
+        // Too few chickens: throw eggs into their pen.
         List<Animals> chickens = herd.getOrDefault(EntityType.CHICKEN, List.of());
-        if (!chickens.isEmpty() && chickens.size() < size && w.count(Material.EGG) > 0) {
-            Location spot = chickens.get(0).getLocation();
-            return new Work.GoToEntity(w, chickens.get(0), 3.0, "Throwing eggs", en -> throwEgg(w, spot));
+        int chickenSize = wp.herdSize(EntityType.CHICKEN);
+        if (!chickens.isEmpty() && chickens.size() < chickenSize && w.count(Material.EGG) > 0) {
+            Animals hen = chickens.get(w.random.nextInt(chickens.size()));
+            List<Location> pen = pen(hen);
+            w.workStatus = "Throwing eggs for chicks";
+            return new Work.GoToEntity(w, hen, 5.5, "Throwing eggs", en -> {
+                int eggs = Math.min(4, Math.min(w.count(Material.EGG), chickenSize - chickens.size()));
+                for (int i = 0; i < eggs; i++) {
+                    Location target = pen.get(w.random.nextInt(pen.size()));
+                    w.plugin.getServer().getScheduler().runTaskLater(w.plugin, () -> throwEgg(w, target), i * 10L);
+                }
+            });
         }
         if (Work.needsDeposit(w, keep, true)) {
             Activity d = Work.deposit(w, t, keep);
             if (d != null) return d;
         }
-        if (herd.isEmpty()) w.workStatus = "No animals in the work area";
+        if (herd.isEmpty()) w.workStatus = "No animals in the settlement";
         else if (missingFood != null) w.workStatus = "Needs " + missingFood + " to breed (none in storage)";
         else w.workStatus = "Looking after the animals";
         return null;
     }
 
-    /** Animals of the kinds it herds inside the work area, per kind. */
-    static Map<EntityType, List<Animals>> herd(Town.Workplace wp) {
+    /** Animals of the kinds it herds in the whole settlement, per kind. */
+    static Map<EntityType, List<Animals>> herd(Town t, int radius) {
         Map<EntityType, List<Animals>> out = new LinkedHashMap<>();
-        Location c = wp.loc.clone().add(0.5, 0, 0.5);
-        for (Animals a : c.getWorld().getNearbyEntitiesByType(Animals.class, c, wp.radius + 0.5, 6, wp.radius + 0.5)) {
-            if (!FOOD.containsKey(a.getType()) || !Work.inArea(wp, a.getLocation()) || a.isDead()) continue;
+        Location c = t.bell.clone().add(0.5, 0, 0.5);
+        if (c.getWorld() == null) return out;
+        for (Animals a : c.getWorld().getNearbyEntitiesByType(Animals.class, c, radius, 16, radius)) {
+            if (!FOOD.containsKey(a.getType()) || !t.contains(a.getLocation(), radius) || a.isDead()) continue;
             if (a.getPersistentDataContainer().has(Keys.TOWN)) continue; // never someone's settler
             out.computeIfAbsent(a.getType(), k -> new ArrayList<>()).add(a);
         }
@@ -159,14 +189,62 @@ final class HerderJob {
         a.getWorld().playSound(a.getLocation(), "minecraft:entity.generic.eat", SoundCategory.NEUTRAL, 0.8f, 1f);
     }
 
+    /** Throw one egg in an arc so it lands on this spot. */
     private static void throwEgg(Worker w, Location at) {
-        if (!w.take(Material.EGG, 1)) return;
+        if (!w.body.isValid() || !w.take(Material.EGG, 1)) return;
         w.hold(Material.EGG);
         w.anim.look(at);
-        Egg egg = w.body.launchProjectile(Egg.class);
-        egg.setVelocity(at.toVector().subtract(w.body.getEyeLocation().toVector()).normalize().multiply(0.6));
-        w.body.getWorld().playSound(w.body.getLocation(), "minecraft:entity.egg.throw", SoundCategory.NEUTRAL, 0.6f, 1f);
+        w.body.swingMainHand();
+        Location eye = w.body.getEyeLocation();
+        double dx = at.getX() - eye.getX(), dy = at.getY() + 0.2 - eye.getY(), dz = at.getZ() - eye.getZ();
+        double dist = Math.sqrt(dx * dx + dz * dz);
+        double time = Math.max(8, dist * 2.2); // ticks in the air
+        double g = 0.03;
+        org.bukkit.util.Vector v = new org.bukkit.util.Vector(dx / time * 1.05, (dy + 0.5 * g * time * time) / time, dz / time * 1.05);
+        Egg egg = w.body.launchProjectile(Egg.class, v);
+        egg.setVelocity(v);
+        w.body.getWorld().playSound(eye, "minecraft:entity.egg.throw", SoundCategory.NEUTRAL, 0.6f, 1f);
         w.plugin.getServer().getScheduler().runTaskLater(w.plugin, w::holdTool, 10L);
+    }
+
+    /**
+     * The fenced area an animal is in: all spots it could walk to without passing a fence, wall,
+     * gate or carpet-on-fence. If it's not fenced in (too big), just the spots around it.
+     */
+    static List<Location> pen(Entity animal) {
+        org.bukkit.World world = animal.getWorld();
+        org.bukkit.block.Block start = animal.getLocation().getBlock();
+        List<Location> cells = new ArrayList<>();
+        Set<Long> seen = new HashSet<>();
+        Deque<int[]> todo = new ArrayDeque<>();
+        todo.add(new int[]{start.getX(), start.getY(), start.getZ()});
+        seen.add(key(start.getX(), start.getY(), start.getZ()));
+        while (!todo.isEmpty() && cells.size() < 400) {
+            int[] c = todo.poll();
+            cells.add(new Location(world, c[0] + 0.5, c[1], c[2] + 0.5));
+            for (int[] d : new int[][]{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) {
+                for (int dy = -1; dy <= 1; dy++) {
+                    int x = c[0] + d[0], y = c[1] + dy, z = c[2] + d[1];
+                    if (!seen.add(key(x, y, z))) continue;
+                    org.bukkit.block.Block feet = world.getBlockAt(x, y, z);
+                    org.bukkit.Material m = feet.getType();
+                    if (org.bukkit.Tag.FENCE_GATES.isTagged(m) || m.name().endsWith("_CARPET")) continue; // the way out
+                    if (!PathFinder.walkable(world, x, y, z)) continue;
+                    todo.add(new int[]{x, y, z});
+                    break;
+                }
+            }
+        }
+        if (cells.size() >= 400) { // not fenced in: aim close to the animal
+            List<Location> near = new ArrayList<>();
+            for (Location l : cells) if (l.distanceSquared(animal.getLocation()) <= 3 * 3) near.add(l);
+            return near.isEmpty() ? List.of(animal.getLocation()) : near;
+        }
+        return cells;
+    }
+
+    private static long key(int x, int y, int z) {
+        return ((long) x & 0x3FFFFFF) << 38 | ((long) z & 0x3FFFFFF) << 12 | (y & 0xFFF);
     }
 
     private static boolean isFood(Material m) {

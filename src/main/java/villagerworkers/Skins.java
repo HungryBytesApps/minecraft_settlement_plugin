@@ -54,7 +54,7 @@ final class Skins {
         String low = pick.toLowerCase(Locale.ROOT);
         if (low.startsWith("player:") || low.startsWith("texture:") || low.startsWith("url:") || low.startsWith("value:") || pick.contains(":")) return pick;
         String og = s.skinGender().get(low);
-        boolean slim = "female".equals(og) || (og == null && r.nextBoolean());
+        boolean slim = "female".equals(og) || (og == null && r.nextBoolean()); // women slim, men wide
         return low + (slim ? ":slim" : ":wide");
     }
 

@@ -11,6 +11,7 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
@@ -146,6 +147,44 @@ final class Work {
     /** Get such a tool from storage (null if there is none). */
     static Activity fetchTool(Worker w, Town t, String suffix, String what) {
         return fetch(w, t, m -> m.name().endsWith(suffix), 1, "Getting " + what);
+    }
+
+    // ---- Sharing the work: what someone is busy with ----
+
+    private record Claim(java.util.UUID who, int until) {}
+
+    private static final Map<Object, Claim> claims = new HashMap<>();
+
+    /** Mark a crop, tree or animal as "mine" for a while, so others pick something else. */
+    static void claim(Worker w, Object thing) {
+        claims.put(thing, new Claim(w.body.getUniqueId(), Bukkit.getCurrentTick() + 600));
+    }
+
+    /** Is someone else busy with this? */
+    static boolean taken(Worker w, Object thing) {
+        Claim c = claims.get(thing);
+        if (c == null) return false;
+        if (Bukkit.getCurrentTick() > c.until()) {
+            claims.remove(thing);
+            return false;
+        }
+        return !c.who().equals(w.body.getUniqueId());
+    }
+
+    /** The nearest of these blocks that passes the test and nobody else is busy with. */
+    static Block nearestOf(Worker w, List<Block> blocks, Predicate<Block> test) {
+        Location me = w.body.getLocation();
+        Block best = null;
+        double bestD = Double.MAX_VALUE;
+        for (Block b : blocks) {
+            if (b.getWorld() != me.getWorld()) continue;
+            double dx = b.getX() + 0.5 - me.getX(), dy = b.getY() - me.getY(), dz = b.getZ() + 0.5 - me.getZ();
+            double d = dx * dx + dy * dy * 4 + dz * dz;
+            if (d >= bestD || w.isSkipped(b) || taken(w, b) || !test.test(b)) continue;
+            bestD = d;
+            best = b;
+        }
+        return best;
     }
 
     // ---- Finding things ----

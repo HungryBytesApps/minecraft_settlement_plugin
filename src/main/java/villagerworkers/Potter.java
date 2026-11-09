@@ -35,7 +35,7 @@ final class Potter implements Activity {
                 case SMITH -> "Sharpening tools";
                 default -> "Tidying up";
             };
-            int r = wp.job().usesArea ? Math.max(3, wp.radius) : 4;
+            int r = wp.job().usesArea ? 6 : 4;
             return new Potter(w, wp.loc.clone().add(0.5, 0, 0.5), r, label);
         }
         Location c = w.center();

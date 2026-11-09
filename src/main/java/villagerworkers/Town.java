@@ -26,16 +26,23 @@ final class Town {
         final Location loc;
         int radius;
         boolean enabled = true;
-        UUID worker;
+        /** Everyone who works here (no limit). */
+        final Set<UUID> workers = new LinkedHashSet<>();
         /** Herder: how many adults of each kind to keep. */
         int herd = 6;
+        /** Herder: herd size per kind of animal (EntityType name). 0 = leave that kind alone. */
+        final Map<String, Integer> herds = new HashMap<>();
+
+        int herdSize(org.bukkit.entity.EntityType type) {
+            return herds.getOrDefault(type.name(), herd);
+        }
         /** On/off settings (furnace categories): key → on. */
         final Map<String, Boolean> options = new HashMap<>();
 
         boolean isOn(String key) {
             Boolean v = options.get(key);
             if (v != null) return v;
-            return !key.equals("BUILDING") && !key.equals("OTHER"); // furnace: food and ores by default
+            return !key.equals("BUILDING") && !key.equals("OTHER") && !key.equals("OUTSIDE"); // furnace: food and ores; lumberjack: inside
         }
 
         Workplace(Location loc, int radius) {
@@ -277,14 +284,14 @@ final class Town {
         return workplaces.computeIfAbsent(Keys.ser(l), k -> new Workplace(l.getBlock().getLocation(), radius));
     }
 
-    /** Nearest enabled workplace nobody works at. */
+    /** The enabled workplace with the fewest workers (nearest first). */
     Workplace freeWorkplace(Location near) {
         Workplace best = null;
         double bestD = Double.MAX_VALUE;
         for (Workplace wp : workplaces.values()) {
-            if (!wp.enabled || wp.worker != null || wp.job() == Worker.Job.NONE) continue;
+            if (!wp.enabled || wp.job() == Worker.Job.NONE) continue;
             if (wp.loc.getWorld() != near.getWorld()) continue;
-            double d = wp.loc.distanceSquared(near);
+            double d = wp.workers.size() * 1_000_000.0 + wp.loc.distanceSquared(near);
             if (d < bestD) {
                 bestD = d;
                 best = wp;

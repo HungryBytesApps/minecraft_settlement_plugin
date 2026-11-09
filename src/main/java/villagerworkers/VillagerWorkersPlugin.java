@@ -59,7 +59,7 @@ public final class VillagerWorkersPlugin extends JavaPlugin {
     }
 
     /** Changes with every version I send, to check the right jar is installed. */
-    static final String BUILD = "2026-11-09 #20";
+    static final String BUILD = "2026-11-09 #23";
 
     @Override
     public boolean onCommand(org.bukkit.command.CommandSender sender, org.bukkit.command.Command cmd, String label, String[] args) {
@@ -126,10 +126,7 @@ public final class VillagerWorkersPlugin extends JavaPlugin {
         Worker w = makeSettler(at, t, ownerId, name);
         for (ItemStack it : carried) w.pockets.addItem(it);
         for (Town.Workplace wp : t.workplaces.values()) {
-            if (oldId.equals(wp.worker)) {
-                wp.worker = null;
-                if (workplace != null && workplace.equals(Keys.ser(wp.loc))) w.assign(wp);
-            }
+            if (wp.workers.remove(oldId) && workplace != null && workplace.equals(Keys.ser(wp.loc))) w.assign(wp);
         }
         w.save();
         towns.save();
@@ -302,7 +299,7 @@ public final class VillagerWorkersPlugin extends JavaPlugin {
         if (t != null) {
             t.settlers.remove(w.body.getUniqueId());
             for (Town.Workplace wp : t.workplaces.values()) {
-                if (w.body.getUniqueId().equals(wp.worker)) wp.worker = null;
+                wp.workers.remove(w.body.getUniqueId());
             }
             towns.save();
         }

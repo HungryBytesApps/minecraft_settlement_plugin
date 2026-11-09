@@ -97,8 +97,11 @@ final class Towns {
                 w.set("loc", Keys.ser(wp.loc));
                 w.set("radius", wp.radius);
                 w.set("enabled", wp.enabled);
-                if (wp.worker != null) w.set("worker", wp.worker.toString());
+                List<String> ids = new ArrayList<>();
+                for (UUID id : wp.workers) ids.add(id.toString());
+                w.set("workers", ids);
                 w.set("herd", wp.herd);
+                for (Map.Entry<String, Integer> h : wp.herds.entrySet()) w.set("herds." + h.getKey(), h.getValue());
                 for (Map.Entry<String, Boolean> o : wp.options.entrySet()) w.set("options." + o.getKey(), o.getValue());
             }
             for (Map.Entry<UUID, String> e : t.settlers.entrySet()) s.set("settlers." + e.getKey(), e.getValue());
@@ -158,11 +161,14 @@ final class Towns {
                     Town.Workplace wp = new Town.Workplace(loc, w.getInt("radius", plugin.settings().defaultRadius()));
                     wp.enabled = w.getBoolean("enabled", true);
                     wp.herd = w.getInt("herd", 6);
+                    ConfigurationSection herds = w.getConfigurationSection("herds");
+                    if (herds != null) for (String kind : herds.getKeys(false)) wp.herds.put(kind, herds.getInt(kind));
                     ConfigurationSection opts = w.getConfigurationSection("options");
                     if (opts != null) for (String opt : opts.getKeys(false)) wp.options.put(opt, opts.getBoolean(opt));
                     try {
                         String worker = w.getString("worker");
-                        if (worker != null) wp.worker = UUID.fromString(worker);
+                        if (worker != null) wp.workers.add(UUID.fromString(worker)); // older versions: one worker
+                        for (String id : w.getStringList("workers")) wp.workers.add(UUID.fromString(id));
                     } catch (IllegalArgumentException ignored) {
                     }
                     t.workplaces.put(Keys.ser(loc), wp);

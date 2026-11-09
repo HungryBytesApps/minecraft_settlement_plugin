@@ -188,7 +188,8 @@ final class Worker {
         // No skin yet, or a man's skin with a woman's name (or the other way around): pick one that fits the name.
         Settings st = plugin.settings();
         String g = Skins.gender(st, skin);
-        boolean mismatch = ("male".equals(g) && st.femaleNames().contains(name)) || ("female".equals(g) && st.maleNames().contains(name));
+        boolean mismatch = ("male".equals(g) && st.femaleNames().contains(name)) || ("female".equals(g) && st.maleNames().contains(name))
+                || (skin != null && "male".equals(g) && skin.endsWith(":slim")) || (skin != null && "female".equals(g) && skin.endsWith(":wide"));
         if (skin == null || mismatch) {
             skin = Skins.skinFor(st, name, random);
             body.getPersistentDataContainer().set(Keys.SKIN, PersistentDataType.STRING, skin);
@@ -315,7 +316,7 @@ final class Worker {
     void assign(Town.Workplace wp) {
         leaveWorkplace();
         guard = false;
-        wp.worker = body.getUniqueId();
+        wp.workers.add(body.getUniqueId());
         workplace = wp.loc;
         save();
         plugin.towns().save();
@@ -324,10 +325,7 @@ final class Worker {
 
     void leaveWorkplace() {
         Town.Workplace wp = workplace();
-        if (wp != null && body.getUniqueId().equals(wp.worker)) {
-            wp.worker = null;
-            plugin.towns().save();
-        }
+        if (wp != null && wp.workers.remove(body.getUniqueId())) plugin.towns().save();
         if (workplace != null) {
             workplace = null;
             save();
@@ -373,14 +371,9 @@ final class Worker {
     private void checkWorkplace(Town t) {
         if (guard) return;
         Town.Workplace wp = workplace();
-        if (workplace != null && (wp == null || !wp.enabled || wp.job() == Job.NONE
-                || (wp.worker != null && !wp.worker.equals(body.getUniqueId())))) {
-            leaveWorkplace();
+        if (workplace != null && (wp == null || !wp.enabled || wp.job() == Job.NONE || !wp.workers.contains(body.getUniqueId()))) {
+            leaveWorkplace(); // gone, switched off, or you sent it away
             wp = null;
-        }
-        if (wp != null && wp.worker == null) {
-            wp.worker = body.getUniqueId();
-            plugin.towns().save();
         }
         if (wp == null && t.autoJobs) {
             Town.Workplace free = t.freeWorkplace(body.getLocation());
@@ -610,8 +603,7 @@ final class Worker {
                 default -> false;
             };
             if (!want) continue;
-            Town.Workplace wp = workplace();
-            if (job() != Job.FARMER && (wp == null || !Work.inArea(wp, item.getLocation()))) continue;
+
             Map<Integer, ItemStack> left = pockets.addItem(stack.clone());
             if (left.isEmpty()) {
                 item.remove();

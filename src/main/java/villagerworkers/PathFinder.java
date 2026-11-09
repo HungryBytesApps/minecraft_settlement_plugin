@@ -16,8 +16,8 @@ import java.util.*;
 final class PathFinder {
     private PathFinder() {}
 
-    private static final int MAX_NODES = 2500;
-    private static final int MAX_RANGE = 48;
+    private static final int MAX_NODES = 6000; // the whole settlement can be a workplace now
+    private static final int MAX_RANGE = 112;
     private static final int[][] DIRS = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}, {1, 1}, {1, -1}, {-1, 1}, {-1, -1}};
 
     private static final class Node {
@@ -147,6 +147,11 @@ final class PathFinder {
     static boolean walkable(World w, int x, int y, int z) {
         if (y - 1 < w.getMinHeight() || y + 1 >= w.getMaxHeight()) return false;
         if (!w.isChunkLoaded(x >> 4, z >> 4)) return false;
+        // A carpet: stand on it (on a floor, or on top of a fence or wall: the way over a fence).
+        Block feet = w.getBlockAt(x, y, z);
+        if (feet.getType().name().endsWith("_CARPET")) {
+            return !w.getBlockAt(x, y - 1, z).isPassable() && passable(w.getBlockAt(x, y + 1, z));
+        }
         return standable(w.getBlockAt(x, y - 1, z))
                 && passable(w.getBlockAt(x, y, z))
                 && passable(w.getBlockAt(x, y + 1, z));

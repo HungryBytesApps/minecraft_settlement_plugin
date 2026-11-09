@@ -61,12 +61,22 @@ final class FarmerJob {
             Activity d = deposit(w, t);
             if (d != null) return d;
         }
-        Block crop = nearest(w, wp, b -> ripe(b) && !w.isSkipped(b) && t.wants(PRODUCE.get(b.getType()), radius));
-        if (crop != null && !storageFull) return harvest(w, crop);
+        // All farmland in the settlement; several farmers share it (each claims what it works on).
+        List<Block> land = Fields.farmland(t, radius);
+        Block field = storageFull ? null : Work.nearestOf(w, land, f -> {
+            Block c = f.getRelative(BlockFace.UP);
+            return ripe(c) && !w.isSkipped(c) && t.wants(PRODUCE.get(c.getType()), radius);
+        });
+        if (field != null) {
+            Work.claim(w, field);
+            return harvest(w, field.getRelative(BlockFace.UP));
+        }
 
-        Block spot = nearest(w, wp, b -> b.getType() == Material.AIR
-                && b.getRelative(BlockFace.DOWN).getType() == Material.FARMLAND && !w.isSkipped(b));
+        Block empty = Work.nearestOf(w, land, f -> f.getType() == Material.FARMLAND && f.getRelative(BlockFace.UP).getType() == Material.AIR
+                && !w.isSkipped(f.getRelative(BlockFace.UP)));
+        Block spot = empty == null ? null : empty.getRelative(BlockFace.UP);
         if (spot != null) {
+            Work.claim(w, empty);
             if (hasAnySeed(w)) return plant(w, spot);
             Activity fetch = fetchSeeds(w, t);
             if (fetch != null) return fetch;
@@ -195,7 +205,8 @@ final class FarmerJob {
     }
 
     private static boolean anyRipe(Worker w, Town.Workplace wp) {
-        return nearest(w, wp, FarmerJob::ripe) != null;
+        Town t = w.town();
+        return t != null && Work.nearestOf(w, Fields.farmland(t, w.plugin.settings().townRadius()), f -> ripe(f.getRelative(BlockFace.UP))) != null;
     }
 
     /** Nearest block in the work area (around the composter) matching the test. */

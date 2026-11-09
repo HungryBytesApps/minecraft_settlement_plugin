@@ -190,11 +190,11 @@ final class Menus {
         head(body, "Settlement");
         text(body, "Your settlement is everything within " + s.townRadius() + " blocks of this bell. Settlers live, work and sleep here.");
         text(body, "Bell: recruit settlers (" + costText(s.recruitCost()) + "), show the border, get a ledger, rename or disband.");
-        text(body, "Show border: particles mark the settlement and the work areas. When holding ledger / On / Off.");
+        text(body, "Show border: particles mark the settlement. When holding ledger / On / Off.");
         head(body, "Settlement Ledger");
         text(body, "One per player. Right-click with it:");
         text(body, "• a chest or barrel: may settlers put things in / take things out?");
-        text(body, "• a composter: its work radius, who works there, on/off.");
+        text(body, "• a workstation: who works there (as many as you like), on/off and its settings.");
         text(body, "• (right-click a settler, no ledger needed) its menu: rename, inventory (take things out or put things in), worker or guard, guard settings, leave workplace, dismiss.");
         text(body, "• a wild villager: hire it. It walks to the settlement, or follows you if it's far away.");
         text(body, "• anything else: storage targets, chests, settlers, defense settings.");
@@ -202,12 +202,12 @@ final class Menus {
         text(body, "Choose who works where: ledger on a workplace → Choose settler. With Free settlers take jobs: On (bell) they take empty workplaces by themselves. A composter is a farm: the farmer harvests, replants and plants the fields around it.");
         text(body, "They fetch seeds from chests they may take from, and bring the harvest to a chest that already has that item (or the nearest one with room). No room left: they keep it in their pockets and you get a message.");
         head(body, "Workplaces");
-        text(body, "Place one in the settlement and choose who works there. Right-click it with the ledger for its settings.");
-        text(body, "• Composter: farmer. Harvests and replants the farmland in its work area.");
+        text(body, "Place one in the settlement and add as many settlers as you like; they all work in the whole settlement. Right-click it with the ledger for its settings.");
+        text(body, "• Composter: farmer. Harvests and replants all farmland in the settlement.");
         text(body, "• Smoker: cook. Cooks raw food from storage. Blast furnace: smelter. Smelts ores and raw metal.");
         text(body, "• Furnace: furnace worker. Choose what it may smelt: food, ores, stone & building, other.");
-        text(body, "• Loom: herder. Keeps each kind of animal in its area at the herd size: breeds (with food from storage), slaughters the extra adults, shears sheep (shears from storage), throws eggs for chicks.");
-        text(body, "• Fletching table: lumberjack. Fells real trees in its area (needs an axe from storage) and replants.");
+        text(body, "• Loom: herder. Keeps each kind of animal in the settlement at its own herd size (0 = leave that kind alone): breeds (with food from storage), slaughters the extra adults, shears sheep (shears from storage), throws eggs into the chickens' pen for chicks.");
+        text(body, "• Fletching table: lumberjack. Fells real trees inside or outside the settlement (your choice; needs an axe from storage) and replants.");
         text(body, "• Smithing table: smith. Makes weapons, armor, bows and arrows from storage, only what you ask for in What to make.");
         text(body, "Furnace jobs need fuel in storage (coal, charcoal or wood). Everyone stops when storage targets are reached.");
         text(body, "When they're not working they take walks, chat, read, make music together and visit each other at work.");
@@ -245,7 +245,7 @@ final class Menus {
 
     private static int freeWorkplaces(Town t) {
         int free = 0;
-        for (Town.Workplace wp : t.workplaces.values()) if (wp.enabled && wp.worker == null) free++;
+        for (Town.Workplace wp : t.workplaces.values()) if (wp.enabled && wp.workers.isEmpty()) free++;
         return free;
     }
 
@@ -336,33 +336,34 @@ final class Menus {
     static void workplace(VillagerWorkersPlugin plugin, Player p, Town t, Town.Workplace wp) {
         Settings s = plugin.settings();
         Worker.Job job = wp.job();
-        Worker worker = wp.worker == null ? null : plugin.workers().get(wp.worker);
-        String who = wp.worker == null ? "nobody" : worker != null ? worker.name : t.settlers.getOrDefault(wp.worker, "?") + " (far away)";
         List<DialogBody> body = new ArrayList<>();
-        body.add(line("Works here: " + who + (worker != null && !worker.workStatus.isEmpty() ? " — " + worker.workStatus : ""), NamedTextColor.GRAY));
+        if (wp.workers.isEmpty()) body.add(line("Nobody works here yet.", NamedTextColor.GRAY));
+        for (java.util.UUID id : wp.workers) {
+            Worker wk = plugin.workers().get(id);
+            String who = wk != null ? wk.name + (wk.workStatus.isEmpty() ? "" : " — " + wk.workStatus) : t.settlers.getOrDefault(id, "?") + " (far away)";
+            body.add(line(who, NamedTextColor.GRAY));
+        }
+        if (job.usesArea) body.add(line("Works in the whole settlement.", NamedTextColor.DARK_GRAY));
 
         // Sliders: applied when you click any button or close the window (no Save button).
         List<DialogInput> inputs = new ArrayList<>();
-        if (job.usesArea) {
-            inputs.add(DialogInput.numberRange("radius", Component.text("Work radius"), 2, s.maxRadius())
-                    .step(1f).initial((float) Math.min(wp.radius, s.maxRadius())).width(220).build());
-        }
         if (job == Worker.Job.HERDER) {
-            inputs.add(DialogInput.numberRange("herd", Component.text("Herd size (adults of each kind)"), 2, 20)
-                    .step(1f).initial((float) Math.max(2, Math.min(20, wp.herd))).width(220).build());
+            // Herd size per kind of animal (0 = the herder leaves that kind alone).
+            for (org.bukkit.entity.EntityType kind : HerderJob.FOOD.keySet()) {
+                inputs.add(DialogInput.numberRange("herd_" + kind.name().toLowerCase(Locale.ROOT),
+                                Component.text(HerderJob.kindName(kind) + " (0 = leave alone)"), 0, 20)
+                        .step(1f).initial((float) Math.max(0, Math.min(20, wp.herdSize(kind)))).width(220).build());
+            }
         }
         java.util.function.BiConsumer<DialogResponseView, Player> apply = (view, pl) -> {
             boolean changed = false;
-            Float r = job.usesArea ? view.getFloat("radius") : null;
-            if (r != null && Math.round(r) != wp.radius) {
-                wp.radius = Math.max(2, Math.min(s.maxRadius(), Math.round(r)));
-                changed = true;
-                plugin.borders().flash(pl);
-            }
-            Float h = job == Worker.Job.HERDER ? view.getFloat("herd") : null;
-            if (h != null && Math.round(h) != wp.herd) {
-                wp.herd = Math.max(2, Math.min(20, Math.round(h)));
-                changed = true;
+            if (job == Worker.Job.HERDER) {
+                for (org.bukkit.entity.EntityType kind : HerderJob.FOOD.keySet()) {
+                    Float h = view.getFloat("herd_" + kind.name().toLowerCase(Locale.ROOT));
+                    if (h == null || Math.round(h) == wp.herdSize(kind)) continue;
+                    wp.herds.put(kind.name(), Math.max(0, Math.min(20, Math.round(h))));
+                    changed = true;
+                }
             }
             if (changed) plugin.towns().save();
         };
@@ -390,19 +391,18 @@ final class Menus {
             buttons.add(wbutton(plugin, apply, "What to make", NamedTextColor.AQUA, "How many of each item to keep in storage (0 = don't make)",
                     w, pl -> TargetsMenu.smith(plugin, pl, t)));
         }
-        if (job.usesArea) {
-            buttons.add(wbutton(plugin, apply, "Show work area", NamedTextColor.WHITE, "Shows the work area for 10 seconds",
-                    w, pl -> plugin.borders().flash(pl)));
+        if (job == Worker.Job.LUMBERJACK) {
+            boolean outside = wp.isOn("OUTSIDE");
+            buttons.add(wbutton(plugin, apply, "Cut trees: " + (outside ? "Outside settlement" : "Inside settlement"), NamedTextColor.WHITE,
+                    "Only real trees (logs on the ground with natural leaves), never your buildings", w, pl -> {
+                        wp.options.put("OUTSIDE", !wp.isOn("OUTSIDE"));
+                        plugin.towns().save();
+                        workplace(plugin, pl, t, wp);
+                    }));
         }
-        buttons.add(wbutton(plugin, apply, "Choose settler", NamedTextColor.WHITE, "Pick who works here", w, pl -> chooseWorker(plugin, pl, t, wp)));
-        if (wp.worker != null) {
-            buttons.add(wbutton(plugin, apply, "Send " + (worker != null ? worker.name : "worker") + " away", NamedTextColor.RED, "This settler stops working here", w, pl -> {
-                Worker cur = wp.worker == null ? null : plugin.workers().get(wp.worker);
-                if (cur != null) cur.leaveWorkplace();
-                wp.worker = null;
-                plugin.towns().save();
-                workplace(plugin, pl, t, wp);
-            }));
+        buttons.add(wbutton(plugin, apply, "Add settler", NamedTextColor.GREEN, "Another settler works here too", w, pl -> chooseWorker(plugin, pl, t, wp)));
+        if (!wp.workers.isEmpty()) {
+            buttons.add(wbutton(plugin, apply, "Send someone away", NamedTextColor.RED, "A settler stops working here", w, pl -> removeWorker(plugin, pl, t, wp)));
         }
         ActionButton close = wbutton(plugin, apply, "Close", null, null, 100, pl -> {});
         show(p, job.title + "'s workplace", body, inputs, DialogType.multiAction(buttons).columns(2).exitAction(close).build());
@@ -420,15 +420,30 @@ final class Menus {
                 }, ONCE));
     }
 
+    private static void removeWorker(VillagerWorkersPlugin plugin, Player p, Town t, Town.Workplace wp) {
+        List<ActionButton> buttons = new ArrayList<>();
+        for (java.util.UUID id : new ArrayList<>(wp.workers)) {
+            Worker wk = plugin.workers().get(id);
+            String name = wk != null ? wk.name : t.settlers.getOrDefault(id, "?");
+            buttons.add(button(plugin, name, NamedTextColor.RED, null, 200, pl -> {
+                Worker cur = plugin.workers().get(id);
+                if (cur != null) cur.leaveWorkplace();
+                wp.workers.remove(id);
+                plugin.towns().save();
+                workplace(plugin, pl, t, wp);
+            }));
+        }
+        show(p, "Send someone away", List.of(), List.of(), DialogType.multiAction(buttons).columns(1)
+                .exitAction(button(plugin, "Back", NamedTextColor.GRAY, null, 100, pl -> workplace(plugin, pl, t, wp))).build());
+    }
+
     private static void chooseWorker(VillagerWorkersPlugin plugin, Player p, Town t, Town.Workplace wp) {
         List<ActionButton> buttons = new ArrayList<>();
         for (Worker w : plugin.workers().all()) {
             if (!t.id.equals(w.townId)) continue;
             String current = w.guard ? "now guard" : w.job() == Worker.Job.NONE ? "no workplace" : "now " + w.job().title.toLowerCase(Locale.ROOT);
+            if (wp.workers.contains(w.body.getUniqueId())) continue; // already works here
             buttons.add(button(plugin, w.name + " (" + current + ")", NamedTextColor.WHITE, null, 200, pl -> {
-                Worker prev = wp.worker == null ? null : plugin.workers().get(wp.worker);
-                if (prev != null && prev != w) prev.leaveWorkplace();
-                wp.worker = null;
                 w.assign(wp);
                 pl.sendActionBar(Component.text(w.name + " now works here.", NamedTextColor.GREEN));
                 workplace(plugin, pl, t, wp);
