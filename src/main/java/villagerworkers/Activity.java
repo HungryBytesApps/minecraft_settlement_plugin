@@ -11,6 +11,11 @@ interface Activity {
     /** Shown in the worker's menu, e.g. "Taking a walk". */
     String label();
 
+    /** Free time (chatting, walking, music...): stopped as soon as there's work to do. */
+    default boolean freeTime() {
+        return false;
+    }
+
     /** Can another worker interrupt this to start a chat? */
     default boolean interruptible() {
         return false;

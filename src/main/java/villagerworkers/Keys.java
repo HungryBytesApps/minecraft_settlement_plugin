@@ -10,7 +10,7 @@ import org.bukkit.plugin.Plugin;
 final class Keys {
     private Keys() {}
 
-    static NamespacedKey OWNER, NAME, TOWN, WORKPLACE, BED, TEMP, LEDGER;
+    static NamespacedKey OWNER, NAME, TOWN, WORKPLACE, BED, TEMP, LEDGER, SKIN, POCKETS, ROLE, STANCE, POST, GUARD_RADIUS, WEAPON;
 
     static void init(Plugin p) {
         OWNER = new NamespacedKey(p, "owner");
@@ -18,8 +18,15 @@ final class Keys {
         TOWN = new NamespacedKey(p, "town");
         WORKPLACE = new NamespacedKey(p, "workplace");
         BED = new NamespacedKey(p, "bed");
-        TEMP = new NamespacedKey(p, "temp"); // marks speech bubbles
+        TEMP = new NamespacedKey(p, "temp"); // marks speech bubbles and seats
         LEDGER = new NamespacedKey(p, "ledger");
+        SKIN = new NamespacedKey(p, "skin");
+        POCKETS = new NamespacedKey(p, "pockets");
+        ROLE = new NamespacedKey(p, "role");
+        STANCE = new NamespacedKey(p, "stance");
+        POST = new NamespacedKey(p, "post");
+        GUARD_RADIUS = new NamespacedKey(p, "guard_radius");
+        WEAPON = new NamespacedKey(p, "weapon");
     }
 
     static String ser(Location l) {

@@ -47,6 +47,26 @@ final class Town {
     final Map<String, boolean[]> chestRules = new HashMap<>();
     final Map<Material, Integer> targets = new LinkedHashMap<>();
     final Map<String, Workplace> workplaces = new LinkedHashMap<>();
+    /** What non-guards do when hostile mobs get in. */
+    enum Reaction {
+        TAKE_COVER("Take cover"), CALL_TO_ARMS("Call to arms");
+
+        final String label;
+
+        Reaction(String label) {
+            this.label = label;
+        }
+    }
+
+    Reaction reaction = Reaction.TAKE_COVER;
+    boolean mayEat = true;
+    boolean guardPotions = false;
+
+    // Runtime (not saved): the alarm.
+    boolean alarm;
+    final List<org.bukkit.entity.LivingEntity> hostiles = new ArrayList<>();
+    int quietTicks;
+
     /** All settlers of this town (also the ones in unloaded chunks): id → name. */
     final Map<UUID, String> settlers = new LinkedHashMap<>();
 

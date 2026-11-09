@@ -1,7 +1,6 @@
 package villagerworkers;
 
 import org.bukkit.Location;
-import org.bukkit.SoundCategory;
 
 import java.util.List;
 
@@ -9,9 +8,6 @@ import java.util.List;
 final class Chat {
     private Chat() {}
 
-    private static final String[] SOUNDS = {
-            "minecraft:entity.villager.ambient", "minecraft:entity.villager.ambient",
-            "minecraft:entity.villager.yes", "minecraft:entity.villager.trade"};
 
     static Activity start(Worker a, Worker b) {
         Talk talk = new Talk(a, b);
@@ -33,11 +29,11 @@ final class Chat {
 
         void tick() {
             t++;
-            if (t > 900 || !a.villager.isValid() || !b.villager.isValid()) {
+            if (t > 900 || !a.body.isValid() || !b.body.isValid()) {
                 done = true;
                 return;
             }
-            Location la = a.villager.getLocation(), lb = b.villager.getLocation();
+            Location la = a.body.getLocation(), lb = b.body.getLocation();
             if (!talking) {
                 if (la.distanceSquared(lb) <= 2.6 * 2.6) {
                     talking = true;
@@ -51,8 +47,8 @@ final class Chat {
                 }
                 return;
             }
-            Mover.lookAt(a.villager, b.villager.getEyeLocation());
-            Mover.lookAt(b.villager, a.villager.getEyeLocation());
+            Mover.lookAt(a.body, b.body.getEyeLocation());
+            Mover.lookAt(b.body, a.body.getEyeLocation());
             if (endAt >= 0) {
                 if (t >= endAt) done = true;
                 return;
@@ -60,11 +56,8 @@ final class Chat {
             if (t < nextLine) return;
             Worker speaker = said % 2 == 0 ? a : b;
             List<String> chat = a.plugin.settings().chatLines();
-            Bubbles.say(a.plugin, speaker.villager, chat.get(speaker.random.nextInt(chat.size())), 45);
-            String sound = SOUNDS[speaker.random.nextInt(SOUNDS.length)];
-            speaker.villager.getWorld().playSound(speaker.villager.getLocation(), sound, SoundCategory.NEUTRAL,
-                    0.7f, 0.85f + speaker.random.nextFloat() * 0.3f);
-            if (speaker.random.nextInt(5) == 0) speaker.villager.shakeHead();
+            Bubbles.say(a.plugin, speaker.body, chat.get(speaker.random.nextInt(chat.size())), 45);
+            if (speaker.random.nextInt(3) == 0) speaker.body.swingMainHand(); // a little gesture
             said++;
             nextLine = t + 50 + speaker.random.nextInt(30);
             if (said >= lines) endAt = t + 45;
@@ -100,12 +93,17 @@ final class Chat {
         public void stop() {
             talk.done = true;
             me.mover.stop();
-            Bubbles.clear(me.villager);
+            Bubbles.clear(me.body);
         }
 
         @Override
         public String label() {
             return "Chatting with " + other.name;
+        }
+
+        @Override
+        public boolean freeTime() {
+            return true;
         }
     }
 }

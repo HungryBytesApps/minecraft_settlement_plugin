@@ -43,8 +43,8 @@ final class GoAndDo implements Activity {
             }
             if (w.mover.arrived() || closeEnough(center)) {
                 w.mover.stop();
-                Mover.lookAt(w.villager, target.getLocation().add(0.5, 0.5, 0.5));
-                w.villager.swingMainHand();
+                Mover.lookAt(w.body, target.getLocation().add(0.5, 0.5, 0.5));
+                w.body.swingMainHand();
                 action.accept(target);
                 phase = 2;
                 wait = 8;
@@ -59,7 +59,7 @@ final class GoAndDo implements Activity {
     }
 
     private boolean closeEnough(Location center) {
-        Location l = w.villager.getLocation();
+        Location l = w.body.getLocation();
         double dx = l.getX() - center.getX(), dz = l.getZ() - center.getZ();
         return dx * dx + dz * dz <= reach * reach && Math.abs(l.getY() - center.getY()) <= 1.5;
     }

@@ -10,7 +10,7 @@ import org.bukkit.SoundCategory;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
-import org.bukkit.entity.TextDisplay;
+import org.bukkit.entity.Display;
 import org.bukkit.entity.Villager;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -50,7 +50,7 @@ final class WorkerListener implements Listener {
                 // The bell still rings; this just opens the town menu (or offers to found a town).
                 Town t = plugin.towns().atBell(b);
                 if (t != null) {
-                    if (canManage(p, t)) Menus.town(plugin, p, t);
+                    if (canManage(p, t)) Menus.bell(plugin, p, t);
                     else p.sendActionBar(Component.text("The bell of " + t.name + ".", NamedTextColor.GRAY));
                 } else if (plugin.canFoundTown(p, b, false)) {
                     Menus.foundTown(plugin, p, b);
@@ -86,7 +86,7 @@ final class WorkerListener implements Listener {
             e.setCancelled(true);
             Town t = plugin.ownTown(p);
             if (t == null) p.sendActionBar(Component.text("Right-click a bell to create a settlement first.", NamedTextColor.YELLOW));
-            else Menus.town(plugin, p, t);
+            else Menus.ledger(plugin, p, t);
         }
     }
 
@@ -142,22 +142,23 @@ final class WorkerListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGH)
     public void onClickVillager(PlayerInteractEntityEvent e) {
-        if (e.getHand() != EquipmentSlot.HAND || !(e.getRightClicked() instanceof Villager v)) return;
+        if (e.getHand() != EquipmentSlot.HAND) return;
         Player p = e.getPlayer();
         boolean ledger = Ledger.is(p.getInventory().getItemInMainHand());
-        Worker w = plugin.workers().get(v.getUniqueId());
+        Worker w = plugin.workers().get(e.getRightClicked().getUniqueId());
         if (w != null) {
             e.setCancelled(true);
             if (ledger && w.canManage(p)) {
                 Menus.settler(plugin, p, w);
             } else {
-                Bubbles.say(plugin, v, GREETINGS.get(w.random.nextInt(GREETINGS.size())), 40);
-                Mover.lookAt(v, p.getEyeLocation());
-                v.getWorld().playSound(v.getLocation(), "minecraft:entity.villager.ambient", SoundCategory.NEUTRAL, 0.8f, 1f);
+                Bubbles.say(plugin, w.body, GREETINGS.get(w.random.nextInt(GREETINGS.size())), 40);
+                if (!w.body.isInsideVehicle()) Mover.lookAt(w.body, p.getEyeLocation());
+                w.body.swingMainHand();
             }
             return;
         }
-        if (ledger && v.isAdult() && !Worker.isWorker(v)) {
+        if (!(e.getRightClicked() instanceof Villager v)) return;
+        if (ledger && v.isAdult() && !VillagerWorkersPlugin.isOldSettler(v)) {
             e.setCancelled(true);
             Town t = plugin.ownTown(p);
             if (t == null) p.sendActionBar(Component.text("Right-click a bell to create a settlement first.", NamedTextColor.YELLOW));
@@ -173,27 +174,127 @@ final class WorkerListener implements Listener {
         }
     }
 
+    // ---- One ledger per player ----
+
+    @EventHandler(ignoreCancelled = true)
+    public void onPickup(org.bukkit.event.entity.EntityPickupItemEvent e) {
+        if (e.getEntity() instanceof Player p && Ledger.is(e.getItem().getItemStack()) && Ledger.has(p)) e.setCancelled(true);
+    }
+
+    /** Moving a ledger from a chest (or anywhere else) into your inventory when you already have one. */
+    @EventHandler(ignoreCancelled = true)
+    public void onInventoryClick(org.bukkit.event.inventory.InventoryClickEvent e) {
+        if (!(e.getWhoClicked() instanceof Player p) || e.getClickedInventory() == null) return;
+        boolean ownInv = e.getClickedInventory().equals(p.getInventory());
+        org.bukkit.inventory.ItemStack moving = null;
+        if (!ownInv && (e.isShiftClick() || e.getClick() == org.bukkit.event.inventory.ClickType.NUMBER_KEY)) {
+            moving = e.getCurrentItem(); // from a chest straight into your inventory
+        } else if (ownInv && !e.isShiftClick()) {
+            moving = e.getCursor();      // putting a ledger from the cursor into your inventory
+        }
+        if (Ledger.is(moving) && countLedgers(p) >= 1) {
+            e.setCancelled(true);
+            p.sendActionBar(Component.text("You can only carry one Settlement Ledger.", NamedTextColor.YELLOW));
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onInventoryDrag(org.bukkit.event.inventory.InventoryDragEvent e) {
+        if (!(e.getWhoClicked() instanceof Player p) || !Ledger.is(e.getOldCursor()) || countLedgers(p) < 1) return;
+        int top = e.getView().getTopInventory().getSize();
+        for (int slot : e.getRawSlots()) {
+            if (slot >= top) {
+                e.setCancelled(true);
+                return;
+            }
+        }
+    }
+
+    private static int countLedgers(Player p) {
+        int n = 0;
+        for (org.bukkit.inventory.ItemStack it : p.getInventory().getContents()) if (Ledger.is(it)) n += it.getAmount();
+        return n;
+    }
+
+    // ---- Combat ----
+
+    /** Who's really behind this damage (the shooter of an arrow, etc.). */
+    private static Entity source(Entity damager) {
+        if (damager instanceof org.bukkit.entity.Projectile pr && pr.getShooter() instanceof Entity shooter) return shooter;
+        if (damager instanceof org.bukkit.entity.TNTPrimed tnt && tnt.getSource() != null) return tnt.getSource();
+        if (damager instanceof org.bukkit.entity.AreaEffectCloud cloud && cloud.getSource() instanceof Entity src) return src;
+        return damager;
+    }
+
+    @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGH)
+    public void onDamage(org.bukkit.event.entity.EntityDamageByEntityEvent e) {
+        Entity victim = e.getEntity();
+        Entity src = source(e.getDamager());
+        boolean victimSettler = Worker.isWorker(victim);
+        boolean bySettler = Worker.isWorker(src);
+        // Players can't hurt settlers; settlers don't hurt each other, players or animals.
+        if (victimSettler && (src instanceof Player || bySettler)) {
+            e.setCancelled(true);
+            if (e.getDamager() instanceof org.bukkit.entity.Projectile pr && !(pr instanceof org.bukkit.entity.Trident)) pr.remove();
+            return;
+        }
+        if (bySettler && !Combat.hostile(victim)) {
+            e.setCancelled(true);
+            if (e.getDamager() instanceof org.bukkit.entity.Arrow a) a.remove();
+            return;
+        }
+        if (victimSettler) {
+            Worker w = plugin.workers().get(victim.getUniqueId());
+            if (w == null) return;
+            w.lastHurt = Bukkit.getCurrentTick();
+            if (src instanceof org.bukkit.entity.LivingEntity le && Combat.hostile(le)) w.lastAttacker = le;
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true, priority = EventPriority.MONITOR)
+    public void onAnyDamage(org.bukkit.event.entity.EntityDamageEvent e) {
+        if (!Worker.isWorker(e.getEntity())) return;
+        Worker w = plugin.workers().get(e.getEntity().getUniqueId());
+        if (w != null) w.lastHurt = Bukkit.getCurrentTick();
+    }
+
     @EventHandler
     public void onDeath(EntityDeathEvent e) {
         Worker w = plugin.workers().get(e.getEntity().getUniqueId());
         if (w == null) return;
+        // Drop what they carried and wore (the item in hand is only a copy).
+        e.getDrops().clear();
+        e.setDroppedExp(0);
+        for (org.bukkit.inventory.ItemStack it : w.pockets.getContents()) {
+            if (it != null && !it.getType().isAir()) e.getDrops().add(it.clone());
+        }
+        w.pockets.clear();
+        org.bukkit.inventory.EntityEquipment eq = w.body.getEquipment();
+        for (EquipmentSlot slot : new EquipmentSlot[]{EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET}) {
+            org.bukkit.inventory.ItemStack it = eq.getItem(slot);
+            if (it != null && !it.getType().isAir()) e.getDrops().add(it.clone());
+        }
         String name = w.name;
         plugin.forget(w);
         Player owner = Bukkit.getPlayer(w.owner);
-        if (owner != null) owner.sendMessage(Component.text("Your settler " + name + " has died.", NamedTextColor.RED));
+        if (owner != null) owner.sendMessage(Component.text("✝ " + (w.guard ? "Guard " : "Settler ") + name + " has died. Their things lie where they fell.", NamedTextColor.RED));
     }
 
     @EventHandler
     public void onAdd(EntityAddToWorldEvent e) {
         Entity en = e.getEntity();
-        // Leftover speech bubbles (normally never saved).
-        if (en instanceof TextDisplay && en.getPersistentDataContainer().has(Keys.TEMP, PersistentDataType.BYTE)) {
+        // Leftover speech bubbles / seats (normally never saved).
+        if ((en instanceof Display || Seats.isSeatEntity(en)) && en.getPersistentDataContainer().has(Keys.TEMP, PersistentDataType.BYTE)) {
             Bukkit.getScheduler().runTask(plugin, en::remove);
             return;
         }
         if (Worker.isWorker(en)) {
             Bukkit.getScheduler().runTask(plugin, () -> {
-                if (en.isValid()) plugin.load((Villager) en);
+                if (en.isValid()) plugin.load((org.bukkit.entity.Mannequin) en);
+            });
+        } else if (en instanceof Villager v && VillagerWorkersPlugin.isOldSettler(v)) {
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                if (v.isValid()) plugin.convertOld(v);
             });
         }
     }

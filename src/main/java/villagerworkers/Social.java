@@ -1,33 +1,111 @@
 package villagerworkers;
 
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.SoundCategory;
-import org.bukkit.Tag;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
-import org.bukkit.block.data.type.Bed;
+import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Player;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 
-/** Free-time behaviour: walks, chats, looking around, sleeping at night, walking to town. */
+/**
+ * Free time: walks, chats, music, reading, sitting, visiting someone at work, and in the evening
+ * getting together at the gathering spot. Also: walking to the settlement / following the owner.
+ */
 final class Social {
     private Social() {}
 
-    private static final Map<Block, UUID> claimedBeds = new HashMap<>();
-
+    /** Something to do during the day when there's no work. */
     static Activity idle(Worker w) {
         int r = w.random.nextInt(100);
-        if (r < 30) {
-            Worker partner = findPartner(w);
+        if (r < 20) {
+            Worker partner = partner(w);
             if (partner != null) return Chat.start(w, partner);
+        } else if (r < 32) {
+            Activity band = Music.start(w);
+            if (band != null) return band;
+        } else if (r < 47) {
+            Block seat = Seats.nearestFree(w.body.getLocation(), 12, w);
+            if (seat != null && w.town() != null && w.town().contains(seat.getLocation(), w.plugin.settings().socialRadius() + 8)) {
+                return new Sit(w, seat, w.random.nextBoolean() ? Mode.READ : Mode.IDLE, 400 + w.random.nextInt(600), null);
+            }
+        } else if (r < 57) {
+            return new Read(w, 300 + w.random.nextInt(300));
+        } else if (r < 67) {
+            Worker busy = someoneWorking(w);
+            if (busy != null) return new Visit(w, busy);
         }
-        if (r < 85) {
+        if (r < 92) {
             Activity walk = stroll(w);
             if (walk != null) return walk;
         }
         return new LookAround(w, 60 + w.random.nextInt(100));
+    }
+
+    /** In the evening: get together with the others at the gathering spot. */
+    static Activity evening(Worker w, Town t) {
+        Location spot = Seats.gatheringSpot(t, w.plugin.settings().townRadius());
+        Block seat = Seats.nearestFree(spot, 8, w);
+        if (seat != null) return new Sit(w, seat, Mode.SOCIAL, Integer.MAX_VALUE, spot);
+        return new Hangout(w, spot);
+    }
+
+    private static Worker partner(Worker w) {
+        List<Worker> options = new ArrayList<>();
+        Location me = w.body.getLocation();
+        for (Worker o : w.plugin.workers().all()) {
+            if (o == w || o.body.getWorld() != me.getWorld() || !o.available() || o.body.isInsideVehicle()) continue;
+            if (o.body.getLocation().distanceSquared(me) <= 20 * 20) options.add(o);
+        }
+        return options.isEmpty() ? null : options.get(w.random.nextInt(options.size()));
+    }
+
+    private static Worker someoneWorking(Worker w) {
+        List<Worker> options = new ArrayList<>();
+        Location me = w.body.getLocation();
+        for (Worker o : w.plugin.workers().all()) {
+            if (o == w || o.job() == Worker.Job.NONE || o.body.getWorld() != me.getWorld()) continue;
+            if (o.body.getLocation().distanceSquared(me) <= 32 * 32) options.add(o);
+        }
+        return options.isEmpty() ? null : options.get(w.random.nextInt(options.size()));
+    }
+
+    /** Someone says something (speech bubble) and gestures. */
+    static void say(Worker w, Location lookAt) {
+        List<String> lines = w.plugin.settings().chatLines();
+        if (lookAt != null) Mover.lookAt(w.body, lookAt);
+        Bubbles.say(w.plugin, w.body, lines.get(w.random.nextInt(lines.size())), 50);
+        if (w.random.nextBoolean()) w.body.swingMainHand();
+    }
+
+    /** The nearest other settler within 8 blocks (to look at while talking). */
+    static Location nearestOther(Worker w) {
+        Location me = w.body.getLocation();
+        Location best = null;
+        double bestD = 64;
+        for (Worker o : w.plugin.workers().all()) {
+            if (o == w || o.body.getWorld() != me.getWorld()) continue;
+            double d = o.body.getLocation().distanceSquared(me);
+            if (d < bestD) {
+                bestD = d;
+                best = o.body.getEyeLocation();
+            }
+        }
+        return best;
+    }
+
+    static float yaw(BlockFace face) {
+        return switch (face) {
+            case SOUTH -> 0f;
+            case WEST -> 90f;
+            case NORTH -> 180f;
+            case EAST -> -90f;
+            default -> 0f;
+        };
     }
 
     // ---- Walk ----
@@ -35,15 +113,13 @@ final class Social {
     static Activity stroll(Worker w) {
         Location c = w.center();
         World world = c.getWorld();
-        if (world == null || world != w.villager.getWorld()) return null;
+        if (world == null || world != w.body.getWorld()) return null;
         int r = w.plugin.settings().socialRadius();
         for (int tries = 0; tries < 12; tries++) {
             int x = c.getBlockX() + w.random.nextInt(r * 2 + 1) - r;
             int z = c.getBlockZ() + w.random.nextInt(r * 2 + 1) - r;
             for (int y = c.getBlockY() + 4; y >= c.getBlockY() - 6; y--) {
-                if (PathFinder.walkable(world, x, y, z)) {
-                    return new Stroll(w, new Location(world, x + 0.5, y, z + 0.5));
-                }
+                if (PathFinder.walkable(world, x, y, z)) return new Stroll(w, new Location(world, x + 0.5, y, z + 0.5));
             }
         }
         return null;
@@ -85,57 +161,13 @@ final class Social {
         }
 
         @Override
-        public boolean interruptible() {
+        public boolean freeTime() {
             return true;
         }
-    }
-
-    // ---- Walking to town ----
-
-    /** Walk to the town bell; if it's too far to find a path, follow the owner; otherwise wait. */
-    static final class GoHome implements Activity {
-        private final Worker w;
-        private final Town t;
-        private int time, repathIn;
-        private String label = "Walking to the settlement";
-
-        GoHome(Worker w, Town t) {
-            this.w = w;
-            this.t = t;
-        }
 
         @Override
-        public boolean tick() {
-            Location me = w.villager.getLocation();
-            if (t.contains(me, w.plugin.settings().socialRadius() + 4)) return true;
-            if (--repathIn <= 0) {
-                repathIn = 40;
-                Player owner = org.bukkit.Bukkit.getPlayer(w.owner);
-                boolean sameWorld = t.bell.getWorld() == me.getWorld();
-                double dx = sameWorld ? t.bell.getX() - me.getX() : 1e9, dz = sameWorld ? t.bell.getZ() - me.getZ() : 1e9;
-                Location bell = t.bell.clone().add(0.5, -1, 0.5);
-                if (dx * dx + dz * dz <= 46 * 46 && w.mover.go(bell, 4, w.plugin.settings().walkSpeed())) {
-                    label = "Walking to the settlement";
-                } else if (owner != null && owner.getWorld() == me.getWorld() && owner.getLocation().distanceSquared(me) <= 24 * 24) {
-                    w.mover.go(owner.getLocation(), 2.5, w.plugin.settings().workSpeed());
-                    label = "Following " + owner.getName();
-                } else {
-                    w.mover.stop();
-                    label = "Waiting to be shown the way";
-                    if (w.random.nextInt(8) == 0) Bubbles.say(w.plugin, w.villager, "Which way to the settlement?", 50);
-                }
-            }
-            return ++time > 2400;
-        }
-
-        @Override
-        public void stop() {
-            w.mover.stop();
-        }
-
-        @Override
-        public String label() {
-            return label;
+        public boolean interruptible() {
+            return true;
         }
     }
 
@@ -151,8 +183,8 @@ final class Social {
         }
 
         static void glance(Worker w) {
-            float yaw = w.villager.getLocation().getYaw() + w.random.nextInt(120) - 60;
-            w.villager.setRotation(yaw, w.random.nextInt(30) - 15);
+            float yaw = w.body.getLocation().getYaw() + w.random.nextInt(120) - 60;
+            w.body.setRotation(yaw, w.random.nextInt(30) - 15);
         }
 
         @Override
@@ -167,146 +199,347 @@ final class Social {
         }
 
         @Override
+        public boolean freeTime() {
+            return true;
+        }
+
+        @Override
         public boolean interruptible() {
             return true;
         }
     }
 
-    // ---- Chat ----
+    // ---- Read (standing) ----
 
-    private static Worker findPartner(Worker w) {
-        List<Worker> options = new ArrayList<>();
-        Location me = w.villager.getLocation();
-        for (Worker o : w.plugin.workers().all()) {
-            if (o == w || o.villager.getWorld() != me.getWorld()) continue;
-            if (o.villager.getLocation().distanceSquared(me) > 20 * 20) continue;
-            if (o.villager.isSleeping() || o.villager.isInsideVehicle()) continue;
-            if (o.activity != null && !o.activity.interruptible()) continue;
-            options.add(o);
-        }
-        return options.isEmpty() ? null : options.get(w.random.nextInt(options.size()));
-    }
-
-    // ---- Sleep ----
-
-    static Activity sleep(Worker w) {
-        Block bed = findBed(w);
-        if (bed == null) return null;
-        return new Sleep(w, bed);
-    }
-
-    private static Block findBed(Worker w) {
-        UUID me = w.villager.getUniqueId();
-        if (w.bed != null && w.bed.getWorld() == w.villager.getWorld()) {
-            Block b = w.bed.getBlock();
-            if (isFreeBedHead(b, me)) {
-                claimedBeds.put(b, me);
-                return b;
-            }
-            claimedBeds.remove(b);
-            w.bed = null;
-        }
-        Location c = w.center();
-        World world = c.getWorld();
-        if (world == null || world != w.villager.getWorld()) return null;
-        int r = Math.min(24, w.plugin.settings().socialRadius() + 8);
-        Block best = null;
-        double bestD = Double.MAX_VALUE;
-        for (int x = c.getBlockX() - r; x <= c.getBlockX() + r; x++) {
-            for (int z = c.getBlockZ() - r; z <= c.getBlockZ() + r; z++) {
-                if (!world.isChunkLoaded(x >> 4, z >> 4)) continue;
-                for (int y = c.getBlockY() - 4; y <= c.getBlockY() + 4; y++) {
-                    Block b = world.getBlockAt(x, y, z);
-                    if (!Tag.BEDS.isTagged(b.getType()) || !isFreeBedHead(b, me) || w.isSkipped(b)) continue;
-                    double d = b.getLocation().distanceSquared(c);
-                    if (d < bestD) {
-                        bestD = d;
-                        best = b;
-                    }
-                }
-            }
-        }
-        if (best != null) {
-            claimedBeds.put(best, me);
-            w.bed = best.getLocation();
-            w.save();
-        }
-        return best;
-    }
-
-    private static boolean isFreeBedHead(Block b, UUID me) {
-        if (!(b.getBlockData() instanceof Bed bed) || bed.getPart() != Bed.Part.HEAD) return false;
-        UUID owner = claimedBeds.get(b);
-        if (owner != null && !owner.equals(me)) return false;
-        return !bed.isOccupied();
-    }
-
-    static void releaseBed(Worker w) {
-        claimedBeds.values().removeIf(id -> id.equals(w.villager.getUniqueId()));
-    }
-
-    private static final class Sleep implements Activity {
+    private static final class Read implements Activity {
         private final Worker w;
-        private final Block bed;
-        private int phase, time;
+        private int left;
+        private boolean started;
 
-        Sleep(Worker w, Block bed) {
+        Read(Worker w, int ticks) {
             this.w = w;
-            this.bed = bed;
+            this.left = ticks;
+        }
+
+        @Override
+        public boolean tick() {
+            if (!started) {
+                started = true;
+                w.hold(Material.BOOK);
+            }
+            readTick(w, left);
+            return --left <= 0;
+        }
+
+        @Override
+        public void stop() {
+            w.holdTool();
+        }
+
+        @Override
+        public String label() {
+            return "Reading a book";
+        }
+
+        @Override
+        public boolean freeTime() {
+            return true;
+        }
+
+        @Override
+        public boolean interruptible() {
+            return true;
+        }
+    }
+
+    /** Head down, a page turn now and then. */
+    static void readTick(Worker w, int t) {
+        if (t % 20 == 0) w.body.setRotation(w.body.getLocation().getYaw(), 40);
+        if (t % 70 == 0 && w.random.nextBoolean()) {
+            w.body.getWorld().playSound(w.body.getLocation(), "minecraft:item.book.page_turn", SoundCategory.NEUTRAL, 0.5f, 1f);
+        }
+    }
+
+    // ---- Sit ----
+
+    enum Mode { IDLE, READ, SOCIAL }
+
+    /** Walk to a seat and sit: just relaxing, reading, or (in the evening) hanging out with the group. */
+    private static final class Sit implements Activity {
+        private final Worker w;
+        private final Block seat;
+        private final Mode mode;
+        private final Location lookAt;
+        private int left, phase, time, next;
+        private ArmorStand stand;
+        private Music.Instrument playing;
+        private int playUntil, readUntil;
+
+        Sit(Worker w, Block seat, Mode mode, int ticks, Location lookAt) {
+            this.w = w;
+            this.seat = seat;
+            this.mode = mode;
+            this.left = ticks;
+            this.lookAt = lookAt;
         }
 
         @Override
         public boolean tick() {
             if (phase == 0) {
                 phase = 1;
-                if (!w.mover.go(bed.getLocation().add(0.5, 0.5, 0.5), 2.0, w.plugin.settings().walkSpeed())) {
-                    w.skip(bed, 2400);
+                if (!w.mover.go(seat.getLocation().add(0.5, 1, 0.5), 1.3, w.plugin.settings().walkSpeed())) {
+                    w.skip(seat, 1200);
                     return true;
                 }
             }
             if (phase == 1) {
-                if (!w.isNight()) return true;
-                if (w.mover.failed() || ++time > 900) {
-                    w.skip(bed, 2400);
+                if (mode == Mode.SOCIAL && !w.isNight()) return true;
+                if (w.mover.failed() || ++time > 600) {
+                    w.skip(seat, 1200);
                     return true;
                 }
                 if (!w.mover.arrived()) return false;
-                if (!w.villager.sleep(bed.getLocation())) {
-                    w.skip(bed, 2400);
+                stand = Seats.sit(w, seat, lookAt);
+                if (stand == null) {
+                    w.skip(seat, 600);
                     return true;
                 }
+                if (mode == Mode.READ) w.hold(Material.BOOK);
                 phase = 2;
+                next = 40 + w.random.nextInt(80);
             }
-            if (phase == 2) {
-                if (!w.isNight() || !w.villager.isSleeping()) return true;
-                if (++time % 200 == 0 && w.random.nextInt(4) == 0) {
-                    w.villager.getWorld().playSound(w.villager.getLocation(), "minecraft:entity.villager.ambient",
-                            SoundCategory.NEUTRAL, 0.3f, 0.6f); // snoring...
+            if (stand == null || !stand.isValid() || !w.body.isInsideVehicle()) return true;
+            time++;
+            switch (mode) {
+                case READ -> readTick(w, time);
+                case IDLE -> {
+                    if (time % 50 == 0 && w.random.nextInt(3) == 0) LookAround.glance(w);
+                }
+                case SOCIAL -> {
+                    if (!w.isNight()) return true;
+                    socialTick();
                 }
             }
-            return false;
+            return --left <= 0;
+        }
+
+        /** Evening: talk, play some music, read a bit, look around. */
+        private void socialTick() {
+            if (playing != null) {
+                if (time >= playUntil) {
+                    playing = null;
+                    w.holdTool();
+                } else if (time % (6 + w.random.nextInt(4)) == 0) {
+                    Music.note(w, playing);
+                }
+                return;
+            }
+            if (readUntil > 0) {
+                if (time >= readUntil) {
+                    readUntil = 0;
+                    w.holdTool();
+                } else {
+                    readTick(w, time);
+                }
+                return;
+            }
+            if (time < next) return;
+            next = time + 80 + w.random.nextInt(140);
+            int r = w.random.nextInt(100);
+            if (r < 55) {
+                say(w, nearestOther(w));
+            } else if (r < 72) {
+                playing = Music.random(w.random);
+                w.hold(playing.item());
+                playUntil = time + 100 + w.random.nextInt(80);
+            } else if (r < 85) {
+                w.hold(Material.BOOK);
+                readUntil = time + 200;
+            } else {
+                Location other = nearestOther(w);
+                if (other != null) Mover.lookAt(w.body, other);
+                else LookAround.glance(w);
+            }
         }
 
         @Override
         public void stop() {
             w.mover.stop();
-            if (w.villager.isSleeping()) w.villager.wakeup();
+            if (stand != null) Seats.standUp(w, seat, stand);
+            w.holdTool();
         }
 
         @Override
         public String label() {
-            return phase == 2 ? "Sleeping" : "Going to bed";
+            if (phase < 2) return mode == Mode.SOCIAL ? "Going to meet the others" : "Looking for a place to sit";
+            return switch (mode) {
+                case READ -> "Reading on a bench";
+                case IDLE -> "Sitting down";
+                case SOCIAL -> playing != null ? "Playing music with the others" : "Hanging out with the others";
+            };
+        }
+
+        @Override
+        public boolean freeTime() {
+            return true;
+        }
+
+        @Override
+        public boolean interruptible() {
+            return mode != Mode.SOCIAL && phase < 2;
         }
     }
 
-    static float yaw(BlockFace face) {
-        return switch (face) {
-            case SOUTH -> 0f;
-            case WEST -> 90f;
-            case NORTH -> 180f;
-            case EAST -> -90f;
-            default -> 0f;
-        };
+    /** Evening without a free seat: stand around the gathering spot with the others. */
+    private static final class Hangout implements Activity {
+        private final Worker w;
+        private final Location spot;
+        private int phase, time, next;
+
+        Hangout(Worker w, Location spot) {
+            this.w = w;
+            this.spot = spot;
+        }
+
+        @Override
+        public boolean tick() {
+            if (!w.isNight()) return true;
+            if (phase == 0) {
+                phase = 1;
+                double a = w.random.nextDouble() * Math.PI * 2;
+                Location around = spot.clone().add(Math.cos(a) * 2.5, 0, Math.sin(a) * 2.5);
+                if (!w.mover.go(around, 1.5, w.plugin.settings().walkSpeed())) return true;
+            }
+            if (phase == 1) {
+                if (w.mover.failed() || ++time > 600) return true;
+                if (!w.mover.arrived()) return false;
+                phase = 2;
+                next = 40;
+            }
+            time++;
+            if (time >= next) {
+                next = time + 100 + w.random.nextInt(140);
+                if (w.random.nextInt(100) < 60) say(w, nearestOther(w));
+                else Mover.lookAt(w.body, spot.clone().add(0, 1.4, 0));
+            }
+            return time > 2400; // re-check now and then (a seat may have come free)
+        }
+
+        @Override
+        public void stop() {
+            w.mover.stop();
+        }
+
+        @Override
+        public String label() {
+            return phase < 2 ? "Going to meet the others" : "Hanging out with the others";
+        }
+
+        @Override
+        public boolean freeTime() {
+            return true;
+        }
     }
 
+    // ---- Visit someone at work ----
+
+    private static final class Visit implements Activity {
+        private final Worker w, other;
+        private int time, phase;
+
+        Visit(Worker w, Worker other) {
+            this.w = w;
+            this.other = other;
+        }
+
+        @Override
+        public boolean tick() {
+            if (!other.body.isValid() || ++time > 600) return true;
+            if (phase == 0) {
+                if (time % 30 == 1 && !w.mover.go(other.body.getLocation(), 2.5, w.plugin.settings().walkSpeed())) return true;
+                if (w.body.getLocation().distanceSquared(other.body.getLocation()) <= 3 * 3) {
+                    w.mover.stop();
+                    phase = 1;
+                    time = 0;
+                    say(w, other.body.getEyeLocation());
+                }
+                return false;
+            }
+            Mover.lookAt(w.body, other.body.getEyeLocation());
+            if (time == 45) {
+                List<String> lines = other.plugin.settings().chatLines();
+                Bubbles.say(other.plugin, other.body, lines.get(other.random.nextInt(lines.size())), 45);
+            }
+            return time > 100;
+        }
+
+        @Override
+        public void stop() {
+            w.mover.stop();
+        }
+
+        @Override
+        public String label() {
+            return "Visiting " + other.name;
+        }
+
+        @Override
+        public boolean freeTime() {
+            return true;
+        }
+
+        @Override
+        public boolean interruptible() {
+            return true;
+        }
+    }
+
+    // ---- Walking to the settlement ----
+
+    /** Walk to the bell; if it's too far to find a path, follow the owner; otherwise wait. */
+    static final class GoHome implements Activity {
+        private final Worker w;
+        private final Town t;
+        private int time, repathIn;
+        private String label = "Walking to the settlement";
+
+        GoHome(Worker w, Town t) {
+            this.w = w;
+            this.t = t;
+        }
+
+        @Override
+        public boolean tick() {
+            Location me = w.body.getLocation();
+            if (t.contains(me, w.plugin.settings().socialRadius() + 4)) return true;
+            if (--repathIn <= 0) {
+                repathIn = 40;
+                Player owner = org.bukkit.Bukkit.getPlayer(w.owner);
+                boolean sameWorld = t.bell.getWorld() == me.getWorld();
+                double dx = sameWorld ? t.bell.getX() - me.getX() : 1e9, dz = sameWorld ? t.bell.getZ() - me.getZ() : 1e9;
+                Location bell = t.bell.clone().add(0.5, -1, 0.5);
+                if (dx * dx + dz * dz <= 46 * 46 && w.mover.go(bell, 4, w.plugin.settings().walkSpeed())) {
+                    label = "Walking to the settlement";
+                } else if (owner != null && owner.getWorld() == me.getWorld() && owner.getLocation().distanceSquared(me) <= 24 * 24) {
+                    w.mover.go(owner.getLocation(), 2.5, w.plugin.settings().workSpeed());
+                    label = "Following " + owner.getName();
+                } else {
+                    w.mover.stop();
+                    label = "Waiting to be shown the way";
+                    if (w.random.nextInt(8) == 0) Bubbles.say(w.plugin, w.body, "Which way to the settlement?", 50);
+                }
+            }
+            return ++time > 2400;
+        }
+
+        @Override
+        public void stop() {
+            w.mover.stop();
+        }
+
+        @Override
+        public String label() {
+            return label;
+        }
+    }
 }

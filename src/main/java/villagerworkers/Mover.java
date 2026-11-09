@@ -8,7 +8,6 @@ import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.data.Openable;
 import org.bukkit.entity.LivingEntity;
-import org.bukkit.entity.Villager;
 import org.bukkit.util.BoundingBox;
 import org.bukkit.util.Vector;
 
@@ -48,7 +47,7 @@ final class Mover {
     }
 
     private boolean repath() {
-        List<int[]> p = PathFinder.find(w.villager.getLocation(), target, reach);
+        List<int[]> p = PathFinder.find(w.body.getLocation(), target, reach);
         if (p == null) {
             path = null;
             failed = true;
@@ -58,7 +57,7 @@ final class Mover {
         path = p;
         idx = 0;
         stuckTicks = 0;
-        lastPos = w.villager.getLocation();
+        lastPos = w.body.getLocation();
         if (p.isEmpty()) {
             path = null;
             arrived = true;
@@ -76,14 +75,14 @@ final class Mover {
     }
 
     private void halt() {
-        Vector v = w.villager.getVelocity();
-        w.villager.setVelocity(new Vector(0, Math.min(0, v.getY()), 0));
+        Vector v = w.body.getVelocity();
+        w.body.setVelocity(new Vector(0, Math.min(0, v.getY()), 0));
     }
 
     void tick() {
         closeDoors(false);
         if (path == null) return;
-        Villager v = w.villager;
+        LivingEntity v = w.body;
         if (v.isInsideVehicle() || v.isSleeping()) return;
         Location loc = v.getLocation();
 
@@ -129,12 +128,12 @@ final class Mover {
         }
     }
 
-    static void face(Villager v, double dx, double dz) {
+    static void face(LivingEntity v, double dx, double dz) {
         float yaw = (float) Math.toDegrees(Math.atan2(-dx, dz));
         v.setRotation(yaw, 0);
     }
 
-    static void lookAt(Villager v, Location at) {
+    static void lookAt(LivingEntity v, Location at) {
         Location l = v.getEyeLocation();
         double dx = at.getX() - l.getX(), dy = at.getY() - l.getY(), dz = at.getZ() - l.getZ();
         float yaw = (float) Math.toDegrees(Math.atan2(-dx, dz));

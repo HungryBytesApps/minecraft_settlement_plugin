@@ -4,7 +4,6 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
 import org.bukkit.Color;
-import org.bukkit.HeightMap;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
@@ -13,6 +12,7 @@ import org.bukkit.SoundCategory;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Mannequin;
 import org.bukkit.entity.Villager;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataContainer;
@@ -28,6 +28,7 @@ public final class VillagerWorkersPlugin extends JavaPlugin {
     private Settings settings;
     private Workers workers;
     private Towns towns;
+    private Borders borders;
     private final Random random = new Random();
 
     @Override
@@ -40,13 +41,18 @@ public final class VillagerWorkersPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new WorkerListener(this), this);
 
         for (World w : getServer().getWorlds()) {
+            for (Mannequin m : w.getEntitiesByClass(Mannequin.class)) {
+                if (Worker.isWorker(m)) load(m);
+            }
             for (Villager v : w.getEntitiesByClass(Villager.class)) {
-                if (Worker.isWorker(v)) load(v);
+                if (isOldSettler(v)) convertOld(v);
             }
         }
         getServer().getScheduler().runTaskTimer(this, workers::tick, 1L, 1L);
-        // Holding the ledger shows the nearby settlement border.
-        getServer().getScheduler().runTaskTimer(this, this::ledgerBorders, 20L, 10L);
+        // Holding the ledger shows the settlement border.
+        borders = new Borders(this);
+        getServer().getScheduler().runTaskTimer(this, borders::tick, 20L, 10L);
+        getServer().getScheduler().runTaskTimer(this, () -> Defense.tick(this), 40L, 20L);
     }
 
     @Override
@@ -59,14 +65,57 @@ public final class VillagerWorkersPlugin extends JavaPlugin {
     Workers workers() { return workers; }
     Towns towns() { return towns; }
 
-    /** A settler came into the world: start it, or release it if its town is gone. */
-    void load(Villager v) {
-        String townId = v.getPersistentDataContainer().get(Keys.TOWN, PersistentDataType.STRING);
+    /** A settler came into the world: start it, or turn it into a villager if its settlement is gone. */
+    void load(Mannequin m) {
+        String townId = m.getPersistentDataContainer().get(Keys.TOWN, PersistentDataType.STRING);
         if (towns.get(townId) == null) {
-            strip(v);
+            becomeVillager(m);
             return;
         }
-        workers.register(v);
+        workers.register(m);
+    }
+
+    /** Settlers from the previous version were villagers. */
+    static boolean isOldSettler(Villager v) {
+        return v.getPersistentDataContainer().has(Keys.TOWN, PersistentDataType.STRING);
+    }
+
+    /** Swap an old villager settler for a Mannequin with the same name, settlement and workplace. */
+    void convertOld(Villager v) {
+        PersistentDataContainer pdc = v.getPersistentDataContainer();
+        Town t = towns.get(pdc.get(Keys.TOWN, PersistentDataType.STRING));
+        String name = pdc.getOrDefault(Keys.NAME, PersistentDataType.STRING, "Settler");
+        String owner = pdc.get(Keys.OWNER, PersistentDataType.STRING);
+        String workplace = pdc.get(Keys.WORKPLACE, PersistentDataType.STRING);
+        for (NamespacedKey key : new NamespacedKey[]{Keys.OWNER, Keys.NAME, Keys.TOWN, Keys.WORKPLACE, Keys.BED}) pdc.remove(key);
+        if (t == null) {
+            v.customName(null);
+            v.setCustomNameVisible(false);
+            v.setAware(true);
+            return;
+        }
+        UUID oldId = v.getUniqueId();
+        List<ItemStack> carried = new java.util.ArrayList<>();
+        for (ItemStack it : v.getInventory().getContents()) if (it != null && !it.getType().isAir()) carried.add(it.clone());
+        Location at = v.getLocation();
+        v.remove();
+        t.settlers.remove(oldId);
+        UUID ownerId;
+        try {
+            ownerId = UUID.fromString(owner);
+        } catch (RuntimeException e) {
+            ownerId = t.owner;
+        }
+        Worker w = makeSettler(at, t, ownerId, name);
+        for (ItemStack it : carried) w.pockets.addItem(it);
+        for (Town.Workplace wp : t.workplaces.values()) {
+            if (oldId.equals(wp.worker)) {
+                wp.worker = null;
+                if (workplace != null && workplace.equals(Keys.ser(wp.loc))) w.assign(wp);
+            }
+        }
+        w.save();
+        towns.save();
     }
 
     Town ownTown(Player p) {
@@ -99,8 +148,10 @@ public final class VillagerWorkersPlugin extends JavaPlugin {
         registerComposters(t);
         bell.getWorld().playSound(bell.getLocation(), "minecraft:ui.toast.challenge_complete", SoundCategory.BLOCKS, 0.6f, 1.2f);
         p.sendActionBar(Component.text(t.name + " has been created! Here's your Settlement Ledger.", NamedTextColor.GREEN));
-        for (ItemStack left : p.getInventory().addItem(Ledger.create()).values()) p.getWorld().dropItem(p.getLocation(), left);
-        Menus.town(this, p, t);
+        if (!Ledger.has(p)) {
+            for (ItemStack left : p.getInventory().addItem(Ledger.create()).values()) p.getWorld().dropItem(p.getLocation(), left);
+        }
+        Menus.bell(this, p, t);
     }
 
     /** Composters that were already there become workplaces. */
@@ -151,8 +202,7 @@ public final class VillagerWorkersPlugin extends JavaPlugin {
         }
         for (ItemStack cost : settings.recruitCost()) p.getInventory().removeItem(cost.clone());
         String name = settings.names().get(random.nextInt(settings.names().size()));
-        Villager v = spawn.getWorld().spawn(spawn, Villager.class, nv -> nv.setProfession(Villager.Profession.NONE));
-        makeSettler(v, t, p.getUniqueId(), name);
+        makeSettler(spawn, t, p.getUniqueId(), name);
         p.sendActionBar(Component.text(name + " heard about " + t.name + " and is on the way!", NamedTextColor.GREEN));
     }
 
@@ -185,116 +235,60 @@ public final class VillagerWorkersPlugin extends JavaPlugin {
     void hire(Player p, Villager v, Town t, String name) {
         if (!v.isValid() || Worker.isWorker(v) || towns.get(t.id) == null || !hasRoom(p, t)) return;
         if (name == null || name.isBlank()) name = settings.names().get(random.nextInt(settings.names().size()));
-        makeSettler(v, t, p.getUniqueId(), name.trim());
-        v.getWorld().playSound(v.getLocation(), "minecraft:entity.villager.celebrate", SoundCategory.NEUTRAL, 1f, 1f);
+        Location at = v.getLocation();
+        v.getWorld().playSound(at, "minecraft:entity.villager.celebrate", SoundCategory.NEUTRAL, 1f, 1f);
+        v.getWorld().spawnParticle(Particle.HAPPY_VILLAGER, at.clone().add(0, 1, 0), 15, 0.4, 0.6, 0.4);
+        v.remove();
+        makeSettler(at, t, p.getUniqueId(), name.trim());
         p.sendActionBar(Component.text(name.trim() + " joined " + t.name + "!", NamedTextColor.GREEN));
     }
 
-    private void makeSettler(Villager v, Town t, UUID owner, String name) {
-        PersistentDataContainer pdc = v.getPersistentDataContainer();
-        pdc.set(Keys.OWNER, PersistentDataType.STRING, owner.toString());
-        pdc.set(Keys.NAME, PersistentDataType.STRING, name);
-        pdc.set(Keys.TOWN, PersistentDataType.STRING, t.id);
-        Worker w = workers.register(v);
+    /** Spawn a new settler (a player-like Mannequin). */
+    private Worker makeSettler(Location at, Town t, UUID owner, String name) {
+        Mannequin m = at.getWorld().spawn(at, Mannequin.class, nm -> {
+            PersistentDataContainer pdc = nm.getPersistentDataContainer();
+            pdc.set(Keys.OWNER, PersistentDataType.STRING, owner.toString());
+            pdc.set(Keys.NAME, PersistentDataType.STRING, name);
+            pdc.set(Keys.TOWN, PersistentDataType.STRING, t.id);
+        });
+        Worker w = workers.register(m);
         w.save();
         w.applyLook();
+        return w;
     }
 
+    /** Dismissed: the settler leaves and a normal villager stands in its place. */
     void dismiss(Worker w) {
+        Location at = w.body.getLocation();
+        for (ItemStack it : w.pockets.getContents()) if (it != null && !it.getType().isAir()) at.getWorld().dropItemNaturally(at, it);
+        w.pockets.clear();
+        for (ItemStack it : w.body.getEquipment().getArmorContents()) if (it != null && !it.getType().isAir()) at.getWorld().dropItemNaturally(at, it);
         forget(w);
-        strip(w.villager);
+        becomeVillager(w.body);
     }
 
     /** Remove a settler from its town and workplace (death or dismissal). */
     void forget(Worker w) {
-        workers.unregister(w.villager.getUniqueId());
+        workers.unregister(w.body.getUniqueId());
         Town t = w.town();
         if (t != null) {
-            t.settlers.remove(w.villager.getUniqueId());
+            t.settlers.remove(w.body.getUniqueId());
             for (Town.Workplace wp : t.workplaces.values()) {
-                if (w.villager.getUniqueId().equals(wp.worker)) wp.worker = null;
+                if (w.body.getUniqueId().equals(wp.worker)) wp.worker = null;
             }
             towns.save();
         }
-        Social.releaseBed(w);
     }
 
-    /** Back to a normal villager. */
-    private void strip(Villager v) {
-        PersistentDataContainer pdc = v.getPersistentDataContainer();
-        for (NamespacedKey key : new NamespacedKey[]{Keys.OWNER, Keys.NAME, Keys.TOWN, Keys.WORKPLACE, Keys.BED}) pdc.remove(key);
-        v.customName(null);
-        v.setCustomNameVisible(false);
-        v.setAware(true);
+    private void becomeVillager(Mannequin m) {
+        Location at = m.getLocation();
+        if (m.isInsideVehicle()) m.leaveVehicle();
+        m.remove();
+        at.getWorld().spawn(at, Villager.class);
+        at.getWorld().spawnParticle(Particle.POOF, at.clone().add(0, 1, 0), 10, 0.3, 0.5, 0.3, 0.01);
     }
 
     // ---- Settlement border ----
 
-    private static final Particle.DustOptions BORDER = new Particle.DustOptions(Color.fromRGB(255, 170, 40), 1.6f);
-
-    /** The whole border for 10 seconds. */
-    void showBorder(Player p, Town t) {
-        final BukkitTask[] task = new BukkitTask[1];
-        final int[] runs = {0};
-        task[0] = getServer().getScheduler().runTaskTimer(this, () -> {
-            if (!p.isOnline() || runs[0]++ >= 20) {
-                task[0].cancel();
-                return;
-            }
-            drawBorder(p, t, Double.MAX_VALUE);
-        }, 0L, 10L);
-    }
-
-    private void ledgerBorders() {
-        for (Player p : getServer().getOnlinePlayers()) {
-            if (!Ledger.is(p.getInventory().getItemInMainHand())) continue;
-            for (Town t : towns.all()) {
-                if (t.bell.getWorld() != p.getWorld()) continue;
-                double reach = settings.townRadius() + 24;
-                if (t.bell.distanceSquared(p.getLocation()) <= reach * reach) drawBorder(p, t, 24);
-            }
-        }
-    }
-
-    /** Particles on the ground along the border circle, within {@code range} blocks of the player. */
-    private void drawBorder(Player p, Town t, double range) {
-        World w = t.bell.getWorld();
-        if (w != p.getWorld()) return;
-        int r = settings.townRadius();
-        double cx = t.bell.getBlockX() + 0.5, cz = t.bell.getBlockZ() + 0.5;
-        Location me = p.getLocation();
-        int points = (int) Math.ceil(2 * Math.PI * r);
-        for (int i = 0; i < points; i++) {
-            double a = 2 * Math.PI * i / points;
-            double x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r;
-            double dx = x - me.getX(), dz = z - me.getZ();
-            if (dx * dx + dz * dz > range * range) continue;
-            int bx = (int) Math.floor(x), bz = (int) Math.floor(z);
-            if (!w.isChunkLoaded(bx >> 4, bz >> 4)) continue;
-            double y = w.getHighestBlockYAt(bx, bz, HeightMap.MOTION_BLOCKING_NO_LEAVES) + 1.2;
-            p.spawnParticle(Particle.DUST, x, y, z, 1, BORDER);
-        }
-    }
-
-    // ---- Show area ----
-
-    /** Outlines an area with particles for 6 seconds, only for this player. */
-    void showArea(Player p, Location c, int r) {
-        Particle.DustOptions green = new Particle.DustOptions(Color.LIME, 1.2f);
-        final BukkitTask[] task = new BukkitTask[1];
-        final int[] runs = {0};
-        task[0] = getServer().getScheduler().runTaskTimer(this, () -> {
-            if (!p.isOnline() || runs[0]++ >= 12 || p.getWorld() != c.getWorld()) {
-                task[0].cancel();
-                return;
-            }
-            double y = c.getBlockY() + 0.2;
-            for (int i = -r; i <= r + 1; i++) {
-                p.spawnParticle(Particle.DUST, c.getBlockX() + i, y, c.getBlockZ() - r, 1, green);
-                p.spawnParticle(Particle.DUST, c.getBlockX() + i, y, c.getBlockZ() + r + 1, 1, green);
-                p.spawnParticle(Particle.DUST, c.getBlockX() - r, y, c.getBlockZ() + i, 1, green);
-                p.spawnParticle(Particle.DUST, c.getBlockX() + r + 1, y, c.getBlockZ() + i, 1, green);
-            }
-        }, 0L, 10L);
-    }
+    Borders borders() { return borders; }
 }

@@ -21,8 +21,13 @@ record Settings(
         int maxRadius,
         int socialRadius,
         boolean workAtNight,
-        boolean sleepAtNight,
         int seedsToKeep,
+        double sitHeight,
+        int arrowsToCarry,
+        int guardRadius,
+        int regenSeconds,
+        int eatBelowPercent,
+        List<String> skins,
         List<String> names,
         List<String> chatLines
 ) {
@@ -31,6 +36,7 @@ record Settings(
         if (names.isEmpty()) names = List.of("Bob");
         List<String> lines = c.getStringList("chat-lines");
         if (lines.isEmpty()) lines = List.of("Hmm...");
+        List<String> skins = c.getStringList("skins");
         List<ItemStack> cost = new ArrayList<>();
         for (String s : c.getStringList("recruit-cost")) {
             String[] p = s.split(":");
@@ -57,8 +63,13 @@ record Settings(
                 maxRadius,
                 (int) clamp(c.getInt("social-radius", 16), 4, 48),
                 c.getBoolean("work-at-night", false),
-                c.getBoolean("sleep-at-night", true),
                 (int) clamp(c.getInt("seeds-to-keep", 16), 1, 64),
+                clamp(c.getDouble("sit-height", 0.0), -1.5, 1.5),
+                (int) clamp(c.getInt("arrows-to-carry", 32), 1, 256),
+                (int) clamp(c.getInt("guard-radius", 16), 4, 48),
+                (int) clamp(c.getInt("regen-seconds", 4), 1, 600),
+                (int) clamp(c.getInt("eat-below-health-percent", 60), 1, 99),
+                skins.isEmpty() ? List.of("steve", "alex") : skins,
                 names,
                 lines
         );

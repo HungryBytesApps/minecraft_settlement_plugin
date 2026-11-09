@@ -81,6 +81,9 @@ final class Towns {
             s.set("name", t.name);
             s.set("bell", Keys.ser(t.bell));
             s.set("chest-default", t.chestDefault);
+            s.set("when-attacked", t.reaction.name());
+            s.set("may-eat", t.mayEat);
+            s.set("guard-potions", t.guardPotions);
             for (Map.Entry<String, boolean[]> e : t.chestRules.entrySet()) {
                 s.set("chests." + e.getKey().replace('.', '_'), List.of(e.getValue()[0], e.getValue()[1]));
             }
@@ -121,6 +124,12 @@ final class Towns {
                 continue;
             }
             Town t = new Town(id, owner, s.getString("name", "Town"), bell, s.getBoolean("chest-default", true));
+            try {
+                t.reaction = Town.Reaction.valueOf(s.getString("when-attacked", "TAKE_COVER"));
+            } catch (IllegalArgumentException ignored) {
+            }
+            t.mayEat = s.getBoolean("may-eat", true);
+            t.guardPotions = s.getBoolean("guard-potions", false);
             ConfigurationSection chests = s.getConfigurationSection("chests");
             if (chests != null) {
                 for (String k : chests.getKeys(false)) {

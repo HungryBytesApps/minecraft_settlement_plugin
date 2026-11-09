@@ -28,9 +28,27 @@ max-work-radius: 12
 # How far from the bell settlers wander in their free time.
 social-radius: 16
 
-# Settlers stop working at night and go to sleep in a free bed near the bell.
+# Settlers stop working at night and get together at a gathering spot (the place with the
+# most seats close together: stairs, slabs, cushions). Without seats they meet at the bell.
 work-at-night: false
-sleep-at-night: true
+
+# ---- Defense ----
+# Guards (and settlers called to arms) take weapons, armor, arrows and potions only from chests
+# settlers may take from. Arrows a guard carries (refilled after a fight; archers when they run out).
+arrows-to-carry: 32
+# Default radius a defensive guard protects around its post.
+guard-radius: 16
+# Settlers heal 1 health point every this many seconds when not fighting.
+regen-seconds: 4
+# Below this health (in %) settlers eat food from storage (if allowed in the ledger). Guards eat first.
+eat-below-health-percent: 60
+
+# Height of sitting settlers relative to the top of the seat (raise if they sink in).
+sit-height: 0.0
+
+# Settler skins, picked at random. Built-in skins: steve, alex, ari, efe, kai, makena, noor,
+# sunny, zuri. Use "player:Name" for a real player's skin.
+skins: [steve, alex, ari, efe, kai, makena, noor, sunny, zuri]
 
 # Farmers keep this many of each seed (seeds, carrots, potatoes, beetroot seeds) for replanting.
 seeds-to-keep: 16

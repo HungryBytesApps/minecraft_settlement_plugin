@@ -122,9 +122,10 @@ final class FarmerJob {
         Map<Material, Integer> ex = excess(w);
         Material first = ex.entrySet().stream().max(Map.Entry.comparingByValue()).map(Map.Entry::getKey).orElse(null);
         if (first == null) return null;
-        Block chest = t.storeChest(first, w.villager.getLocation(), radius);
+        Block chest = t.storeChest(first, w.body.getLocation(), radius);
         if (chest == null) {
             w.storageFullUntil = Bukkit.getCurrentTick() + 400;
+            w.warnStorageFull(first);
             return null;
         }
         w.workStatus = "Bringing the harvest to storage";
@@ -134,7 +135,7 @@ final class FarmerJob {
                     openLid(w, b);
                     Inventory inv = Town.inventory(b);
                     if (inv == null) return;
-                    Inventory pockets = w.villager.getInventory();
+                    Inventory pockets = w.pockets;
                     for (Map.Entry<Material, Integer> e : excess(w).entrySet()) {
                         Material m = e.getKey();
                         if (!b.equals(t.storeChest(m, b.getLocation(), radius))) continue; // belongs elsewhere
@@ -153,14 +154,14 @@ final class FarmerJob {
         int most = 0;
         for (Material seed : CROP.keySet()) {
             int n = t.count(seed, radius);
-            if (n > most && t.takeChest(seed, w.villager.getLocation(), radius) != null) {
+            if (n > most && t.takeChest(seed, w.body.getLocation(), radius) != null) {
                 most = n;
                 best = seed;
             }
         }
         if (best == null) return null;
         Material seed = best;
-        Block chest = t.takeChest(seed, w.villager.getLocation(), radius);
+        Block chest = t.takeChest(seed, w.body.getLocation(), radius);
         w.workStatus = "Getting seeds";
         return new GoAndDo(w, chest, 2.0, "Getting seeds from storage",
                 b -> Town.isStorage(b) && t.rule(b)[1],
@@ -174,7 +175,7 @@ final class FarmerJob {
                         if (it == null || it.getType() != seed) continue;
                         int n = Math.min(want, it.getAmount());
                         ItemStack taken = new ItemStack(seed, n);
-                        if (!w.villager.getInventory().addItem(taken).isEmpty()) break;
+                        if (!w.pockets.addItem(taken).isEmpty()) break;
                         inv.removeItem(new ItemStack(seed, n));
                         want -= n;
                     }
@@ -205,9 +206,9 @@ final class FarmerJob {
     /** Nearest block in the work area (around the composter) matching the test. */
     private static Block nearest(Worker w, Town.Workplace wp, Predicate<Block> test) {
         World world = wp.loc.getWorld();
-        if (world == null || world != w.villager.getWorld()) return null;
+        if (world == null || world != w.body.getWorld()) return null;
         int cx = wp.loc.getBlockX(), cy = wp.loc.getBlockY(), cz = wp.loc.getBlockZ(), r = wp.radius;
-        Location me = w.villager.getLocation();
+        Location me = w.body.getLocation();
         Block best = null;
         double bestD = Double.MAX_VALUE;
         for (int x = cx - r; x <= cx + r; x++) {
@@ -231,7 +232,7 @@ final class FarmerJob {
     /** Items to bring to storage (everything except the seeds it keeps for planting). */
     private static Map<Material, Integer> excess(Worker w) {
         Map<Material, Integer> totals = new HashMap<>();
-        for (ItemStack it : w.villager.getInventory().getContents()) {
+        for (ItemStack it : w.pockets.getContents()) {
             if (it != null && !it.getType().isAir()) totals.merge(it.getType(), it.getAmount(), Integer::sum);
         }
         int keep = w.plugin.settings().seedsToKeep();
@@ -246,7 +247,7 @@ final class FarmerJob {
         if (ex.isEmpty()) return false;
         if (anything) return true;
         int total = ex.values().stream().mapToInt(Integer::intValue).sum();
-        return total >= 48 || w.villager.getInventory().firstEmpty() == -1;
+        return total >= 48 || w.pockets.firstEmpty() == -1;
     }
 
     private static boolean hasAnySeed(Worker w) {

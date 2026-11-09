@@ -1,6 +1,6 @@
 package villagerworkers;
 
-import org.bukkit.entity.Villager;
+import org.bukkit.entity.Mannequin;
 
 import java.util.*;
 
@@ -13,9 +13,9 @@ final class Workers {
         this.plugin = plugin;
     }
 
-    Worker register(Villager v) {
+    Worker register(Mannequin v) {
         Worker w = loaded.get(v.getUniqueId());
-        if (w != null && w.villager == v) return w;
+        if (w != null && w.body == v) return w;
         if (w != null) w.stop();
         w = new Worker(plugin, v);
         w.applyLook();
@@ -38,7 +38,7 @@ final class Workers {
 
     void tick() {
         for (Worker w : all()) {
-            if (!w.villager.isValid()) continue;
+            if (!w.body.isValid()) continue;
             w.tick();
         }
     }
