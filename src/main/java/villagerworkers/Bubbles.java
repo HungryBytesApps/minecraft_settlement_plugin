@@ -24,7 +24,7 @@ final class Bubbles {
             d.setPersistent(false);
             d.setTransformation(new Transformation(new Vector3f(0, 0.8f, 0), new Quaternionf(),
                     new Vector3f(0.8f, 0.8f, 0.8f), new Quaternionf()));
-            d.getPersistentDataContainer().set(Keys.TEMP, PersistentDataType.BYTE, (byte) 1);
+            Keys.markTemp(d);
         });
         v.addPassenger(bubble);
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
@@ -34,7 +34,7 @@ final class Bubbles {
 
     static void clear(Entity v) {
         for (Entity e : v.getPassengers()) {
-            if (e instanceof TextDisplay && e.getPersistentDataContainer().has(Keys.TEMP, PersistentDataType.BYTE)) e.remove();
+            if (e instanceof TextDisplay && Keys.isTemp(e)) e.remove();
         }
     }
 }

@@ -29,6 +29,28 @@ final class Keys {
         WEAPON = new NamespacedKey(p, "weapon");
     }
 
+    /** Random per server start: temporary entities from an earlier run are leftovers. */
+    static final int SESSION = new java.util.Random().nextInt();
+
+    static void markTemp(org.bukkit.entity.Entity e) {
+        e.getPersistentDataContainer().set(TEMP, org.bukkit.persistence.PersistentDataType.INTEGER, SESSION);
+    }
+
+    static boolean isTemp(org.bukkit.entity.Entity e) {
+        return e.getPersistentDataContainer().has(TEMP);
+    }
+
+    /** A bubble, seat or panel left over from before a restart. */
+    static boolean isLeftover(org.bukkit.entity.Entity e) {
+        if (!isTemp(e)) return false;
+        try {
+            Integer s = e.getPersistentDataContainer().get(TEMP, org.bukkit.persistence.PersistentDataType.INTEGER);
+            return s == null || s != SESSION;
+        } catch (IllegalArgumentException old) {
+            return true; // marked by an older version
+        }
+    }
+
     static String ser(Location l) {
         if (l == null || l.getWorld() == null) return null;
         return l.getWorld().getName() + "," + l.getBlockX() + "," + l.getBlockY() + "," + l.getBlockZ();

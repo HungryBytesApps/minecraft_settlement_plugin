@@ -39,6 +39,7 @@ public final class VillagerWorkersPlugin extends JavaPlugin {
         towns = new Towns(this);
         workers = new Workers(this);
         getServer().getPluginManager().registerEvents(new WorkerListener(this), this);
+        getServer().getPluginManager().registerEvents(new TargetsMenu.Events(), this);
 
         for (World w : getServer().getWorlds()) {
             for (Mannequin m : w.getEntitiesByClass(Mannequin.class)) {
@@ -59,6 +60,7 @@ public final class VillagerWorkersPlugin extends JavaPlugin {
     public void onDisable() {
         if (workers != null) for (Worker w : workers.all()) w.stop();
         if (towns != null) towns.save();
+        if (borders != null) borders.clearAll();
     }
 
     Settings settings() { return settings; }

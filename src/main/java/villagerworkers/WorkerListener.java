@@ -284,7 +284,7 @@ final class WorkerListener implements Listener {
     public void onAdd(EntityAddToWorldEvent e) {
         Entity en = e.getEntity();
         // Leftover speech bubbles / seats (normally never saved).
-        if ((en instanceof Display || Seats.isSeatEntity(en)) && en.getPersistentDataContainer().has(Keys.TEMP, PersistentDataType.BYTE)) {
+        if ((en instanceof Display || Seats.isSeatEntity(en)) && Keys.isLeftover(en)) {
             Bukkit.getScheduler().runTask(plugin, en::remove);
             return;
         }

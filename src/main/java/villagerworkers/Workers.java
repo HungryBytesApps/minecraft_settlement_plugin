@@ -39,7 +39,16 @@ final class Workers {
     void tick() {
         for (Worker w : all()) {
             if (!w.body.isValid()) continue;
-            w.tick();
+            try {
+                w.tick();
+            } catch (RuntimeException ex) {
+                // One broken settler must not freeze all the others. Log it (at most once a minute).
+                int now = org.bukkit.Bukkit.getCurrentTick();
+                if (now >= w.errorLoggedUntil) {
+                    w.errorLoggedUntil = now + 1200;
+                    w.plugin.getLogger().log(java.util.logging.Level.WARNING, "Settler " + w.name + " ran into an error", ex);
+                }
+            }
         }
     }
 }

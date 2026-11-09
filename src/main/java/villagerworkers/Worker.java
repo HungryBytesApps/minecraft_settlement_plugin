@@ -63,6 +63,7 @@ final class Worker {
     org.bukkit.entity.LivingEntity lastAttacker;
     private int regenTimer, healthShown = -1, defenseCheck = 20, foodCheck = 100;
 
+    int errorLoggedUntil;
     Activity activity;
     String workStatus = "";
     int storageFullUntil;

@@ -6,8 +6,8 @@ Build a settlement with settlers who work and live their own lives. Server-side 
 
 Right-click a **bell** → create a settlement. You get the **Settlement Ledger** (one per player).
 - **Bell menu**: recruit, show border, get a ledger, rename, disband.
-- **Ledger menu** (right-click with the ledger): targets, use all chests, settlers, when attacked, settlers may eat, guards use potions.
-The settlement border (orange) and work areas (green) are shown as walls of particles (only for you).
+- **Ledger menu** (right-click with the ledger): storage targets, use all chests, settlers, when attacked, settlers may eat, guards use potions.
+The settlement border (orange) and work areas (green) are shown as see-through colored bands (only for you; no particles, so resource packs don't change them and they don't cost FPS).
 Bell menu → **Show border**: When holding ledger / On / Off.
 
 ## Settlers
@@ -30,10 +30,11 @@ Settlers use the chests and barrels in the settlement (on by default, `chests-al
 - Farmers fetch seeds from storage when they run out.
 - No room left: settlers keep the goods in their pockets (9 slots), stop harvesting and you get a message (at most every 5 minutes).
 
-## Targets
+## Storage targets
 
-Ledger menu → **Targets**: e.g. 256 wheat. Farmers stop harvesting a crop once settlement storage holds that much
-(they keep replanting).
+Ledger menu → **Storage targets**: a chest window with one row per job and its products. Each item shows what's in storage
+and the target. Left/right-click +16/−16, shift ±64, Q = no limit. Settlers stop making a product once storage holds that much
+(farmers keep replanting).
 
 ## Settlers
 

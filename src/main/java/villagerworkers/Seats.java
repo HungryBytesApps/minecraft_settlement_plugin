@@ -134,7 +134,7 @@ final class Seats {
             a.setInvulnerable(true);
             a.setSilent(true);
             a.setPersistent(false);
-            a.getPersistentDataContainer().set(Keys.TEMP, PersistentDataType.BYTE, (byte) 1);
+            Keys.markTemp(a);
         });
         w.mover.stop();
         w.body.setRotation(yaw, 0);
@@ -157,6 +157,6 @@ final class Seats {
     }
 
     static boolean isSeatEntity(Entity e) {
-        return e instanceof ArmorStand && e.getPersistentDataContainer().has(Keys.TEMP, PersistentDataType.BYTE);
+        return e instanceof ArmorStand && Keys.isTemp(e);
     }
 }
