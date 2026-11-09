@@ -53,6 +53,20 @@ public final class VillagerWorkersPlugin extends JavaPlugin {
         borders = new Borders(this);
         getServer().getScheduler().runTaskTimer(this, borders::tick, 20L, 10L);
         getServer().getScheduler().runTaskTimer(this, () -> Defense.tick(this), 40L, 20L);
+        getLogger().info("Build " + BUILD + " enabled, " + workers.all().size() + " settlers running.");
+    }
+
+    /** Changes with every version I send, to check the right jar is installed. */
+    static final String BUILD = "2026-11-09 #8";
+
+    @Override
+    public boolean onCommand(org.bukkit.command.CommandSender sender, org.bukkit.command.Command cmd, String label, String[] args) {
+        if (!(sender instanceof Player p)) {
+            sender.sendMessage("VillagerWorkers build " + BUILD + ", " + workers.all().size() + " settlers running.");
+            return true;
+        }
+        Diagnose.info(this, p);
+        return true;
     }
 
     @Override

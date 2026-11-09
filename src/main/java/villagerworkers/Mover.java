@@ -66,6 +66,11 @@ final class Mover {
     }
 
     boolean moving() { return path != null; }
+
+    String debug() {
+        return "moving " + moving() + ", node " + idx + "/" + (path == null ? 0 : path.size()) + ", arrived " + arrived
+                + ", failed " + failed + (target == null ? "" : String.format(", to %.0f %.0f %.0f", target.getX(), target.getY(), target.getZ()));
+    }
     boolean arrived() { return arrived; }
     boolean failed() { return failed; }
 

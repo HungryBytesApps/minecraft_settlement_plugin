@@ -154,6 +154,8 @@ final class WorkerListener implements Listener {
         Player p = e.getPlayer();
         if (Worker.isWorker(e.getRightClicked())) {
             e.setCancelled(true);
+            Worker seen = plugin.workers().get(e.getRightClicked().getUniqueId());
+            if (seen != null) seen.lastClickSeen = Bukkit.getCurrentTick();
             // Both click events can come for one click: handle it once.
             int now = Bukkit.getCurrentTick();
             Integer last = lastClick.put(p.getUniqueId(), now);

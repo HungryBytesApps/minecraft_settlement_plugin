@@ -7,3 +7,8 @@ permissions:
   villagerworkers.admin:
     description: Manage anyone's workers and ignore the worker limit.
     default: op
+commands:
+  settlers:
+    description: Settler diagnostics. Look at a settler and type /settlers info
+    usage: /settlers info
+    aliases: [vw]

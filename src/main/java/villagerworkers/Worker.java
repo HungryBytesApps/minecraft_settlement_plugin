@@ -64,6 +64,8 @@ final class Worker {
     private int regenTimer, healthShown = -1, defenseCheck = 20, foodCheck = 100;
 
     int errorLoggedUntil;
+    long ticks;               // diagnostics: how often tick() ran
+    int lastClickSeen = -1;   // diagnostics: tick of the last right-click event
     Activity activity;
     String workStatus = "";
     int storageFullUntil;
@@ -367,6 +369,7 @@ final class Worker {
     // ---- Thinking ----
 
     void tick() {
+        ticks++;
         if (activity != null) {
             boolean done;
             try {
