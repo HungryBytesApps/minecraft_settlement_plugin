@@ -172,10 +172,13 @@ final class WorkerListener implements Listener {
         }
         if (w != null) {
             e.setCancelled(true);
-            if (ledger && w.canManage(p)) {
+            if (w.canManage(p)) { // your own settler: its menu (no ledger needed)
+                w.anim.look(p.getEyeLocation());
                 Menus.settler(plugin, p, w);
             } else {
-                Bubbles.say(plugin, w.body, GREETINGS.get(w.random.nextInt(GREETINGS.size())), 40);
+                String hi = GREETINGS.get(w.random.nextInt(GREETINGS.size()));
+                Bubbles.say(plugin, w.body, hi, 40);
+                Voice.speak(w, hi);
                 w.anim.look(p.getEyeLocation());
             }
             return;
@@ -271,6 +274,23 @@ final class WorkerListener implements Listener {
             if (w == null) return;
             w.lastHurt = Bukkit.getCurrentTick();
             if (src instanceof org.bukkit.entity.LivingEntity le && Combat.hostile(le)) w.lastAttacker = le;
+        }
+    }
+
+    /** Settlers move by themselves (not by physics): no damage from bumping into blocks or falling. */
+    @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGH)
+    public void onMoveDamage(org.bukkit.event.entity.EntityDamageEvent e) {
+        if (!Worker.isWorker(e.getEntity())) return;
+        switch (e.getCause()) {
+            case SUFFOCATION, FALL, CRAMMING, FLY_INTO_WALL -> {
+                e.setCancelled(true);
+                if (e.getCause() == org.bukkit.event.entity.EntityDamageEvent.DamageCause.SUFFOCATION) {
+                    e.getEntity().teleport(e.getEntity().getLocation().add(0, 1, 0),
+                            io.papermc.paper.entity.TeleportFlag.EntityState.RETAIN_PASSENGERS); // out of the block
+                }
+            }
+            default -> {
+            }
         }
     }
 

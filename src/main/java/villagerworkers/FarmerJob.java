@@ -18,8 +18,8 @@ import java.util.*;
 import java.util.function.Predicate;
 
 /**
- * Farmer: works the field around its composter. Harvests ripe crops (while the town wants more
- * of that crop), replants, plants empty farmland (fetching seeds from town storage when needed)
+ * Farmer: works the field around its composter. First harvests all ripe crops (while the town wants
+ * more of that crop), then replants, plants empty farmland (fetching seeds from town storage when needed)
  * and brings the harvest to the town's chests.
  */
 final class FarmerJob {
@@ -95,12 +95,7 @@ final class FarmerJob {
             world.spawnParticle(Particle.BLOCK, c, 12, 0.25, 0.2, 0.25, b.getBlockData());
             world.playSound(c, "minecraft:block.crop.break", SoundCategory.BLOCKS, 0.8f, 1f);
             b.setType(Material.AIR);
-            w.give(drops, c);
-            Material seed = SEED.get(type);
-            if (seed != null && b.getRelative(BlockFace.DOWN).getType() == Material.FARMLAND && w.take(seed, 1)) {
-                b.setType(type);
-                world.playSound(c, "minecraft:item.crop.plant", SoundCategory.BLOCKS, 0.8f, 1f);
-            }
+            w.give(drops, c); // replanting comes after the whole field is harvested
         });
     }
 

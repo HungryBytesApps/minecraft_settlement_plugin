@@ -185,6 +185,12 @@ final class Town {
     }
 
     /** How many of each item are in the chests settlers may use (cached for 2 seconds). */
+    /** Everything in storage (a copy). */
+    Map<Material, Integer> stock(int radius) {
+        count(Material.AIR, radius); // refresh if old
+        return new HashMap<>(counts);
+    }
+
     int count(Material m, int radius) {
         int now = Bukkit.getCurrentTick();
         if (now - countsAt >= 40) {

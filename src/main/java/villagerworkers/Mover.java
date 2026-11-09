@@ -27,6 +27,7 @@ final class Mover {
     private Location target;
     private double reach, speed;
     private int stuckTicks, repaths;
+    private double fall, stepDist;
     private Location lastPos;
     private boolean arrived, failed;
     private final Map<Block, Integer> openedDoors = new HashMap<>();
@@ -111,14 +112,31 @@ final class Mover {
         // Step by step (Mannequins don't walk by themselves); the client smooths it into a walk.
         double nx = loc.getX(), nz = loc.getZ(), ny = loc.getY();
         float yaw = loc.getYaw();
-        if (dist > 0.01) {
+        boolean climbing = n[1] > ny + 0.01 && dist < 1.3;
+        if (dist > 0.01 && !(climbing && dist < 0.95)) { // up a step: first up, then on (no walking into the block)
             double sp = Math.min(speed, dist);
             nx += dx / dist * sp;
             nz += dz / dist * sp;
             yaw = (float) Math.toDegrees(Math.atan2(-dx, dz));
         }
-        if (n[1] > ny) ny = Math.min(n[1], ny + 0.2);       // up a step
-        else if (n[1] < ny) ny = Math.max(n[1], ny - 0.35); // down
+        if (n[1] > ny + 0.01) {
+            if (dist < 1.3) ny = Math.min(n[1], ny + 0.25); // up a step, close to it
+            fall = 0;
+        } else {
+            // Down: stay on the edge until the body is past it, then drop (faster and faster, like falling).
+            double support = Math.max(n[1], supportY(v.getWorld(), nx, ny, nz));
+            if (ny > support + 0.001) {
+                fall = Math.min(0.6, fall + 0.08);
+                ny = Math.max(support, ny - fall);
+            } else {
+                fall = 0;
+            }
+        }
+        stepDist += Math.abs(nx - loc.getX()) + Math.abs(nz - loc.getZ());
+        if (stepDist > 1.6 && fall == 0) {
+            stepDist = 0;
+            Voice.step(w);
+        }
         v.setVelocity(new Vector());
         v.teleport(new Location(v.getWorld(), nx, ny, nz, yaw, 0),
                 io.papermc.paper.entity.TeleportFlag.EntityState.RETAIN_PASSENGERS);
@@ -137,6 +155,24 @@ final class Mover {
             stuckTicks = 0;
             lastPos = v.getLocation();
         }
+    }
+
+    /** Top of whatever is under the body (its four corners), up to 3 blocks down. */
+    private static double supportY(World w, double x, double y, double z) {
+        double best = y - 3;
+        for (double ox : new double[]{-0.29, 0.29}) {
+            for (double oz : new double[]{-0.29, 0.29}) {
+                int bx = (int) Math.floor(x + ox), bz = (int) Math.floor(z + oz);
+                for (int by = (int) Math.floor(y + 0.5); by >= (int) Math.floor(y) - 3; by--) {
+                    Block b = w.getBlockAt(bx, by, bz);
+                    if (b.isPassable()) continue;
+                    double top = b.getBoundingBox().getMaxY();
+                    if (top <= y + 0.51) best = Math.max(best, top);
+                    break;
+                }
+            }
+        }
+        return best;
     }
 
     static void face(LivingEntity v, double dx, double dz) {

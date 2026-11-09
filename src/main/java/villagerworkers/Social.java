@@ -22,28 +22,29 @@ final class Social {
     /** Something to do during the day when there's no work. */
     static Activity idle(Worker w) {
         int r = w.random.nextInt(100);
-        if (r < 20) {
-            Worker partner = partner(w);
-            if (partner != null) return Chat.start(w, partner);
-        } else if (r < 32) {
+        if (r < 30) {
+            Activity talk = Chat.start(w);
+            if (talk != null) return talk;
+        } else if (r < 42) {
             Activity band = Music.start(w);
             if (band != null) return band;
-        } else if (r < 47) {
+        } else if (r < 54) {
             Block seat = Seats.nearestFree(w.body.getLocation(), 12, w);
             if (seat != null && w.town() != null && w.town().contains(seat.getLocation(), w.plugin.settings().socialRadius() + 8)) {
-                return new Sit(w, seat, w.random.nextBoolean() ? Mode.READ : Mode.IDLE, 400 + w.random.nextInt(600), null);
+                return new Sit(w, seat, w.random.nextBoolean() ? Mode.READ : Mode.IDLE, 300 + w.random.nextInt(400), null);
             }
-        } else if (r < 57) {
-            return new Read(w, 300 + w.random.nextInt(300));
-        } else if (r < 67) {
+        } else if (r < 61) {
+            return new Read(w, 200 + w.random.nextInt(200));
+        } else if (r < 71) {
             Worker busy = someoneWorking(w);
             if (busy != null) return new Visit(w, busy);
+        } else if (r < 83) {
+            Activity p = Potter.start(w);
+            if (p != null) return p;
         }
-        if (r < 92) {
-            Activity walk = stroll(w);
-            if (walk != null) return walk;
-        }
-        return new LookAround(w, 60 + w.random.nextInt(100));
+        Activity walk = stroll(w);
+        if (walk != null) return walk;
+        return new LookAround(w, 40 + w.random.nextInt(60));
     }
 
     /** In the evening: get together with the others at the gathering spot. */
@@ -78,7 +79,9 @@ final class Social {
     static void say(Worker w, Location lookAt) {
         List<String> lines = w.plugin.settings().chatLines();
         if (lookAt != null) w.anim.look(lookAt);
-        Bubbles.say(w.plugin, w.body, lines.get(w.random.nextInt(lines.size())), 50);
+        String line = lines.get(w.random.nextInt(lines.size()));
+        Bubbles.say(w.plugin, w.body, line, 50);
+        Voice.speak(w, line);
         if (w.random.nextInt(4) == 0) w.body.swingMainHand();
         else if (w.random.nextBoolean()) w.anim.nod();
     }
@@ -255,6 +258,8 @@ final class Social {
     /** Head down, a page turn now and then. */
     static void readTick(Worker w, int t) {
         if (t % 20 == 0) w.anim.lookDown(35 + w.random.nextInt(10));
+        if (t % 80 == 40 && w.random.nextBoolean())
+            w.body.getWorld().playSound(w.body.getLocation(), "minecraft:item.book.page_turn", org.bukkit.SoundCategory.NEUTRAL, 0.5f, 1f);
         if (t % 70 == 0 && w.random.nextBoolean()) {
             w.body.getWorld().playSound(w.body.getLocation(), "minecraft:item.book.page_turn", SoundCategory.NEUTRAL, 0.5f, 1f);
         }

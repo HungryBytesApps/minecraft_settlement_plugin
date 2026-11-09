@@ -108,7 +108,8 @@ final class GoAndDo implements Activity {
             }
         }
         Location me = w.body.getLocation();
-        spots.sort(java.util.Comparator.comparingDouble(l -> l.distanceSquared(me)));
+        // Standing at the chest's own level first, then the nearest.
+        spots.sort(java.util.Comparator.comparingDouble(l -> Math.abs(l.getY() - chest.getY()) * 100 + l.distanceSquared(me)));
         for (Location l : spots) {
             if (w.mover.go(l, 0.3, w.plugin.settings().workSpeed())) return l;
         }
@@ -124,10 +125,16 @@ final class GoAndDo implements Activity {
     /** Chest lid opens for a moment, like when a player uses it. */
     private void openLid(Block b) {
         if (!(b.getState(false) instanceof org.bukkit.block.Lidded lid)) return;
+        boolean barrel = b.getType() == org.bukkit.Material.BARREL;
+        org.bukkit.Location at = b.getLocation().add(0.5, 0.5, 0.5);
         try {
             lid.open();
+            b.getWorld().playSound(at, barrel ? "minecraft:block.barrel.open" : "minecraft:block.chest.open", org.bukkit.SoundCategory.BLOCKS, 0.5f, 1f);
             org.bukkit.Bukkit.getScheduler().runTaskLater(w.plugin, () -> {
-                if (b.getState(false) instanceof org.bukkit.block.Lidded l) l.close();
+                if (b.getState(false) instanceof org.bukkit.block.Lidded l) {
+                    l.close();
+                    b.getWorld().playSound(at, barrel ? "minecraft:block.barrel.close" : "minecraft:block.chest.close", org.bukkit.SoundCategory.BLOCKS, 0.5f, 1f);
+                }
             }, 14L);
         } catch (RuntimeException ignored) {
         }

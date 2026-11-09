@@ -71,14 +71,14 @@ final class PathFinder {
                 if (diag) continue;
                 // Step up one block (needs headroom above the current spot to jump).
                 if (walkable(w, nx, n.y + 1, nz, walkCache) && passable(w.getBlockAt(n.x, n.y + 2, n.z))) {
-                    add(open, seen, closed, n, nx, n.y + 1, nz, 2.0, tx, ty, tz);
+                    add(open, seen, closed, n, nx, n.y + 1, nz, 4.0, tx, ty, tz); // climbing: only when needed
                     continue;
                 }
                 // Drop down up to 3 blocks.
                 if (passable(w.getBlockAt(nx, n.y, nz)) && passable(w.getBlockAt(nx, n.y + 1, nz))) {
                     for (int drop = 1; drop <= 3; drop++) {
                         if (walkable(w, nx, n.y - drop, nz, walkCache)) {
-                            add(open, seen, closed, n, nx, n.y - drop, nz, 1.0 + drop, tx, ty, tz);
+                            add(open, seen, closed, n, nx, n.y - drop, nz, 2.0 + drop * 1.5, tx, ty, tz);
                             break;
                         }
                         if (!passable(w.getBlockAt(nx, n.y - drop, nz))) break;
@@ -156,6 +156,11 @@ final class PathFinder {
         Material m = b.getType();
         if (!m.isSolid()) return false;
         if (Tag.FENCES.isTagged(m) || Tag.WALLS.isTagged(m) || Tag.FENCE_GATES.isTagged(m) || Tag.DOORS.isTagged(m)) return false;
+        // No walking over furniture: chests, workstations, the bell, anvils, beds...
+        if (m == Material.CHEST || m == Material.TRAPPED_CHEST || m == Material.ENDER_CHEST || m == Material.BARREL
+                || m == Material.BELL || m == Material.CRAFTING_TABLE || Tag.ANVIL.isTagged(m) || Tag.BEDS.isTagged(m)
+                || Tag.SHULKER_BOXES.isTagged(m) || Worker.Job.forBlock(m) != Worker.Job.NONE || m == Material.LECTERN
+                || m == Material.CAULDRON || m == Material.BREWING_STAND || m == Material.ENCHANTING_TABLE) return false;
         return m != Material.MAGMA_BLOCK && m != Material.CACTUS && m != Material.CAMPFIRE && m != Material.SOUL_CAMPFIRE;
     }
 

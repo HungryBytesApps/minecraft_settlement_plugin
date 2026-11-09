@@ -32,7 +32,13 @@ record Settings(
         List<String> skins,
         List<String> names,
         List<String> chatLines,
-        java.util.Map<String, List<String>> jobSkins
+        java.util.Map<String, List<String>> jobSkins,
+        List<String> maleNames,
+        List<String> femaleNames,
+        java.util.Map<String, String> skinGender,
+        boolean talkSounds,
+        String voiceSound,
+        String laughSound
 ) {
     static Settings from(FileConfiguration c) {
         List<String> names = c.getStringList("names");
@@ -60,8 +66,8 @@ record Settings(
                 c.getBoolean("chests-allowed-by-default", true),
                 cost,
                 c.getBoolean("show-names", true),
-                clamp(c.getDouble("work-speed", 0.11), 0.02, 0.4),
-                clamp(c.getDouble("walk-speed", 0.07), 0.02, 0.4),
+                clamp(c.getDouble("work-speed", 0.15), 0.02, 0.4),
+                clamp(c.getDouble("walk-speed", 0.11), 0.02, 0.4),
                 (int) clamp(c.getInt("default-work-radius", 6), 2, maxRadius),
                 maxRadius,
                 (int) clamp(c.getInt("social-radius", 16), 4, 48),
@@ -77,7 +83,13 @@ record Settings(
                 skins.isEmpty() ? List.of("steve", "alex") : skins,
                 names,
                 lines,
-                jobSkins(c)
+                jobSkins(c),
+                orDefault(c.getStringList("names-male"), List.of("Bram", "Cor", "Daan", "Finn", "Gijs", "Hugo", "Jens", "Joep", "Kees", "Lars", "Otto", "Rik", "Sem", "Teun", "Thijs", "Wim")),
+                orDefault(c.getStringList("names-female"), List.of("Anna", "Eva", "Femke", "Fleur", "Greet", "Ilse", "Lieke", "Lotte", "Maud", "Noor", "Pien", "Roos", "Saar", "Sanne", "Vera", "Yara")),
+                skinGender(c),
+                c.getBoolean("talk-sounds", true),
+                c.getString("voice-sound", "minecraft:entity.villager.ambient"),
+                c.getString("laugh-sound", "minecraft:entity.villager.yes")
         );
     }
 
@@ -91,6 +103,20 @@ record Settings(
             if (!l.isEmpty()) out.put(k.toLowerCase(Locale.ROOT).replace('_', '-'), l);
         }
         return out;
+    }
+
+    private static List<String> orDefault(List<String> l, List<String> def) {
+        return l == null || l.isEmpty() ? def : l;
+    }
+
+    /** skin-gender: steve: male, alex: female… (built-in defaults if missing). */
+    private static java.util.Map<String, String> skinGender(FileConfiguration c) {
+        java.util.Map<String, String> m = new java.util.HashMap<>(java.util.Map.of(
+                "steve", "male", "alex", "female", "ari", "female", "efe", "female", "kai", "male",
+                "makena", "female", "noor", "female", "sunny", "male", "zuri", "male"));
+        org.bukkit.configuration.ConfigurationSection s = c.getConfigurationSection("skin-gender");
+        if (s != null) for (String k : s.getKeys(false)) m.put(k.toLowerCase(Locale.ROOT), String.valueOf(s.getString(k)).toLowerCase(Locale.ROOT));
+        return m;
     }
 
     private static double clamp(double v, double min, double max) {

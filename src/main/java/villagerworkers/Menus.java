@@ -195,7 +195,7 @@ final class Menus {
         text(body, "One per player. Right-click with it:");
         text(body, "• a chest or barrel: may settlers put things in / take things out?");
         text(body, "• a composter: its work radius, who works there, on/off.");
-        text(body, "• a settler: rename, inventory (take things out or put things in), worker or guard, guard settings, leave workplace, dismiss.");
+        text(body, "• (right-click a settler, no ledger needed) its menu: rename, inventory (take things out or put things in), worker or guard, guard settings, leave workplace, dismiss.");
         text(body, "• a wild villager: hire it. It walks to the settlement, or follows you if it's far away.");
         text(body, "• anything else: storage targets, chests, settlers, defense settings.");
         head(body, "Settlers");
@@ -388,7 +388,7 @@ final class Menus {
         }
         if (job == Worker.Job.SMITH) {
             buttons.add(wbutton(plugin, apply, "What to make", NamedTextColor.AQUA, "How many of each item to keep in storage (0 = don't make)",
-                    w, pl -> TargetsMenu.open(plugin, pl, t, SmithJob.PRODUCTS)));
+                    w, pl -> TargetsMenu.smith(plugin, pl, t)));
         }
         if (job.usesArea) {
             buttons.add(wbutton(plugin, apply, "Show work area", NamedTextColor.WHITE, "Shows the work area for 10 seconds",
@@ -551,8 +551,9 @@ final class Menus {
     // ---- Hire a wild villager ----
 
     static void hire(VillagerWorkersPlugin plugin, Player p, Villager v, Town t) {
-        List<String> names = plugin.settings().names();
-        String suggestion = names.get(new Random().nextInt(names.size()));
+        Random rnd = new Random();
+        List<String> names = rnd.nextBoolean() ? plugin.settings().maleNames() : plugin.settings().femaleNames();
+        String suggestion = names.get(rnd.nextInt(names.size()));
         DialogInput name = DialogInput.text("name", Component.text("Name")).initial(suggestion).maxLength(20).width(200).build();
         ActionButton yes = ActionButton.create(Component.text("Hire", NamedTextColor.GREEN), null, 100,
                 click(plugin, (view, audience) -> {

@@ -27,6 +27,37 @@ final class Skins {
         return l.get(Math.floorMod(id.hashCode(), l.size())).trim();
     }
 
+    /** "male", "female" or null (unknown, e.g. a player's skin). */
+    static String gender(Settings s, String spec) {
+        if (spec == null) return null;
+        return s.skinGender().get(spec.split(":")[0].toLowerCase(Locale.ROOT));
+    }
+
+    /** A random name that fits the skin. */
+    static String nameFor(Settings s, String skin, Random r) {
+        String g = gender(s, skin);
+        List<String> l = "male".equals(g) ? s.maleNames() : "female".equals(g) ? s.femaleNames() : s.names();
+        if (l.isEmpty()) l = s.names();
+        return l.get(r.nextInt(l.size()));
+    }
+
+    /** A random skin from the config that fits the name (slim arms for women, wide for men). */
+    static String skinFor(Settings s, String name, Random r) {
+        String g = s.maleNames().contains(name) ? "male" : s.femaleNames().contains(name) ? "female" : null;
+        List<String> fit = new java.util.ArrayList<>();
+        for (String o : s.skins()) {
+            String og = s.skinGender().get(o.trim().split(":")[0].toLowerCase(Locale.ROOT));
+            if (g == null || g.equals(og)) fit.add(o);
+        }
+        if (fit.isEmpty()) fit = s.skins();
+        String pick = fit.get(r.nextInt(fit.size())).trim();
+        String low = pick.toLowerCase(Locale.ROOT);
+        if (low.startsWith("player:") || low.startsWith("texture:") || low.startsWith("url:") || low.startsWith("value:") || pick.contains(":")) return pick;
+        String og = s.skinGender().get(low);
+        boolean slim = "female".equals(og) || (og == null && r.nextBoolean());
+        return low + (slim ? ":slim" : ":wide");
+    }
+
     static ResolvableProfile profile(String spec) {
         if (spec.toLowerCase(Locale.ROOT).startsWith("player:")) {
             return ResolvableProfile.resolvableProfile().name(spec.substring(7)).build();

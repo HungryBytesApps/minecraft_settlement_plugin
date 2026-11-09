@@ -36,6 +36,7 @@ public final class VillagerWorkersPlugin extends JavaPlugin {
         saveDefaultConfig();
         settings = Settings.from(getConfig());
         Keys.init(this);
+        Chat.load(this);
         towns = new Towns(this);
         workers = new Workers(this);
         getServer().getPluginManager().registerEvents(new WorkerListener(this), this);
@@ -58,7 +59,7 @@ public final class VillagerWorkersPlugin extends JavaPlugin {
     }
 
     /** Changes with every version I send, to check the right jar is installed. */
-    static final String BUILD = "2026-11-09 #16";
+    static final String BUILD = "2026-11-09 #20";
 
     @Override
     public boolean onCommand(org.bukkit.command.CommandSender sender, org.bukkit.command.Command cmd, String label, String[] args) {
@@ -217,8 +218,7 @@ public final class VillagerWorkersPlugin extends JavaPlugin {
             return;
         }
         for (ItemStack cost : settings.recruitCost()) p.getInventory().removeItem(cost.clone());
-        String name = settings.names().get(random.nextInt(settings.names().size()));
-        makeSettler(spawn, t, p.getUniqueId(), name);
+        String name = makeSettler(spawn, t, p.getUniqueId(), null).name;
         p.sendActionBar(Component.text(name + " heard about " + t.name + " and is on the way!", NamedTextColor.GREEN));
     }
 
@@ -250,21 +250,31 @@ public final class VillagerWorkersPlugin extends JavaPlugin {
 
     void hire(Player p, Villager v, Town t, String name) {
         if (!v.isValid() || Worker.isWorker(v) || towns.get(t.id) == null || !hasRoom(p, t)) return;
-        if (name == null || name.isBlank()) name = settings.names().get(random.nextInt(settings.names().size()));
+        String given = name == null || name.isBlank() ? null : name.trim();
         Location at = v.getLocation();
         v.getWorld().playSound(at, "minecraft:entity.villager.celebrate", SoundCategory.NEUTRAL, 1f, 1f);
         v.getWorld().spawnParticle(Particle.HAPPY_VILLAGER, at.clone().add(0, 1, 0), 15, 0.4, 0.6, 0.4);
         v.remove();
-        makeSettler(at, t, p.getUniqueId(), name.trim());
-        p.sendActionBar(Component.text(name.trim() + " joined " + t.name + "!", NamedTextColor.GREEN));
+        Worker w = makeSettler(at, t, p.getUniqueId(), given);
+        p.sendActionBar(Component.text(w.name + " joined " + t.name + "!", NamedTextColor.GREEN));
     }
 
     /** Spawn a new settler (a player-like Mannequin). */
-    private Worker makeSettler(Location at, Town t, UUID owner, String name) {
+    /** A new settler; without a name it gets one that fits its skin (and a skin that fits a given name). */
+    private Worker makeSettler(Location at, Town t, UUID owner, String givenName) {
+        String skin, name;
+        if (givenName == null) {
+            skin = Skins.skinFor(settings, "", random);
+            name = Skins.nameFor(settings, skin, random);
+        } else {
+            name = givenName;
+            skin = Skins.skinFor(settings, name, random);
+        }
         Mannequin m = at.getWorld().spawn(at, Mannequin.class, nm -> {
             PersistentDataContainer pdc = nm.getPersistentDataContainer();
             pdc.set(Keys.OWNER, PersistentDataType.STRING, owner.toString());
             pdc.set(Keys.NAME, PersistentDataType.STRING, name);
+            pdc.set(Keys.SKIN, PersistentDataType.STRING, skin);
             pdc.set(Keys.TOWN, PersistentDataType.STRING, t.id);
         });
         Worker w = workers.register(m);

@@ -1,0 +1,1206 @@
+# The built-in conversations (always loaded from the plugin). Add your own in my-conversations.yml.
+# Each one is for 2 or 3 settlers.
+# A line starts with who says it (0, 1 or 2), then a colon.
+# Placeholders: {0} {1} {2} = the names of the settlers talking, {job0} {job1} {job2} = their jobs,
+# {other} = another settler of the settlement, {town} = the settlement, {owner} = its owner,
+# {item} and {count} = something in storage and how much of it there is.
+
+conversations:
+  - people: 2
+    lines:
+      - "0: Morning, {1}! Sleep well?"
+      - "1: Like a log. Until the rooster started."
+      - "0: We don't have a rooster."
+      - "1: ...then who was that?"
+      - "0: I think it was {other}. Singing."
+      - "1: Oh no."
+
+  - people: 2
+    lines:
+      - "0: Did you count the {item} lately?"
+      - "1: {count}, last time I looked."
+      - "0: {count}! That's a lot of {item}."
+      - "1: {owner} says we can never have too much."
+      - "0: {owner} hasn't tried carrying it all."
+
+  - people: 2
+    lines:
+      - "0: I had the strangest dream last night."
+      - "1: Let me guess. Creepers?"
+      - "0: No! I was the boss of {town}."
+      - "1: And?"
+      - "0: Everyone had to do MY job for a day."
+      - "1: Sounds like a nightmare to me."
+
+  - people: 2
+    lines:
+      - "0: How's work, {1}?"
+      - "1: Busy. Being a {job1} is no joke."
+      - "0: I could never do that."
+      - "1: Sure you could. You just need patience."
+      - "0: And a nap."
+      - "1: Mostly a nap."
+
+  - people: 2
+    lines:
+      - "0: Psst. {1}. Can you keep a secret?"
+      - "1: Of course!"
+      - "0: I hid a cookie behind the chests."
+      - "1: Which chests?"
+      - "0: ...I don't remember."
+      - "1: Then it's not a secret, it's lost."
+
+  - people: 2
+    lines:
+      - "0: Have you seen {other} lately?"
+      - "1: Working hard, as always."
+      - "0: Or hardly working!"
+      - "1: Ha! Don't let them hear that."
+      - "0: Too late, they're right behind you."
+      - "1: ...very funny."
+
+  - people: 2
+    lines:
+      - "0: I heard zombies near the edge of {town} last night."
+      - "1: The guards will handle them."
+      - "0: What if they don't?"
+      - "1: Then you run. Fast."
+      - "0: Great plan."
+      - "1: Worked so far!"
+
+  - people: 2
+    lines:
+      - "0: What would you do with a diamond, {1}?"
+      - "1: Make a pickaxe. Obviously."
+      - "0: Boring! I'd make a ring."
+      - "1: A diamond ring? For whom?"
+      - "0: ...nobody. Forget I said that."
+      - "1: Hmm hm hm."
+
+  - people: 2
+    lines:
+      - "0: Rain's coming. I can feel it in my knees."
+      - "1: Your knees said that last week too."
+      - "0: And it rained!"
+      - "1: Three days later."
+      - "0: My knees are patient."
+
+  - people: 2
+    lines:
+      - "0: {1}, do you ever miss the old village?"
+      - "1: Sometimes. The bread was better."
+      - "0: The bread was terrible!"
+      - "1: Yes, but it was OUR terrible bread."
+      - "0: ...I do miss that bread."
+
+  - people: 2
+    lines:
+      - "0: I'm going to build a tower one day."
+      - "1: How high?"
+      - "0: Higher than the clouds!"
+      - "1: You're scared of ladders."
+      - "0: Then I'll build stairs."
+      - "1: That's a lot of stairs."
+
+  - people: 2
+    lines:
+      - "0: {owner} gave me a nod today."
+      - "1: A nod? Like this?"
+      - "0: No, more like... a proud nod."
+      - "1: Wow. Maybe you'll get a raise."
+      - "0: In what? Emeralds?"
+      - "1: In nods. Two nods."
+
+  - people: 2
+    lines:
+      - "0: Do you think the chickens know?"
+      - "1: Know what?"
+      - "0: Anything."
+      - "1: ...I think they know more than they let on."
+      - "0: That's what worries me."
+
+  - people: 2
+    lines:
+      - "0: What's your favourite food, {1}?"
+      - "1: Pumpkin pie. No question."
+      - "0: Mine's baked potato."
+      - "1: That's not a favourite, that's a side dish."
+      - "0: It's a lifestyle."
+
+  - people: 3
+    lines:
+      - "0: Who ate the last apple?"
+      - "1: Not me!"
+      - "2: Not me either."
+      - "0: Then who...?"
+      - "1: {2} has crumbs on their shirt."
+      - "2: Those are... decorative crumbs."
+      - "0: Decorative. Right."
+
+  - people: 3
+    lines:
+      - "0: Let's have a feast tonight!"
+      - "1: I'll bring bread."
+      - "2: I'll bring... a good mood."
+      - "0: That's not food, {2}."
+      - "2: It goes with everything."
+      - "1: Fine, but you're doing the dishes."
+
+  - people: 3
+    lines:
+      - "0: Did you hear? {other} saw a skeleton riding a spider."
+      - "1: A spider jockey! Scary."
+      - "2: I don't believe it."
+      - "0: They were shaking all day."
+      - "2: They shake when they drink coffee too."
+      - "1: We don't have coffee."
+      - "2: Exactly. Suspicious."
+
+  - people: 3
+    lines:
+      - "0: Okay, vote: should {town} get a fountain?"
+      - "1: Yes!"
+      - "2: Who's going to build it?"
+      - "1: ...you?"
+      - "2: I vote no."
+      - "0: One yes, one no. I'll ask {owner}."
+
+  - people: 3
+    lines:
+      - "0: I bet I can carry more {item} than you two."
+      - "1: You're on."
+      - "2: Count me in."
+      - "0: Loser cleans the chests."
+      - "1: Wait, how many are there?"
+      - "2: {count}."
+      - "1: ...I suddenly feel tired."
+
+  - people: 3
+    lines:
+      - "0: Story time! Once upon a time, there was a brave {job0}."
+      - "1: Was it you?"
+      - "0: ...maybe. Anyway, one night a creeper came."
+      - "2: Oh no."
+      - "0: And I said: not in MY settlement!"
+      - "1: And then?"
+      - "0: Then I ran. Very bravely."
+      - "2: Classic."
+
+  - people: 3
+    lines:
+      - "0: What's the best job in {town}?"
+      - "1: {job1}, obviously."
+      - "2: No way, {job2} is the best."
+      - "0: You're both wrong."
+      - "1: Then what is it?"
+      - "0: The one with the most breaks."
+      - "2: Fair."
+
+  - people: 3
+    lines:
+      - "0: Shh. Listen."
+      - "1: What is it?"
+      - "0: ...nothing. That's the point. It's peaceful."
+      - "2: You scared me for nothing!"
+      - "0: For peace. Not for nothing."
+      - "1: Deep."
+
+  - people: 3
+    lines:
+      - "0: I'm thinking of planting flowers by the bell."
+      - "1: What colour?"
+      - "2: Red! Like poppies."
+      - "1: Yellow is nicer."
+      - "0: Both, then. A little garden."
+      - "2: {owner} will love it."
+      - "1: Or not notice at all."
+
+  - people: 2
+    lines:
+      - "0: Nice day, isn't it?"
+      - "1: Too nice. Something's going to go wrong."
+      - "0: You always say that."
+      - "1: And I'm always right eventually."
+
+  - people: 2
+    lines:
+      - "0: {1}, you've got something on your face."
+      - "1: Where?"
+      - "0: Everywhere. It's dirt."
+      - "1: That's called hard work."
+
+  - people: 2
+    lines:
+      - "0: What time is it?"
+      - "1: The sun is up."
+      - "0: That's not a time."
+      - "1: It's the only time I need."
+
+  - people: 2
+    lines:
+      - "0: I'm hungry."
+      - "1: You just ate."
+      - "0: That was a snack."
+      - "1: It was three potatoes."
+
+  - people: 2
+    lines:
+      - "0: Did you hear that?"
+      - "1: Hear what?"
+      - "0: Exactly. Too quiet."
+      - "1: You worry too much, {0}."
+
+  - people: 2
+    lines:
+      - "0: Hey {1}, catch!"
+      - "1: Catch what?"
+      - "0: ...I forgot to throw it."
+      - "1: Classic {0}."
+
+  - people: 2
+    lines:
+      - "0: I think the cows are judging me."
+      - "1: They're cows."
+      - "0: Judgemental cows."
+      - "1: Well, you did sing to them."
+
+  - people: 2
+    lines:
+      - "0: Want to hear a joke?"
+      - "1: Is it the one about the creeper?"
+      - "0: ...maybe."
+      - "1: It blows up at the end. I know."
+
+  - people: 2
+    lines:
+      - "0: {1}! Over here!"
+      - "1: What is it?"
+      - "0: Look. A butterfly."
+      - "1: That's a moth."
+      - "0: Still pretty."
+
+  - people: 2
+    lines:
+      - "0: Do you ever just... stand there?"
+      - "1: All the time."
+      - "0: Me too."
+      - "1: ..."
+      - "0: ..."
+      - "1: This is nice."
+
+  - people: 2
+    lines:
+      - "0: I'm going to learn to fish."
+      - "1: We don't have a fishing rod."
+      - "0: I'll learn the theory first."
+
+  - people: 2
+    lines:
+      - "0: Who's the best {job0} in {town}?"
+      - "1: You're the only {job0}."
+      - "0: So that's a yes."
+
+  - people: 2
+    lines:
+      - "0: I sneezed into the wheat earlier."
+      - "1: Why would you tell me that?"
+      - "0: Don't eat the bread on the left."
+
+  - people: 2
+    lines:
+      - "0: Guess what I found!"
+      - "1: A diamond?"
+      - "0: A stick."
+      - "1: ...wow."
+      - "0: A really straight stick!"
+
+  - people: 2
+    lines:
+      - "0: Is it me, or is {other} always smiling?"
+      - "1: They found an emerald last week."
+      - "0: Still?"
+      - "1: It was a big emerald."
+
+  - people: 2
+    lines:
+      - "0: My feet hurt."
+      - "1: Mine too. We walk a lot."
+      - "0: We should get horses."
+      - "1: You're scared of horses."
+      - "0: Small horses, then."
+
+  - people: 2
+    lines:
+      - "0: Thank you for yesterday, {1}."
+      - "1: What did I do?"
+      - "0: You held the door."
+      - "1: Oh. Anytime!"
+
+  - people: 2
+    lines:
+      - "0: Do zombies get tired?"
+      - "1: They don't sleep, so..."
+      - "0: That explains the moaning."
+
+  - people: 2
+    lines:
+      - "0: I'm writing a book."
+      - "1: About what?"
+      - "0: About {town}. Chapter one: the bell."
+      - "1: Thrilling."
+      - "0: Chapter two is about you."
+      - "1: Now it's thrilling."
+
+  - people: 2
+    lines:
+      - "0: Is that a new shirt?"
+      - "1: No, same as always."
+      - "0: It looks cleaner."
+      - "1: It rained."
+
+  - people: 2
+    lines:
+      - "0: Morning!"
+      - "1: Mrrph."
+      - "0: Not a morning person?"
+      - "1: Not a person before breakfast."
+
+  - people: 2
+    lines:
+      - "0: I counted the stars last night."
+      - "1: How many?"
+      - "0: I fell asleep at forty."
+      - "1: Good effort."
+
+  - people: 2
+    lines:
+      - "0: {owner} looked busy today."
+      - "1: {owner} always looks busy."
+      - "0: Maybe we should help."
+      - "1: We ARE the help."
+
+  - people: 2
+    lines:
+      - "0: Should I grow a beard?"
+      - "1: Can you?"
+      - "0: ...I can try."
+      - "1: Good luck with that."
+
+  - people: 2
+    lines:
+      - "0: The bell rang this morning."
+      - "1: Did it?"
+      - "0: Or was that my ears?"
+      - "1: Probably your ears."
+
+  - people: 2
+    lines:
+      - "0: I like it here."
+      - "1: Me too, {0}."
+      - "0: Good people. Good food."
+      - "1: Good chests."
+      - "0: Yes. Very good chests."
+
+  - people: 2
+    lines:
+      - "0: Have you tried {item}?"
+      - "1: Tried it how?"
+      - "0: Just... tried it."
+      - "1: I don't think you're supposed to."
+
+  - people: 2
+    lines:
+      - "0: Race you to the bell!"
+      - "1: Go!"
+      - "0: Wait, I wasn't ready!"
+      - "1: Too late!"
+
+  - people: 2
+    lines:
+      - "0: That cloud looks like a pig."
+      - "1: That one looks like a cow."
+      - "0: That one looks like {owner}."
+      - "1: Don't let them hear that."
+
+  - people: 2
+    lines:
+      - "0: I've decided. I'm a morning person now."
+      - "1: Since when?"
+      - "0: Since this morning."
+      - "1: How's it going?"
+      - "0: Terrible."
+
+  - people: 2
+    lines:
+      - "0: {1}, I have a problem."
+      - "1: What kind of problem?"
+      - "0: I promised {other} I'd help them tomorrow."
+      - "1: And?"
+      - "0: I also promised to help {owner} tomorrow."
+      - "1: At the same time?"
+      - "0: At the same time."
+      - "1: Then you'll have to run very fast."
+      - "0: I'm not a fast runner."
+      - "1: Then you'll have to promise less."
+      - "0: ...I promise I will."
+
+  - people: 2
+    lines:
+      - "0: I'm going to tell you a story."
+      - "1: Is it short?"
+      - "0: Once there was a {job1} named {1}."
+      - "1: Hey, that's me!"
+      - "0: {1} worked very hard every day."
+      - "1: That's true."
+      - "0: And one day {1} found a chest full of gold."
+      - "1: Really?!"
+      - "0: No. It was full of {item}."
+      - "1: ...that's a terrible story."
+      - "0: It's a true story. Go check the chests."
+
+  - people: 2
+    lines:
+      - "0: I tried to tame a wolf yesterday."
+      - "1: How did that go?"
+      - "0: I gave it a bone."
+      - "1: And?"
+      - "0: It took the bone."
+      - "1: And then?"
+      - "0: It left with the bone."
+      - "1: So you fed a wolf."
+      - "0: I prefer to say I made a friend."
+
+  - people: 2
+    lines:
+      - "0: Can I ask you something, {1}?"
+      - "1: Sure."
+      - "0: Why did you come to {town}?"
+      - "1: Honestly? The bell."
+      - "0: The bell?"
+      - "1: I heard it ringing from far away. It sounded like home."
+      - "0: That's... actually beautiful."
+      - "1: Also there was free bread."
+      - "0: And there it goes."
+
+  - people: 2
+    lines:
+      - "0: I've been thinking about the future."
+      - "1: Big thoughts for a {job0}."
+      - "0: One day {town} will be a city."
+      - "1: With walls?"
+      - "0: Huge walls. And a castle."
+      - "1: And who lives in the castle?"
+      - "0: We all do. Bunk beds."
+      - "1: A castle with bunk beds."
+      - "0: Cozy, right?"
+
+  - people: 2
+    lines:
+      - "0: Did you know {other} talks in their sleep?"
+      - "1: How do you know that?"
+      - "0: The walls are thin."
+      - "1: What do they say?"
+      - "0: Mostly 'more potatoes'."
+      - "1: Honestly, same."
+      - "0: Last night it was 'not the chickens!'"
+      - "1: ...I have so many questions."
+
+  - people: 2
+    lines:
+      - "0: I lost my lucky stone."
+      - "1: Your what?"
+      - "0: My lucky stone. Grey, round, stone-ish."
+      - "1: That describes every stone."
+      - "0: But this one was lucky!"
+      - "1: How do you know?"
+      - "0: Nothing bad happened while I had it."
+      - "1: And now?"
+      - "0: Now I stubbed my toe. Twice."
+      - "1: Let's go find your stone."
+
+  - people: 2
+    lines:
+      - "0: Teach me how to be a {job1}."
+      - "1: Okay. Step one: get up early."
+      - "0: How early?"
+      - "1: Before the sun."
+      - "0: Never mind."
+      - "1: That was quick."
+      - "0: I'll stay a {job0}. We sleep in."
+
+  - people: 2
+    lines:
+      - "0: I had a fight with a chicken today."
+      - "1: Who won?"
+      - "0: ...the chicken."
+      - "1: How?"
+      - "0: It was fast. And loud."
+      - "1: Did you get hurt?"
+      - "0: Just my pride."
+      - "1: Pride heals."
+      - "0: Not when {other} saw everything."
+
+  - people: 2
+    lines:
+      - "0: Do you think {owner} likes us?"
+      - "1: Of course. We work hard."
+      - "0: But do they LIKE us?"
+      - "1: They gave us a home."
+      - "0: True."
+      - "1: And a bell."
+      - "0: And chests!"
+      - "1: You really like the chests, huh?"
+      - "0: They're very good chests."
+
+  - people: 2
+    lines:
+      - "0: I'm going to marry the {item}."
+      - "1: You're going to what?"
+      - "0: I love it. It's always there for me."
+      - "1: There's {count} of it. Which one?"
+      - "0: ...all of them."
+      - "1: I'm worried about you, {0}."
+
+  - people: 2
+    lines:
+      - "0: Remember when we first got here?"
+      - "1: Nothing but grass and a bell."
+      - "0: And now look."
+      - "1: Fields, chests, friends."
+      - "0: We did that."
+      - "1: {owner} did most of it."
+      - "0: We did the walking around."
+      - "1: Very important walking around."
+
+  - people: 2
+    lines:
+      - "0: There's a ghost in the storage."
+      - "1: A ghost?"
+      - "0: Things move! Yesterday {item} was in one chest, today in another."
+      - "1: That's {other}. They sort things."
+      - "0: ...a sorting ghost."
+      - "1: A sorting {job0}, probably."
+      - "0: Even scarier."
+
+  - people: 2
+    lines:
+      - "0: Want to know my secret talent?"
+      - "1: You have one?"
+      - "0: I can whistle with my nose."
+      - "1: Show me."
+      - "0: ...hfffff..."
+      - "1: That's just breathing."
+      - "0: Loud breathing. It's a start."
+
+  - people: 2
+    lines:
+      - "0: I think I'm getting old."
+      - "1: Why?"
+      - "0: I made a noise sitting down."
+      - "1: Everyone does that."
+      - "0: I made a noise standing up too."
+      - "1: Okay, you're getting old."
+
+  - people: 2
+    lines:
+      - "0: {1}, if you could be any animal, what would you be?"
+      - "1: A cat. Sleep all day."
+      - "0: I'd be a parrot."
+      - "1: Why?"
+      - "0: So I could repeat everything {owner} says."
+      - "1: That would get you in trouble."
+      - "0: Squawk! Worth it!"
+
+  - people: 2
+    lines:
+      - "0: I've started a collection."
+      - "1: Of what?"
+      - "0: Interesting rocks."
+      - "1: How many do you have?"
+      - "0: One."
+      - "1: That's not a collection."
+      - "0: It's a very small collection."
+
+  - people: 2
+    lines:
+      - "0: Let's make a deal."
+      - "1: I'm listening."
+      - "0: You do my work tomorrow, I do yours the day after."
+      - "1: What's the catch?"
+      - "0: Tomorrow is a busy day."
+      - "1: And the day after?"
+      - "0: Probably raining. Very relaxing."
+      - "1: No deal."
+
+  - people: 2
+    lines:
+      - "0: I heard a song in the night."
+      - "1: That was me."
+      - "0: You sing?"
+      - "1: Only when nobody listens."
+      - "0: I was listening."
+      - "1: ...then I don't sing."
+      - "0: It was nice, {1}. Really."
+      - "1: ...thanks."
+
+  - people: 2
+    lines:
+      - "0: Did you see the sunset yesterday?"
+      - "1: The orange one?"
+      - "0: It was all purple and gold."
+      - "1: I was asleep."
+      - "0: You missed it!"
+      - "1: There's one every day."
+      - "0: Not like that one."
+
+  - people: 2
+    lines:
+      - "0: Everybody's talking about the creeper."
+      - "1: Which creeper?"
+      - "0: The one that got close to the fields."
+      - "1: What happened?"
+      - "0: {other} yelled at it."
+      - "1: And?"
+      - "0: It left. Very offended."
+      - "1: Good for {other}."
+
+  - people: 2
+    lines:
+      - "0: You look sad, {1}."
+      - "1: I'm fine."
+      - "0: Want a cookie?"
+      - "1: ...yes."
+      - "0: I don't have one. But I could find one."
+      - "1: That actually helps."
+      - "0: Cookie quest begins!"
+
+  - people: 2
+    lines:
+      - "0: I'm going to be famous one day."
+      - "1: For what?"
+      - "0: The best {job0} in the world."
+      - "1: The whole world?"
+      - "0: Okay, the whole {town}."
+      - "1: That's more realistic."
+      - "0: You'll ask for my autograph."
+      - "1: I'll ask for your potatoes."
+
+  - people: 3
+    lines:
+      - "0: Morning, everyone!"
+      - "1: Morning!"
+      - "2: Is it?"
+      - "0: Somebody didn't sleep."
+      - "2: Somebody snored."
+      - "1: Not me!"
+
+  - people: 3
+    lines:
+      - "0: Who wants to hear a riddle?"
+      - "1: Me!"
+      - "2: No."
+      - "0: What has a bell but never rings?"
+      - "1: ..."
+      - "2: {town} on a lazy day."
+      - "0: Close enough."
+
+  - people: 3
+    lines:
+      - "0: Guess what {owner} said today?"
+      - "1: What?"
+      - "0: 'Good job.'"
+      - "2: To you?"
+      - "0: To the bell. But I was standing next to it."
+
+  - people: 3
+    lines:
+      - "0: Let's play a game."
+      - "1: Hide and seek?"
+      - "2: I'll count!"
+      - "0: ..."
+      - "2: ...where did everybody go?"
+      - "1: (giggling)"
+
+  - people: 3
+    lines:
+      - "0: I made soup."
+      - "1: What kind?"
+      - "0: Surprise soup."
+      - "2: What's in it?"
+      - "0: That's the surprise."
+      - "1: I'll pass."
+
+  - people: 3
+    lines:
+      - "0: Which is better, day or night?"
+      - "1: Day. No zombies."
+      - "2: Night. No work."
+      - "0: You're both right."
+      - "1: That's not how it works."
+
+  - people: 3
+    lines:
+      - "0: Who left the door open?"
+      - "1: Not me."
+      - "2: Not me either."
+      - "0: Then it was the wind."
+      - "1: The wind can't open doors."
+      - "2: This wind can."
+
+  - people: 3
+    lines:
+      - "0: I'm thinking about a new hairstyle."
+      - "1: Shorter?"
+      - "2: Longer?"
+      - "0: Blockier."
+      - "1: ...we're already blocky."
+      - "0: Blockier!"
+
+  - people: 3
+    lines:
+      - "0: Has anyone seen my hat?"
+      - "1: You're wearing it."
+      - "0: My other hat."
+      - "2: You have two hats?"
+      - "0: Not anymore."
+
+  - people: 3
+    lines:
+      - "0: Group hug?"
+      - "1: No."
+      - "2: No."
+      - "0: Group nod, then."
+      - "1: (nods)"
+      - "2: (nods)"
+      - "0: Beautiful."
+
+  - people: 3
+    lines:
+      - "0: Okay, listen. I have a plan."
+      - "1: Oh no."
+      - "2: Here we go."
+      - "0: We build a tree house."
+      - "1: In which tree?"
+      - "0: The big one by the fields."
+      - "2: The lumberjack will cut it down."
+      - "0: Not if we live in it!"
+      - "1: That's not a plan, that's a hostage situation."
+      - "2: I'm in."
+      - "1: ...fine, I'm in too."
+
+  - people: 3
+    lines:
+      - "0: Let's tell scary stories."
+      - "1: It's daytime."
+      - "0: Even scarier. Nobody expects it."
+      - "2: Go on then."
+      - "0: Once there was a settler who opened a chest..."
+      - "1: And?"
+      - "0: ...and it was EMPTY."
+      - "2: Nooo!"
+      - "1: The horror."
+      - "0: The {item} was gone. All {count} of it."
+      - "2: Wait, is that true?"
+      - "0: Go check!"
+
+  - people: 3
+    lines:
+      - "0: Who would win in a fight, a cow or a pig?"
+      - "1: Cow. It's bigger."
+      - "2: Pig. It's angrier."
+      - "0: Pigs aren't angry."
+      - "2: Have you seen their eyes?"
+      - "1: Cows have horns."
+      - "2: Pigs have... determination."
+      - "0: I think we need to ask {other}."
+      - "1: Why {other}?"
+      - "0: They've fought both."
+      - "2: ...I have questions."
+
+  - people: 3
+    lines:
+      - "0: Friends, I need advice."
+      - "1: About what?"
+      - "0: {other} said my bread was 'interesting'."
+      - "2: Ouch."
+      - "1: Interesting can be good."
+      - "2: It's never good."
+      - "0: What do I do?"
+      - "1: Make better bread."
+      - "2: Or give it to the pigs."
+      - "0: The pigs said it was interesting too."
+
+  - people: 3
+    lines:
+      - "0: Have you noticed {owner} hums when they build?"
+      - "1: Yes! The same tune every time."
+      - "2: I know that tune!"
+      - "0: How does it go?"
+      - "2: Hmm hm hmmm, hm hm."
+      - "1: That's not it."
+      - "2: Hmm hm hmmm, HMM hm?"
+      - "0: That's... closer."
+      - "1: We should ask them to teach us."
+      - "2: A {town} choir!"
+      - "0: Let's not."
+
+  - people: 3
+    lines:
+      - "0: Big news, everyone."
+      - "1: What?"
+      - "0: I saw a pink sheep."
+      - "2: No way. Those are rare."
+      - "0: It was SO pink."
+      - "1: Where?"
+      - "0: Just outside {town}."
+      - "2: Did you bring it back?"
+      - "0: It didn't want to come."
+      - "1: Smart sheep."
+      - "2: Pink AND smart. Wow."
+
+  - people: 3
+    lines:
+      - "0: Let's each say one nice thing about {town}."
+      - "1: The food is good."
+      - "2: The people are kind."
+      - "0: The bell is shiny."
+      - "1: The chests are well sorted."
+      - "2: The fields are green."
+      - "0: The {item}. There's {count} of it!"
+      - "1: You and your counting."
+      - "0: Numbers are nice too."
+
+  - people: 3
+    lines:
+      - "0: I had an adventure last night."
+      - "1: You were in bed."
+      - "0: In my dream!"
+      - "2: Here we go."
+      - "0: I was a knight, fighting an ender dragon."
+      - "1: Did you win?"
+      - "0: I was about to."
+      - "2: And then?"
+      - "0: Then {other} woke me up asking for a bucket."
+      - "1: Typical."
+      - "2: The dragon got away?"
+      - "0: The dragon got away."
+
+  - people: 3
+    lines:
+      - "0: Who here can cook?"
+      - "1: I can burn things."
+      - "2: I can eat things."
+      - "0: So nobody."
+      - "1: The {job2} can cook."
+      - "2: I said eat. EAT."
+      - "0: Then we'll starve."
+      - "1: We have {count} {item}."
+      - "0: ...we'll be fine."
+
+  - people: 3
+    lines:
+      - "0: Shall we build a statue of {owner}?"
+      - "1: Out of what?"
+      - "0: Hay bales."
+      - "2: It'll look like a pile of hay."
+      - "0: A pile of hay with a lot of love."
+      - "1: And a hat."
+      - "2: Fine, but I'm doing the face."
+      - "0: You can't do faces."
+      - "2: I can do hay faces."
+
+  - people: 3
+    lines:
+      - "0: Okay, honest question. What's the scariest mob?"
+      - "1: Creeper. No warning."
+      - "2: Phantoms. They hate sleepers."
+      - "0: For me it's the chicken."
+      - "1: The chicken?"
+      - "0: You've never seen one stare at you."
+      - "2: He lost a fight to a chicken."
+      - "0: I did NOT lose. It was a draw."
+      - "1: The chicken thinks otherwise."
+
+  - people: 3
+    lines:
+      - "0: I wonder what's past the mountains."
+      - "1: More mountains."
+      - "2: A village, maybe."
+      - "0: Or an ocean!"
+      - "1: Or a desert full of husks."
+      - "2: Thanks for that."
+      - "0: One day I'll go and see."
+      - "1: And come back?"
+      - "0: Of course. {town} is home."
+      - "2: Bring snacks."
+
+  - people: 3
+    lines:
+      - "0: Let's settle this. Best block?"
+      - "1: Oak planks. Classic."
+      - "2: Glass. You see everything."
+      - "0: Hay. It's comfy."
+      - "1: You can't build a house of hay."
+      - "0: Watch me."
+      - "2: Please don't."
+
+  - people: 3
+    lines:
+      - "0: {1}, {2}, I'm leaving {town}."
+      - "1: What?!"
+      - "2: Why?"
+      - "0: ...to get some flowers. I'll be back in five minutes."
+      - "1: You scared us!"
+      - "2: Get me a poppy."
+      - "0: One poppy, coming up."
+
+  - people: 3
+    lines:
+      - "0: We should throw {other} a party."
+      - "1: Why?"
+      - "0: Because they work so hard."
+      - "2: Surprise party!"
+      - "1: Where?"
+      - "0: At the bell. Tonight."
+      - "2: I'll bring music."
+      - "1: I'll bring bread."
+      - "0: I'll bring... the surprise."
+      - "2: You always say that."
+
+  - people: 3
+    lines:
+      - "0: I tried to milk a mooshroom."
+      - "1: And?"
+      - "0: Got soup."
+      - "2: That's how it works."
+      - "0: I wanted milk!"
+      - "1: Use a bucket, not a bowl."
+      - "0: ...oh."
+      - "2: There it is."
+
+  - people: 3
+    lines:
+      - "0: Who's the oldest here?"
+      - "1: Not me."
+      - "2: Definitely {0}."
+      - "0: Why me?"
+      - "2: You remember when the bell was new."
+      - "0: Everybody remembers that."
+      - "1: It was last year."
+      - "0: ...exactly. Ancient history."
+
+  - people: 3
+    lines:
+      - "0: My plan for today: nothing."
+      - "1: Bold."
+      - "2: Ambitious."
+      - "0: I've been planning it all week."
+      - "1: And how's it going?"
+      - "0: I'm doing it right now."
+      - "2: Master at work."
+
+  - people: 3
+    lines:
+      - "0: Does anyone else hear music?"
+      - "1: That's {other} practicing."
+      - "2: On what?"
+      - "1: A goat horn."
+      - "0: That explains the goat."
+      - "2: What goat?"
+      - "0: The one that's been following them all day."
+
+  - people: 3
+    lines:
+      - "0: If {town} had a flag, what would be on it?"
+      - "1: The bell."
+      - "2: A potato."
+      - "0: Why a potato?"
+      - "2: Potatoes are humble. Like us."
+      - "1: That's... surprisingly deep."
+      - "0: A bell holding a potato."
+      - "2: Perfect."
+
+  - people: 2
+    lines:
+      - "0: How's the {job1} business?"
+      - "1: Booming."
+      - "0: Really?"
+      - "1: No. But it sounds good."
+
+  - people: 2
+    lines:
+      - "0: I worked so hard today."
+      - "1: What did you do?"
+      - "0: I thought about working."
+      - "1: That's not work."
+      - "0: It was tiring though."
+
+  - people: 2
+    lines:
+      - "0: The storage is getting full."
+      - "1: Of what?"
+      - "0: {item}. {count} of it."
+      - "1: Somebody tell {owner} to build more chests."
+      - "0: You tell them."
+      - "1: You tell them."
+
+  - people: 2
+    lines:
+      - "0: Do you like your job, {1}?"
+      - "1: I like the breaks."
+      - "0: That's not the job."
+      - "1: It's the best part of the job."
+
+  - people: 2
+    lines:
+      - "0: I dropped my tool in the field."
+      - "1: Did you find it?"
+      - "0: Yes. It found my foot first."
+      - "1: Ouch."
+
+  - people: 2
+    lines:
+      - "0: Who taught you to be a {job1}?"
+      - "1: Nobody. I just started."
+      - "0: And it worked?"
+      - "1: Mostly."
+      - "0: Mostly?"
+      - "1: Don't ask about the first week."
+
+  - people: 2
+    lines:
+      - "0: Tomorrow I'll work twice as hard."
+      - "1: You say that every day."
+      - "0: And tomorrow it will be true."
+      - "1: Tomorrow never comes, {0}."
+
+  - people: 3
+    lines:
+      - "0: Quick meeting. How's work going?"
+      - "1: Good!"
+      - "2: Fine."
+      - "0: Any problems?"
+      - "2: The chickens."
+      - "1: Always the chickens."
+      - "0: Noted. Meeting over."
+
+  - people: 3
+    lines:
+      - "0: If we all worked together, we'd finish twice as fast."
+      - "1: And then?"
+      - "0: Then we'd have free time."
+      - "2: We have free time now."
+      - "0: ...good point."
+      - "1: Meeting over?"
+      - "2: Meeting over."
+
+  - people: 3
+    lines:
+      - "0: I think we need a day off."
+      - "1: Today is a day off."
+      - "0: Then I need another one."
+      - "2: Two days off in a row?"
+      - "0: Rest is important."
+      - "1: Tell {owner}."
+      - "0: Tell {owner} what?"
+      - "2: Nothing. Let's go back to work."
+
+  - people: 2
+    lines:
+      - "0: Stay close to the bell tonight."
+      - "1: Why?"
+      - "0: Full moon. The mobs get bold."
+      - "1: You made that up."
+      - "0: Maybe. Stay close anyway."
+
+  - people: 2
+    lines:
+      - "0: It's raining."
+      - "1: Good for the crops."
+      - "0: Bad for my hair."
+      - "1: You have hair?"
+      - "0: Rude."
+
+  - people: 2
+    lines:
+      - "0: I saw lightning hit a tree."
+      - "1: Scary!"
+      - "0: The tree was fine."
+      - "1: Lucky tree."
+      - "0: The pig next to it, less so."
+
+  - people: 2
+    lines:
+      - "0: Snow would be nice."
+      - "1: Snow is cold."
+      - "0: Snow is pretty."
+      - "1: Pretty cold."
+
+  - people: 2
+    lines:
+      - "0: Night is coming."
+      - "1: Time to gather at the fire."
+      - "0: My favourite part of the day."
+      - "1: Mine too."
+
+  - people: 3
+    lines:
+      - "0: Thunderstorm last night. Anyone sleep?"
+      - "1: Not a wink."
+      - "2: Like a baby."
+      - "0: How?"
+      - "2: I pretended it was applause."
+      - "1: For what?"
+      - "2: For me. Obviously."
+
+  - people: 3
+    lines:
+      - "0: Did you hear the endermen last night?"
+      - "1: Those noises?"
+      - "2: Don't look at them."
+      - "0: I didn't!"
+      - "1: I did. Just a little."
+      - "2: And?"
+      - "1: It looked away first. Very polite."
+
+  - people: 2
+    lines:
+      - "0: {1}, I'm glad you're here."
+      - "1: Me too."
+      - "0: {town} wouldn't be the same without you."
+      - "1: Stop it, you'll make me blush."
+
+  - people: 2
+    lines:
+      - "0: You okay? You've been quiet."
+      - "1: Just thinking about home."
+      - "0: This is home now."
+      - "1: ...yeah. You're right."
+
+  - people: 2
+    lines:
+      - "0: Thanks for helping me yesterday."
+      - "1: That's what friends are for."
+      - "0: Friends?"
+      - "1: Friends."
+      - "0: I like that."
+
+  - people: 3
+    lines:
+      - "0: I want to say something."
+      - "1: Uh oh."
+      - "2: Go on."
+      - "0: I like you two. A lot."
+      - "1: ...we like you too, {0}."
+      - "2: Group hug?"
+      - "0: Group hug."
+
+  - people: 3
+    lines:
+      - "0: Do you remember the first night here?"
+      - "1: We had no beds."
+      - "2: We slept by the bell."
+      - "0: And {owner} kept watch."
+      - "1: I didn't know that."
+      - "0: All night. With a sword."
+      - "2: ...we should thank them."

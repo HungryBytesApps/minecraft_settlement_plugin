@@ -24,9 +24,9 @@ work-area-particle: HAPPY_VILLAGER
 # Show "Name (Job)" above each settler.
 show-names: true
 
-# Walking speed in blocks per tick (20 ticks = 1 second).
-work-speed: 0.11
-walk-speed: 0.07
+# Walking speed in blocks per tick (20 ticks = 1 second). A player walks 0.21.
+work-speed: 0.15
+walk-speed: 0.11
 
 # Work area radius around a workplace (composter): default for new workplaces, and the maximum.
 default-work-radius: 6
@@ -78,10 +78,31 @@ job-skins:
 # Farmers keep this many of each seed (seeds, carrots, potatoes, beetroot seeds) for replanting.
 seeds-to-keep: 16
 
-# Random settler names.
+# Names that fit the skin: men's names for men's skins, women's names for women's skins.
+names-male: [Bram, Cor, Daan, Finn, Gijs, Hugo, Jens, Joep, Kees, Lars, Otto, Rik, Sem, Teun, Thijs, Wim]
+names-female: [Anna, Eva, Femke, Fleur, Greet, Ilse, Lieke, Lotte, Maud, Noor, Pien, Roos, Saar, Sanne, Vera, Yara]
+# Which built-in skins are men and which are women (decides the name and slim/wide arms).
+skin-gender:
+  steve: male
+  alex: female
+  ari: female
+  efe: female
+  kai: male
+  makena: female
+  noor: female
+  sunny: male
+  zuri: male
+
+# Names for skins that are neither (a player's skin, your own skins).
 names: [Anna, Bram, Cor, Daan, Eva, Finn, Greet, Hugo, Ilse, Joep, Kees, Lotte, Maud, Noor, Otto, Pien, Rik, Saar, Teun, Vera, Wim, Yara]
 
-# Things settlers say to each other.
+# Sounds when settlers talk: a mumbling voice (each settler its own pitch), and a laugh.
+talk-sounds: true
+voice-sound: minecraft:entity.villager.ambient
+laugh-sound: minecraft:entity.villager.yes
+
+# Things settlers say when sitting together in the evening. Their conversations (little stories
+# for 2 or 3 settlers) are built in; add your own in my-conversations.yml.
 chat-lines:
   - "Nice weather today!"
   - "Did you see the crops?"

@@ -14,7 +14,7 @@ Bell menu → **Show border**: When holding ledger / On / Off.
 
 - **Recruit** at the bell (price in `recruit-cost`): a new settler walks into the settlement.
 - Or **hire** a wild villager: right-click it with the ledger. If it's far away, it follows you when you're near.
-- Right-click a settler: it says hi. With the ledger: its menu (rename, skin, inventory as a chest window, role worker/guard, guard settings, leave workplace, dismiss).
+- Right-click your settler: its menu (others just say hi) (rename, skin, inventory as a chest window, role worker/guard, guard settings, leave workplace, dismiss).
 
 ## Workplaces
 
@@ -39,19 +39,20 @@ Settlers use the chests and barrels in the settlement (on by default, `chests-al
 
 ## Storage targets
 
-Ledger menu → **Storage targets**: a grid of products (icon, in storage / target). Click one to change its target with −/+ buttons.
+Ledger menu → **Storage targets**: per workstation, its products in alphabetical order (icon, in storage / target). Click one to change its target with −/+ buttons.
 No limit by default (keep producing). Settlers stop making a product once storage holds the target (farmers keep replanting).
 
 ## Settlers
 
-Settlers are player-like (Mannequins): their own skin (`skins` in the config), their job under their name,
+Settlers are player-like (Mannequins): their own skin (`skins` in the config), with a name that fits it (`names-male`, `names-female`, `skin-gender`), their job under their name,
 and only tools they really carry in hand. Look at a settler and it looks back at you. They turn their heads smoothly, glance around, nod while chatting, crouch to work the fields, really eat, draw their bows and blow their horns. Old villager settlers are converted automatically.
+Skins per job: `job-skins` in the config (url:/value: from mineskin.org, texture: from a resource pack, or player:Name).
 Own skins: put them in the server resource pack and add `texture:namespace:path/to/skin` (or `...:slim`) to `skins` in the config.
 Hiring a wild villager turns it into a settler; dismissing a settler turns it back into a villager.
 
 ## Free time
 
-During the day: walks, chats with speech bubbles, reading (on a bench or standing), making music together,
+During the day: conversations of 2 or 3 settlers telling little stories (128 built in, add your own in `my-conversations.yml`), with a mumbling voice per settler (`talk-sounds`, `voice-sound`), pottering around their workplace, walks, reading (on a bench or standing), making music together,
 visiting someone at work, sitting down, looking around.
 
 In the evening everyone gets together at the gathering spot: the place in the settlement with the most seats

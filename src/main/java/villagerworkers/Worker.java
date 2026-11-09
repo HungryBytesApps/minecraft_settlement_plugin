@@ -185,8 +185,12 @@ final class Worker {
         body.setInvulnerable(false); // mobs can hurt settlers (players can't, see WorkerListener)
         body.setRemoveWhenFarAway(false);
         body.setPersistent(true);
-        if (skin == null) {
-            skin = Skins.pick(plugin.settings().skins(), random);
+        // No skin yet, or a man's skin with a woman's name (or the other way around): pick one that fits the name.
+        Settings st = plugin.settings();
+        String g = Skins.gender(st, skin);
+        boolean mismatch = ("male".equals(g) && st.femaleNames().contains(name)) || ("female".equals(g) && st.maleNames().contains(name));
+        if (skin == null || mismatch) {
+            skin = Skins.skinFor(st, name, random);
             body.getPersistentDataContainer().set(Keys.SKIN, PersistentDataType.STRING, skin);
         }
         String jobSkin = Skins.forJob(plugin.settings(), title(), body.getUniqueId());
