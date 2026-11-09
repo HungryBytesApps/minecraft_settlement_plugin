@@ -42,7 +42,7 @@ final class Menus {
      * (no flicker, the mouse stays put). A click that opens nothing new closes the dialog.
      */
     private static DialogAction click(VillagerWorkersPlugin plugin, DialogActionCallback cb, ClickCallback.Options options) {
-        return click(plugin, (view, audience) -> {
+        return DialogAction.customClick((view, audience) -> {
             if (!(audience instanceof Player p)) {
                 cb.accept(view, audience);
                 return;
