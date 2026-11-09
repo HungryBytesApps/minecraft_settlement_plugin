@@ -31,7 +31,8 @@ record Settings(
         org.bukkit.Particle workParticle,
         List<String> skins,
         List<String> names,
-        List<String> chatLines
+        List<String> chatLines,
+        java.util.Map<String, List<String>> jobSkins
 ) {
     static Settings from(FileConfiguration c) {
         List<String> names = c.getStringList("names");
@@ -75,8 +76,21 @@ record Settings(
                 Borders.particle(c.getString("work-area-particle", "HAPPY_VILLAGER"), org.bukkit.Particle.HAPPY_VILLAGER),
                 skins.isEmpty() ? List.of("steve", "alex") : skins,
                 names,
-                lines
+                lines,
+                jobSkins(c)
         );
+    }
+
+    /** job-skins: farmer: [...], guard: [...]: skins per job (empty = the settler's own skin). */
+    private static java.util.Map<String, List<String>> jobSkins(FileConfiguration c) {
+        java.util.Map<String, List<String>> out = new java.util.HashMap<>();
+        org.bukkit.configuration.ConfigurationSection s = c.getConfigurationSection("job-skins");
+        if (s == null) return out;
+        for (String k : s.getKeys(false)) {
+            List<String> l = s.getStringList(k);
+            if (!l.isEmpty()) out.put(k.toLowerCase(Locale.ROOT).replace('_', '-'), l);
+        }
+        return out;
     }
 
     private static double clamp(double v, double min, double max) {

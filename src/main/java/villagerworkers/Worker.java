@@ -189,7 +189,8 @@ final class Worker {
             skin = Skins.pick(plugin.settings().skins(), random);
             body.getPersistentDataContainer().set(Keys.SKIN, PersistentDataType.STRING, skin);
         }
-        body.setProfile(Skins.profile(skin));
+        String jobSkin = Skins.forJob(plugin.settings(), title(), body.getUniqueId());
+        body.setProfile(Skins.profile(jobSkin != null ? jobSkin : skin));
         Job job = job();
         body.customName(Component.text(name, NamedTextColor.WHITE));
         body.setCustomNameVisible(plugin.settings().showNames());

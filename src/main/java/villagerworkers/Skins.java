@@ -15,15 +15,41 @@ final class Skins {
     /** Pick one from the config: "zuri:slim", "steve:wide" or "player:Name". */
     static String pick(List<String> options, Random random) {
         String s = options.get(random.nextInt(options.size())).trim();
-        if (s.toLowerCase(Locale.ROOT).startsWith("player:") || s.toLowerCase(Locale.ROOT).startsWith("texture:")) return s;
+        String low = s.toLowerCase(Locale.ROOT);
+        if (low.startsWith("player:") || low.startsWith("texture:") || low.startsWith("url:") || low.startsWith("value:")) return s;
         return s.toLowerCase(Locale.ROOT) + (random.nextBoolean() ? ":slim" : ":wide");
+    }
+
+    /** The skin for a job from job-skins (the same one for the same settler), or null. */
+    static String forJob(Settings s, String job, java.util.UUID id) {
+        List<String> l = s.jobSkins().get(job.toLowerCase(Locale.ROOT).replace(' ', '-'));
+        if (l == null || l.isEmpty()) return null;
+        return l.get(Math.floorMod(id.hashCode(), l.size())).trim();
     }
 
     static ResolvableProfile profile(String spec) {
         if (spec.toLowerCase(Locale.ROOT).startsWith("player:")) {
             return ResolvableProfile.resolvableProfile().name(spec.substring(7)).build();
         }
-        if (spec.toLowerCase(Locale.ROOT).startsWith("texture:")) {
+        String low = spec.toLowerCase(Locale.ROOT);
+        if (low.startsWith("url:") || low.startsWith("value:")) {
+            // A skin hosted by Minecraft: "url:http://textures.minecraft.net/texture/<id>" (+ ":slim"),
+            // or "value:<texture value>" as MineSkin and other sites give it.
+            String value;
+            if (low.startsWith("value:")) {
+                value = spec.substring(6).trim();
+            } else {
+                String rest = spec.substring(4).trim();
+                boolean slim = rest.endsWith(":slim");
+                if (slim) rest = rest.substring(0, rest.length() - 5);
+                String json = "{\"textures\":{\"SKIN\":{\"url\":\"" + rest + "\"" + (slim ? ",\"metadata\":{\"model\":\"slim\"}" : "") + "}}}";
+                value = java.util.Base64.getEncoder().encodeToString(json.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            }
+            return ResolvableProfile.resolvableProfile()
+                    .addProperty(new com.destroystokyo.paper.profile.ProfileProperty("textures", value))
+                    .build();
+        }
+        if (low.startsWith("texture:")) {
             // Your own skin from the server resource pack: "texture:namespace:path/to/skin" (+ ":slim").
             String[] p = spec.split(":");
             boolean slim = p.length > 3 && p[3].equals("slim");

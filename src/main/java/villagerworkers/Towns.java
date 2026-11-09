@@ -159,7 +159,7 @@ final class Towns {
                     wp.enabled = w.getBoolean("enabled", true);
                     wp.herd = w.getInt("herd", 6);
                     ConfigurationSection opts = w.getConfigurationSection("options");
-                    if (opts != null) for (String k : opts.getKeys(false)) wp.options.put(k, opts.getBoolean(k));
+                    if (opts != null) for (String opt : opts.getKeys(false)) wp.options.put(opt, opts.getBoolean(opt));
                     try {
                         String worker = w.getString("worker");
                         if (worker != null) wp.worker = UUID.fromString(worker);

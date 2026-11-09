@@ -57,6 +57,24 @@ sit-height: 0.0
 # for slim arms) for your own skin image in the server resource pack (assets/namespace/textures/path/to/skin.png).
 skins: [steve, alex, ari, efe, kai, makena, noor, sunny, zuri]
 
+# Skins per job (a settler gets one of these while it has that job; empty or missing = its own skin).
+# Jobs: farmer, cook, smelter, furnace-worker, herder, lumberjack, smith, guard, settler (no job).
+# A skin can be:
+#   url:http://textures.minecraft.net/texture/<id>        (add :slim for slim arms)
+#   value:<texture value>                                  (the long "value" from mineskin.org)
+#   texture:namespace:path/to/skin                         (a skin image in your server resource pack)
+#   player:Name                                            (a player's current skin)
+# To use a skin image from a skin website: upload it at mineskin.org and copy the texture URL or value.
+job-skins:
+  farmer: []
+  cook: []
+  smelter: []
+  furnace-worker: []
+  herder: []
+  lumberjack: []
+  smith: []
+  guard: []
+
 # Farmers keep this many of each seed (seeds, carrots, potatoes, beetroot seeds) for replanting.
 seeds-to-keep: 16
 
