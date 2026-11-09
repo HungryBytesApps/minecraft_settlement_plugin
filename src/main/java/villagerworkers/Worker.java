@@ -41,6 +41,7 @@ final class Worker {
     final VillagerWorkersPlugin plugin;
     final Mannequin body;
     final Mover mover;
+    final Animator anim;
     final Random random = new Random();
     /** What the settler carries (saved on the entity). */
     final Inventory pockets = Bukkit.createInventory(null, 9);
@@ -59,7 +60,8 @@ final class Worker {
     int guardRadius;
 
     // Combat (runtime)
-    int attackReady, chaseRepath, potionReady, lastHurt = -10000;
+    int attackReady, chaseRepath, potionReady, lastHurt = -10000, drawStart;
+    boolean drawing;
     org.bukkit.entity.LivingEntity lastAttacker;
     private int regenTimer, healthShown = -1, defenseCheck = 20, foodCheck = 100;
 
@@ -79,6 +81,7 @@ final class Worker {
         this.plugin = plugin;
         this.body = body;
         this.mover = new Mover(this);
+        this.anim = new Animator(this);
         load();
         decisionCooldown = 10 + random.nextInt(30); // don't all think on the same tick
     }
@@ -239,44 +242,44 @@ final class Worker {
     // ---- Noticing players ----
 
     private org.bukkit.entity.Player watcher;
-    private int watchUntil, watchCheck;
+    private int watchUntil, watchCheck, lookingSince = -1;
 
     /** Is a player looking at this settler (and it's looking back)? */
     boolean watched() {
         return watcher != null && Bukkit.getCurrentTick() < watchUntil;
     }
 
-    /** A player close by looks at the settler: it looks back (and sometimes waves). */
+    /** A player close by looks at the settler: after a moment it looks back at them. */
     private void noticePlayers() {
         if (--watchCheck > 0) return;
         watchCheck = 5;
-        boolean free = activity == null || activity.freeTime() || activity.interruptible()
-                || activity instanceof Social.LookAround || (activity instanceof Guard g && g.idle());
-        if (!free || mover.moving()) {
+        boolean busy = mover.moving() || activity instanceof Defense.Reaction
+                || (activity instanceof Guard g && !g.idle()) || body.isInsideVehicle() && !(activity != null && activity.freeTime());
+        if (busy) {
             watcher = null;
+            lookingSince = -1;
             return;
         }
-        Location eye = body.getEyeLocation();
         org.bukkit.entity.Player found = null;
         for (org.bukkit.entity.Player p : body.getWorld().getPlayers()) {
             if (p.getGameMode() == org.bukkit.GameMode.SPECTATOR) continue;
-            Location pe = p.getEyeLocation();
-            double d2 = pe.distanceSquared(eye);
-            if (d2 > 10 * 10 || d2 < 0.01) continue;
-            org.bukkit.util.Vector to = eye.toVector().subtract(pe.toVector()).normalize();
-            if (pe.getDirection().dot(to) < 0.96 || !p.hasLineOfSight(body)) continue;
-            found = p;
-            break;
+            if (p.getLocation().distanceSquared(body.getLocation()) > 12 * 12) continue;
+            if (body.equals(p.getTargetEntity(12))) {
+                found = p;
+                break;
+            }
         }
         int now = Bukkit.getCurrentTick();
         if (found != null) {
-            if (watcher == null && random.nextInt(4) == 0) body.swingMainHand(); // a little wave
+            if (lookingSince < 0 || found != watcher) lookingSince = now;
             watcher = found;
-            watchUntil = now + 40; // keep looking a moment after they look away
+            if (now - lookingSince >= 30) watchUntil = now + 40; // looked for 1.5 s: look back
+        } else if (!watched()) {
+            lookingSince = -1;
         }
-        if (watched() && watcher.isValid() && watcher.getWorld() == body.getWorld()) {
-            Mover.lookAt(body, watcher.getEyeLocation());
-        } else {
+        if (watched() && watcher != null && watcher.isValid() && watcher.getWorld() == body.getWorld()) {
+            anim.look(watcher.getEyeLocation());
+        } else if (found == null) {
             watcher = null;
         }
     }
@@ -386,6 +389,7 @@ final class Worker {
             }
         }
         mover.tick();
+        anim.tick();
         healthTick();
         noticePlayers();
         if (--defenseCheck <= 0) {

@@ -202,7 +202,7 @@ final class Guard implements Activity {
                 if (w.body.getLocation().distanceSquared(stand) > 1.5 * 1.5) {
                     if (!w.mover.moving() && time % 20 == 0) w.mover.go(stand, 0.6, speed);
                 } else if (time % 60 == 0) {
-                    Social.LookAround.glance(w);
+                    w.anim.glance();
                 }
             }
             case ESCORT -> {

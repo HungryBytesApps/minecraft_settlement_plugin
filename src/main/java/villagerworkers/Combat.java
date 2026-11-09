@@ -301,8 +301,19 @@ final class Combat {
             return true;
         }
         int now = Bukkit.getCurrentTick();
-        if (now < w.attackReady) return true;
-        w.attackReady = now + (bow.getType() == Material.CROSSBOW ? 30 : 22);
+        // Draw the bow first (the real animation), then let go.
+        if (w.drawing && now - w.drawStart > 40) w.drawing = false; // lost the target while drawing
+        if (!w.drawing) {
+            if (now < w.attackReady) return true;
+            w.anim.use(45);
+            w.drawing = true;
+            w.drawStart = now;
+            return true;
+        }
+        if (now - w.drawStart < (bow.getType() == Material.CROSSBOW ? 20 : 18)) return true;
+        w.drawing = false;
+        w.anim.stopUsing();
+        w.attackReady = now + 6;
         Location eye = w.body.getEyeLocation();
         Vector to = target.getLocation().add(0, target.getHeight() * 0.6, 0).toVector().subtract(eye.toVector());
         double dist = to.length();
@@ -310,7 +321,6 @@ final class Combat {
         Arrow arrow = w.body.launchProjectile(Arrow.class, to);
         arrow.setPickupStatus(AbstractArrow.PickupStatus.DISALLOWED);
         w.take(Material.ARROW, 1);
-        w.body.swingMainHand();
         w.body.getWorld().playSound(eye, bow.getType() == Material.CROSSBOW ? "minecraft:item.crossbow.shoot" : "minecraft:entity.arrow.shoot",
                 SoundCategory.NEUTRAL, 0.8f, 1f);
         return true;
@@ -337,12 +347,12 @@ final class Combat {
             Material food = it.getType();
             w.pockets.removeItem(new ItemStack(food, 1));
             w.hold(food);
+            w.anim.use(24); // the real eating animation
             for (int i = 0; i < 3; i++) {
                 int delay = i * 6;
                 Bukkit.getScheduler().runTaskLater(w.plugin, () -> {
                     if (!w.body.isValid()) return;
                     w.body.getWorld().playSound(w.body.getLocation(), "minecraft:entity.generic.eat", SoundCategory.NEUTRAL, 0.6f, 1f);
-                    w.body.swingMainHand();
                 }, delay);
             }
             Bukkit.getScheduler().runTaskLater(w.plugin, () -> {

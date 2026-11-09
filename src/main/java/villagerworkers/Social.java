@@ -77,9 +77,10 @@ final class Social {
     /** Someone says something (speech bubble) and gestures. */
     static void say(Worker w, Location lookAt) {
         List<String> lines = w.plugin.settings().chatLines();
-        if (lookAt != null) Mover.lookAt(w.body, lookAt);
+        if (lookAt != null) w.anim.look(lookAt);
         Bubbles.say(w.plugin, w.body, lines.get(w.random.nextInt(lines.size())), 50);
-        if (w.random.nextBoolean()) w.body.swingMainHand();
+        if (w.random.nextInt(4) == 0) w.body.swingMainHand();
+        else if (w.random.nextBoolean()) w.anim.nod();
     }
 
     /** The nearest other settler within 8 blocks (to look at while talking). */
@@ -183,9 +184,7 @@ final class Social {
         }
 
         static void glance(Worker w) {
-            if (w.watched()) return; // looking back at a player
-            float yaw = w.body.getLocation().getYaw() + w.random.nextInt(120) - 60;
-            w.body.setRotation(yaw, w.random.nextInt(30) - 15);
+            w.anim.glance();
         }
 
         @Override
@@ -255,7 +254,7 @@ final class Social {
 
     /** Head down, a page turn now and then. */
     static void readTick(Worker w, int t) {
-        if (t % 20 == 0) w.body.setRotation(w.body.getLocation().getYaw(), 40);
+        if (t % 20 == 0) w.anim.lookDown(35 + w.random.nextInt(10));
         if (t % 70 == 0 && w.random.nextBoolean()) {
             w.body.getWorld().playSound(w.body.getLocation(), "minecraft:item.book.page_turn", SoundCategory.NEUTRAL, 0.5f, 1f);
         }
@@ -358,7 +357,7 @@ final class Social {
                 readUntil = time + 200;
             } else {
                 Location other = nearestOther(w);
-                if (other != null) Mover.lookAt(w.body, other);
+                if (other != null) w.anim.look(other);
                 else LookAround.glance(w);
             }
         }
@@ -421,7 +420,7 @@ final class Social {
             if (time >= next) {
                 next = time + 100 + w.random.nextInt(140);
                 if (w.random.nextInt(100) < 60) say(w, nearestOther(w));
-                else Mover.lookAt(w.body, spot.clone().add(0, 1.4, 0));
+                else w.anim.look(spot.clone().add(0, 1.4, 0));
             }
             return time > 2400; // re-check now and then (a seat may have come free)
         }
@@ -466,7 +465,7 @@ final class Social {
                 }
                 return false;
             }
-            Mover.lookAt(w.body, other.body.getEyeLocation());
+            w.anim.look(other.body.getEyeLocation());
             if (time == 45) {
                 List<String> lines = other.plugin.settings().chatLines();
                 Bubbles.say(other.plugin, other.body, lines.get(other.random.nextInt(lines.size())), 45);

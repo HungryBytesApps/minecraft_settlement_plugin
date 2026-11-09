@@ -84,6 +84,9 @@ final class WorkerListener implements Listener {
         }
         if (ledger && (e.getAction() == Action.RIGHT_CLICK_BLOCK || e.getAction() == Action.RIGHT_CLICK_AIR)) {
             e.setCancelled(true);
+            // Clicking a settler also sends a "use item" click right after: don't open the ledger over its menu.
+            Integer last = lastClick.get(p.getUniqueId());
+            if (last != null && Bukkit.getCurrentTick() - last < 5) return;
             Town t = plugin.ownTown(p);
             if (t == null) p.sendActionBar(Component.text("Right-click a bell to create a settlement first.", NamedTextColor.YELLOW));
             else Menus.ledger(plugin, p, t);
@@ -173,8 +176,7 @@ final class WorkerListener implements Listener {
                 Menus.settler(plugin, p, w);
             } else {
                 Bubbles.say(plugin, w.body, GREETINGS.get(w.random.nextInt(GREETINGS.size())), 40);
-                if (!w.body.isInsideVehicle()) Mover.lookAt(w.body, p.getEyeLocation());
-                w.body.swingMainHand();
+                w.anim.look(p.getEyeLocation());
             }
             return;
         }

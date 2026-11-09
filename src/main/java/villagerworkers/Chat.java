@@ -47,8 +47,10 @@ final class Chat {
                 }
                 return;
             }
-            Mover.lookAt(a.body, b.body.getEyeLocation());
-            Mover.lookAt(b.body, a.body.getEyeLocation());
+            if (t % 10 == 0) {
+                a.anim.look(b.body.getEyeLocation());
+                b.anim.look(a.body.getEyeLocation());
+            }
             if (endAt >= 0) {
                 if (t >= endAt) done = true;
                 return;
@@ -57,7 +59,9 @@ final class Chat {
             Worker speaker = said % 2 == 0 ? a : b;
             List<String> chat = a.plugin.settings().chatLines();
             Bubbles.say(a.plugin, speaker.body, chat.get(speaker.random.nextInt(chat.size())), 45);
-            if (speaker.random.nextInt(3) == 0) speaker.body.swingMainHand(); // a little gesture
+            Worker listener = speaker == a ? b : a;
+            if (listener.random.nextInt(3) == 0) listener.anim.nod();             // mhm
+            else if (speaker.random.nextInt(5) == 0) speaker.body.swingMainHand(); // a gesture
             said++;
             nextLine = t + 50 + speaker.random.nextInt(30);
             if (said >= lines) endAt = t + 45;

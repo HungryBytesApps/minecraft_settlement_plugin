@@ -37,7 +37,8 @@ final class Music {
         Location head = w.body.getLocation().add(0, 2.3, 0);
         w.body.getWorld().playSound(w.body.getLocation(), "minecraft:block.note_block." + inst.sound(), SoundCategory.RECORDS, 0.8f, pitch);
         w.body.getWorld().spawnParticle(Particle.NOTE, head, 0, n / 24.0, 0, 0, 1);
-        if (w.random.nextInt(4) == 0) w.body.swingMainHand();
+        if (w.body.getEquipment().getItemInMainHand().getType() == org.bukkit.Material.GOAT_HORN) w.anim.use(20); // horn to the mouth
+        else if (w.random.nextInt(4) == 0) w.body.swingMainHand();
     }
 
     /** Start a little band: the leader plus 1–2 free settlers nearby. Null if nobody's around. */
@@ -95,7 +96,7 @@ final class Music {
             }
             for (int i = 0; i < members.size(); i++) {
                 Worker w = members.get(i);
-                Mover.lookAt(w.body, center());
+                w.anim.look(center());
                 if (t >= nextNote[i]) {
                     note(w, instruments.get(i));
                     nextNote[i] = t + 5 + w.random.nextInt(8);

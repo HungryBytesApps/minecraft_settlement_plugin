@@ -40,7 +40,7 @@ final class Defense {
             if (world == null || !world.isChunkLoaded(t.bell.getBlockX() >> 4, t.bell.getBlockZ() >> 4)) continue;
             Location c = t.bell.clone().add(0.5, 0.5, 0.5);
             for (LivingEntity e : world.getNearbyLivingEntities(c, r, Math.min(r, 32), r)) {
-                if (Combat.hostile(e) && t.contains(e.getLocation(), r)) t.hostiles.add(e);
+                if (Combat.hostile(e) && t.contains(e.getLocation(), r) && aboveGround(e)) t.hostiles.add(e);
             }
             for (LivingEntity h : t.hostiles) {
                 if (h instanceof Mob m && m.getTarget() == null) {
@@ -64,6 +64,14 @@ final class Defense {
                 if (Boolean.TRUE.equals(messaged.remove(t.id))) tell(t, "✔ " + t.name + ": all clear.", NamedTextColor.GREEN);
             }
         }
+    }
+
+    /** Monsters in caves under the settlement don't count: only ones on the surface or in buildings. */
+    private static boolean aboveGround(LivingEntity e) {
+        Location l = e.getLocation();
+        if (l.getBlock().getLightFromSky() > 0) return true;
+        int surface = l.getWorld().getHighestBlockYAt(l.getBlockX(), l.getBlockZ(), org.bukkit.HeightMap.MOTION_BLOCKING_NO_LEAVES);
+        return l.getBlockY() >= surface - 4;
     }
 
     private static void ring(Town t) {
@@ -103,9 +111,19 @@ final class Defense {
         return best;
     }
 
+    /** A monster close by that the settler can see (or that is right next to it). */
+    private static boolean seesHostile(Worker w, Town t) {
+        for (LivingEntity h : t.hostiles) {
+            if (!h.isValid() || h.isDead() || h.getWorld() != w.body.getWorld()) continue;
+            double d = h.getLocation().distanceSquared(w.body.getLocation());
+            if (d <= 6 * 6 || (d <= 24 * 24 && w.body.hasLineOfSight(h))) return true;
+        }
+        return false;
+    }
+
     /** What a (non-guard) settler does now: take cover / fight, return a borrowed weapon, or null. */
     static Activity react(Worker w, Town t) {
-        if (t.alarm && nearestHostile(w, t, 24) != null) {
+        if (t.alarm && seesHostile(w, t)) {
             return t.reaction == Town.Reaction.CALL_TO_ARMS ? new CallToArms(w, t) : new TakeCover(w, t);
         }
         if (!t.alarm && w.borrowedWeapon != null && (w.activity == null || w.activity.freeTime())) return new CallToArms(w, t);
@@ -175,7 +193,9 @@ final class Defense {
         private final Worker w;
         private final Town t;
         private Location spot;
-        private int time;
+        private int time, calm, nextFlee;
+        private boolean fleeing;
+        private final java.util.Set<String> unreachable = new java.util.HashSet<>();
 
         TakeCover(Worker w, Town t) {
             this.w = w;
@@ -187,11 +207,65 @@ final class Defense {
         public boolean tick() {
             time++;
             if (!t.alarm || w.town() != t) return true;
-            if (spot == null) {
-                spot = shelter(w, t);
-                if (spot != null) w.mover.go(spot, 0.8, w.plugin.settings().workSpeed() * 1.2);
+            // No monster within 32 blocks for 10 seconds: back to work.
+            if (time % 20 == 0) {
+                if (nearestHostile(w, t, 32) != null) calm = 0;
+                else if ((calm += 20) >= 200) return true;
+            }
+            if (fleeing) return flee();
+            if (spot == null || (w.mover.failed() && time % 20 == 0)) {
+                if (spot != null) unreachable.add(Keys.ser(spot));
+                spot = unreachable.size() >= 4 ? null : shelter(w, t, unreachable);
+                if (spot == null) {
+                    fleeing = true; // nowhere to hide: keep away from the monsters
+                    return flee();
+                }
+                if (!w.mover.go(spot, 0.8, w.plugin.settings().workSpeed() * 1.2)) unreachable.add(Keys.ser(spot));
             } else if (!w.mover.moving() && time % 40 == 0 && w.body.getLocation().distanceSquared(spot) > 2 * 2) {
                 w.mover.go(spot, 0.8, w.plugin.settings().workSpeed() * 1.2);
+            }
+            return false;
+        }
+
+        /** Run to a spot in the settlement away from the monsters; pick a new one when there or when one comes close. */
+        private boolean flee() {
+            boolean danger = nearestHostile(w, t, 7) != null;
+            if (w.mover.moving() && !danger) return false;
+            if (!danger && time < nextFlee) return false;
+            nextFlee = time + 40 + w.random.nextInt(40);
+            Location me = w.body.getLocation();
+            // Direction away from the monsters (closer ones count more).
+            double ax = 0, az = 0;
+            for (LivingEntity h : t.hostiles) {
+                if (!h.isValid() || h.getWorld() != me.getWorld()) continue;
+                double dx = me.getX() - h.getX(), dz = me.getZ() - h.getZ();
+                double d2 = Math.max(1, dx * dx + dz * dz);
+                if (d2 > 32 * 32) continue;
+                ax += dx / d2;
+                az += dz / d2;
+            }
+            double base = (ax == 0 && az == 0) ? w.random.nextDouble() * Math.PI * 2 : Math.atan2(az, ax);
+            int r = w.plugin.settings().townRadius() - 4;
+            World world = me.getWorld();
+            for (int tries = 0; tries < 12; tries++) {
+                double a = base + (w.random.nextDouble() - 0.5) * (tries < 6 ? Math.PI / 1.5 : Math.PI * 1.5);
+                double dist = 8 + w.random.nextInt(8);
+                int x = (int) Math.floor(me.getX() + Math.cos(a) * dist), z = (int) Math.floor(me.getZ() + Math.sin(a) * dist);
+                if (!t.contains(new Location(world, x, me.getY(), z), r)) continue;
+                for (int y = me.getBlockY() + 4; y >= me.getBlockY() - 6; y--) {
+                    if (!PathFinder.walkable(world, x, y, z)) continue;
+                    Location to = new Location(world, x + 0.5, y, z + 0.5);
+                    if (tooClose(to, 8)) break;
+                    if (w.mover.go(to, 1.0, w.plugin.settings().workSpeed() * 1.5)) return false;
+                    break;
+                }
+            }
+            return false;
+        }
+
+        private boolean tooClose(Location l, double min) {
+            for (LivingEntity h : t.hostiles) {
+                if (h.isValid() && h.getWorld() == l.getWorld() && h.getLocation().distanceSquared(l) < min * min) return true;
             }
             return false;
         }
@@ -203,7 +277,7 @@ final class Defense {
 
         @Override
         public String label() {
-            return "Taking cover";
+            return fleeing ? "Running from monsters" : "Taking cover";
         }
 
         @Override
@@ -218,13 +292,13 @@ final class Defense {
 
     /**
      * Where to hide: inside the nearest building with a door (the settler closes the door behind
-     * it, like villagers). No such building: under a roof near the gathering spot, else the bell.
+     * it, like villagers). No such building: under a roof near the gathering spot. Null: nowhere.
      */
-    static Location shelter(Worker w, Town t) {
+    static Location shelter(Worker w, Town t, java.util.Set<String> skip) {
         Location best = null;
         double bestD = Double.MAX_VALUE;
         for (Location in : indoorSpots(w.plugin, t)) {
-            if (in.getWorld() != w.body.getWorld()) continue;
+            if (in.getWorld() != w.body.getWorld() || skip.contains(Keys.ser(in))) continue;
             double d = in.distanceSquared(w.body.getLocation());
             if (d < bestD) {
                 bestD = d;
@@ -251,7 +325,7 @@ final class Defense {
                 break;
             }
         }
-        return best != null ? best : c.clone().add(0.5, 1, 0.5);
+        return best; // null: nowhere to hide
     }
 
     /** A free spot a little further into the room, so not everyone stands on one block. */

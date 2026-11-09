@@ -43,7 +43,8 @@ final class GoAndDo implements Activity {
             }
             if (w.mover.arrived() || closeEnough(center)) {
                 w.mover.stop();
-                Mover.lookAt(w.body, target.getLocation().add(0.5, 0.5, 0.5));
+                w.anim.look(target.getLocation().add(0.5, 0.5, 0.5));
+                if (target.getY() <= w.body.getLocation().getY() + 0.2) w.anim.crouch(16); // bend down to the ground
                 w.body.swingMainHand();
                 action.accept(target);
                 phase = 2;
