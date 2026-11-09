@@ -168,7 +168,7 @@ final class Towns {
                     try {
                         String worker = w.getString("worker");
                         if (worker != null) wp.workers.add(UUID.fromString(worker)); // older versions: one worker
-                        for (String id : w.getStringList("workers")) wp.workers.add(UUID.fromString(id));
+                        for (String workerId : w.getStringList("workers")) wp.workers.add(UUID.fromString(workerId));
                     } catch (IllegalArgumentException ignored) {
                     }
                     t.workplaces.put(Keys.ser(loc), wp);
