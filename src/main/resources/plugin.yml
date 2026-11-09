@@ -1,0 +1,9 @@
+name: VillagerWorkers
+version: 1.0.0
+main: villagerworkers.VillagerWorkersPlugin
+api-version: '1.21'
+description: Create a settlement at a bell, recruit settlers who work (farming) and live their own lives.
+permissions:
+  villagerworkers.admin:
+    description: Manage anyone's workers and ignore the worker limit.
+    default: op

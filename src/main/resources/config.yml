@@ -1,0 +1,62 @@
+# VillagerWorkers settings
+
+# ---- Settlements ----
+# Right-click a bell to create a settlement there. Everything happens within this radius of the bell.
+max-settlements-per-player: 1
+settlement-radius: 48
+max-settlers-per-settlement: 10
+
+# Can settlers use chests and barrels in the settlement unless you switch them off with the ledger?
+chests-allowed-by-default: true
+
+# Price to recruit a new settler at the bell (item:amount). Empty list = free.
+recruit-cost:
+  - emerald:5
+  - bread:10
+
+# ---- Settlers ----
+# Show "Name (Job)" above each settler.
+show-names: true
+
+# Walking speed in blocks per tick (20 ticks = 1 second).
+work-speed: 0.11
+walk-speed: 0.07
+
+# Work area radius around a workplace (composter): default for new workplaces, and the maximum.
+default-work-radius: 6
+max-work-radius: 12
+# How far from the bell settlers wander in their free time.
+social-radius: 16
+
+# Settlers stop working at night and go to sleep in a free bed near the bell.
+work-at-night: false
+sleep-at-night: true
+
+# Farmers keep this many of each seed (seeds, carrots, potatoes, beetroot seeds) for replanting.
+seeds-to-keep: 16
+
+# Random settler names.
+names: [Anna, Bram, Cor, Daan, Eva, Finn, Greet, Hugo, Ilse, Joep, Kees, Lotte, Maud, Noor, Otto, Pien, Rik, Saar, Teun, Vera, Wim, Yara]
+
+# Things settlers say to each other.
+chat-lines:
+  - "Nice weather today!"
+  - "Did you see the crops?"
+  - "Hmm..."
+  - "I heard a zombie last night."
+  - "Busy day, busy day."
+  - "Haha!"
+  - "Really?"
+  - "My back hurts from all that farming."
+  - "Have you met the new guy?"
+  - "I could use a nap."
+  - "The emeralds aren't what they used to be."
+  - "Look at that!"
+  - "Mhm, mhm."
+  - "I love carrots."
+  - "Where's my hoe?"
+  - "Rain soon, I can feel it."
+  - "Hrrm."
+  - "No way!"
+  - "That's what I said!"
+  - "Let's grab some bread later."
