@@ -59,7 +59,7 @@ final class WorkerListener implements Listener {
             }
             if (!ledger) return;
             Town t = plugin.towns().at(b.getLocation());
-            if (Town.isStorage(b) || b.getType() == Material.COMPOSTER) {
+            if (Town.isStorage(b) || Worker.Job.forBlock(b.getType()) != Worker.Job.NONE) {
                 e.setCancelled(true);
                 if (t == null) {
                     p.sendActionBar(Component.text("This isn't in a settlement.", NamedTextColor.RED));
@@ -69,7 +69,7 @@ final class WorkerListener implements Listener {
                     p.sendActionBar(Component.text("This belongs to " + t.name + ".", NamedTextColor.RED));
                     return;
                 }
-                if (b.getType() == Material.COMPOSTER) {
+                if (Worker.Job.forBlock(b.getType()) != Worker.Job.NONE) {
                     Town.Workplace wp = t.workplace(b.getLocation());
                     if (wp == null) {
                         wp = t.addWorkplace(b.getLocation(), plugin.settings().defaultRadius());
@@ -99,11 +99,11 @@ final class WorkerListener implements Listener {
         Block b = e.getBlockPlaced();
         Town t = plugin.towns().at(b.getLocation());
         if (t == null) return;
-        if (b.getType() == Material.COMPOSTER) {
+        if (Worker.Job.forBlock(b.getType()) != Worker.Job.NONE) {
             t.addWorkplace(b.getLocation(), plugin.settings().defaultRadius());
             plugin.towns().save();
             if (canManage(e.getPlayer(), t)) {
-                e.getPlayer().sendActionBar(Component.text("New farm workplace in " + t.name + ".", NamedTextColor.GREEN));
+                e.getPlayer().sendActionBar(Component.text("New " + Worker.Job.forBlock(b.getType()).title.toLowerCase(java.util.Locale.ROOT) + "'s workplace in " + t.name + ".", NamedTextColor.GREEN));
             }
         } else if (Town.isStorage(b)) {
             t.invalidate();
@@ -127,7 +127,7 @@ final class WorkerListener implements Listener {
         Block b = e.getBlock();
         Town t = plugin.towns().at(b.getLocation());
         if (t == null) return;
-        if (b.getType() == Material.COMPOSTER) {
+        if (Worker.Job.forBlock(b.getType()) != Worker.Job.NONE) {
             Town.Workplace wp = t.workplace(b.getLocation());
             if (wp != null) {
                 Worker w = wp.worker == null ? null : plugin.workers().get(wp.worker);
@@ -261,7 +261,7 @@ final class WorkerListener implements Listener {
             if (e.getDamager() instanceof org.bukkit.entity.Projectile pr && !(pr instanceof org.bukkit.entity.Trident)) pr.remove();
             return;
         }
-        if (bySettler && !Combat.hostile(victim)) {
+        if (bySettler && !Combat.hostile(victim) && !HerderJob.mayKill(victim)) {
             e.setCancelled(true);
             if (e.getDamager() instanceof org.bukkit.entity.Arrow a) a.remove();
             return;
@@ -285,6 +285,7 @@ final class WorkerListener implements Listener {
     public void onDeath(EntityDeathEvent e) {
         Worker w = plugin.workers().get(e.getEntity().getUniqueId());
         if (w == null) return;
+        SettlerInventory.close(w); // someone looking in its pockets: finish that first
         // Drop what they carried and wore (the item in hand is only a copy).
         e.getDrops().clear();
         e.setDroppedExp(0);

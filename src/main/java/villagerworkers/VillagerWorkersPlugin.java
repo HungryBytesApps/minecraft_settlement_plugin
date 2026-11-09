@@ -39,6 +39,7 @@ public final class VillagerWorkersPlugin extends JavaPlugin {
         towns = new Towns(this);
         workers = new Workers(this);
         getServer().getPluginManager().registerEvents(new WorkerListener(this), this);
+        getServer().getPluginManager().registerEvents(new SettlerInventory.Events(this), this);
 
         for (World w : getServer().getWorlds()) {
             for (Mannequin m : w.getEntitiesByClass(Mannequin.class)) {
@@ -57,7 +58,7 @@ public final class VillagerWorkersPlugin extends JavaPlugin {
     }
 
     /** Changes with every version I send, to check the right jar is installed. */
-    static final String BUILD = "2026-11-09 #12";
+    static final String BUILD = "2026-11-09 #15";
 
     @Override
     public boolean onCommand(org.bukkit.command.CommandSender sender, org.bukkit.command.Command cmd, String label, String[] args) {
@@ -178,7 +179,7 @@ public final class VillagerWorkersPlugin extends JavaPlugin {
             for (int z = bz - r; z <= bz + r; z++) {
                 if (!w.isChunkLoaded(x >> 4, z >> 4)) continue;
                 for (int y = Math.max(w.getMinHeight(), by - 12); y <= Math.min(w.getMaxHeight() - 1, by + 12); y++) {
-                    if (w.getType(x, y, z) == Material.COMPOSTER) {
+                    if (Worker.Job.forBlock(w.getType(x, y, z)) != Worker.Job.NONE) {
                         Location l = new Location(w, x, y, z);
                         if (t.contains(l, r)) t.addWorkplace(l, settings.defaultRadius());
                     }
@@ -274,6 +275,7 @@ public final class VillagerWorkersPlugin extends JavaPlugin {
 
     /** Dismissed: the settler leaves and a normal villager stands in its place. */
     void dismiss(Worker w) {
+        SettlerInventory.close(w);
         Location at = w.body.getLocation();
         for (ItemStack it : w.pockets.getContents()) if (it != null && !it.getType().isAir()) at.getWorld().dropItemNaturally(at, it);
         w.pockets.clear();
@@ -284,6 +286,7 @@ public final class VillagerWorkersPlugin extends JavaPlugin {
 
     /** Remove a settler from its town and workplace (death or dismissal). */
     void forget(Worker w) {
+        SettlerInventory.close(w);
         workers.unregister(w.body.getUniqueId());
         Town t = w.town();
         if (t != null) {

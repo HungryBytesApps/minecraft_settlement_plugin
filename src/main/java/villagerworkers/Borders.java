@@ -100,7 +100,7 @@ final class Borders {
             if (t == null) continue;
             draw(p, t);
             for (Town.Workplace wp : t.workplaces.values()) {
-                if (wp.loc.getWorld() == p.getWorld() && wp.loc.distanceSquared(p.getLocation()) <= VIEW * VIEW) drawWork(p, wp);
+                if (wp.job().usesArea && wp.loc.getWorld() == p.getWorld() && wp.loc.distanceSquared(p.getLocation()) <= VIEW * VIEW) drawWork(p, wp);
             }
         }
     }

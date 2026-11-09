@@ -1,6 +1,7 @@
 package villagerworkers;
 
 import io.papermc.paper.dialog.Dialog;
+import io.papermc.paper.dialog.DialogResponseView;
 import io.papermc.paper.registry.data.dialog.ActionButton;
 import io.papermc.paper.registry.data.dialog.DialogBase;
 import io.papermc.paper.registry.data.dialog.action.DialogAction;
@@ -121,6 +122,13 @@ final class Menus {
                     plugin.borders().cycle(pl);
                     bell(plugin, pl, t);
                 }));
+        buttons.add(button(plugin, "Free settlers take jobs: " + (t.autoJobs ? "On" : "Off"), t.autoJobs ? NamedTextColor.GREEN : NamedTextColor.RED,
+                "On: a settler without a job takes an empty workplace by itself. Off: you choose who works where (ledger on the workplace).",
+                w, pl -> {
+                    t.autoJobs = !t.autoJobs;
+                    plugin.towns().save();
+                    bell(plugin, pl, t);
+                }));
         buttons.add(button(plugin, "Get a ledger", NamedTextColor.WHITE, "The book to manage your settlement", w, pl -> {
             if (Ledger.has(pl)) {
                 pl.sendActionBar(Component.text("You already have a Settlement Ledger.", NamedTextColor.YELLOW));
@@ -144,7 +152,7 @@ final class Menus {
 
         int w = 150;
         List<ActionButton> buttons = new ArrayList<>();
-        buttons.add(button(plugin, "Storage targets…", NamedTextColor.WHITE, "How much of each product to keep in storage", w, pl -> TargetsMenu.open(plugin, pl, t)));
+        buttons.add(button(plugin, "Storage targets", NamedTextColor.WHITE, "How much of each product to keep in storage", w, pl -> TargetsMenu.open(plugin, pl, t)));
         buttons.add(button(plugin, "Use all chests: " + (on ? "On" : "Off"), on ? NamedTextColor.GREEN : NamedTextColor.RED, "On: settlers use every chest. Off: only the chests you allow with the ledger.", w, pl -> {
             boolean now = !(t.chestDefault && t.chestRules.isEmpty());
             t.allChests(now);
@@ -187,12 +195,21 @@ final class Menus {
         text(body, "One per player. Right-click with it:");
         text(body, "• a chest or barrel: may settlers put things in / take things out?");
         text(body, "• a composter: its work radius, who works there, on/off.");
-        text(body, "• a settler: rename, inventory, worker or guard, guard settings, leave workplace, dismiss.");
+        text(body, "• a settler: rename, inventory (take things out or put things in), worker or guard, guard settings, leave workplace, dismiss.");
         text(body, "• a wild villager: hire it. It walks to the settlement, or follows you if it's far away.");
         text(body, "• anything else: storage targets, chests, settlers, defense settings.");
         head(body, "Settlers");
-        text(body, "A free settler takes an empty workplace by itself. A composter is a farm: the farmer harvests, replants and plants the fields around it.");
+        text(body, "Choose who works where: ledger on a workplace → Choose settler. With Free settlers take jobs: On (bell) they take empty workplaces by themselves. A composter is a farm: the farmer harvests, replants and plants the fields around it.");
         text(body, "They fetch seeds from chests they may take from, and bring the harvest to a chest that already has that item (or the nearest one with room). No room left: they keep it in their pockets and you get a message.");
+        head(body, "Workplaces");
+        text(body, "Place one in the settlement and choose who works there. Right-click it with the ledger for its settings.");
+        text(body, "• Composter: farmer. Harvests and replants the farmland in its work area.");
+        text(body, "• Smoker: cook. Cooks raw food from storage. Blast furnace: smelter. Smelts ores and raw metal.");
+        text(body, "• Furnace: furnace worker. Choose what it may smelt: food, ores, stone & building, other.");
+        text(body, "• Loom: herder. Keeps each kind of animal in its area at the herd size: breeds (with food from storage), slaughters the extra adults, shears sheep (shears from storage), throws eggs for chicks.");
+        text(body, "• Fletching table: lumberjack. Fells real trees in its area (needs an axe from storage) and replants.");
+        text(body, "• Smithing table: smith. Makes weapons, armor, bows and arrows from storage, only what you ask for in What to make.");
+        text(body, "Furnace jobs need fuel in storage (coal, charcoal or wood). Everyone stops when storage targets are reached.");
         text(body, "When they're not working they take walks, chat, read, make music together and visit each other at work.");
         text(body, "In the evening they get together at the spot with the most seats close together (stairs, slabs, cushions, extra cosy near a campfire), or at the bell.");
         head(body, "Guards and defense");
@@ -287,61 +304,99 @@ final class Menus {
     static void chest(VillagerWorkersPlugin plugin, Player p, Town t, Block chest) {
         boolean[] r = t.rule(chest);
         boolean own = t.hasOwnRule(chest);
-        List<DialogBody> body = List.of(
-                line(own ? "Own rules" : "Settlement default", NamedTextColor.GRAY));
-        List<DialogInput> inputs = List.of(
-                DialogInput.bool("store", Component.text("Settlers may put things in"), r[0], "true", "false"),
-                DialogInput.bool("take", Component.text("Settlers may take things out"), r[1], "true", "false"));
-        ActionButton save = ActionButton.create(Component.text("Save", NamedTextColor.GREEN), null, 120,
-                click(plugin, (view, audience) -> {
-                    Boolean store = view.getBoolean("store"), take = view.getBoolean("take");
-                    if (!(audience instanceof Player pl)) return;
-                    Bukkit.getScheduler().runTask(plugin, () -> {
-                        t.setRule(chest, new boolean[]{Boolean.TRUE.equals(store), Boolean.TRUE.equals(take)});
-                        plugin.towns().save();
-                        pl.sendActionBar(Component.text("Chest rules saved.", NamedTextColor.GREEN));
-                    });
-                }, ONCE));
-        ActionButton reset = button(plugin, "Use settlement default", NamedTextColor.WHITE, "Forget this chest's own rules", 120, pl -> {
-            t.setRule(chest, null);
-            plugin.towns().save();
-            pl.sendActionBar(Component.text("This chest follows the settlement default again.", NamedTextColor.GREEN));
-        });
-        show(p, "Chest", body, inputs, DialogType.multiAction(List.of(save, reset)).columns(2).exitAction(close(plugin)).build());
+        List<DialogBody> body = List.of(line(own ? "Own rules" : "Settlement default", NamedTextColor.GRAY));
+        int w = 170;
+        List<ActionButton> buttons = new ArrayList<>();
+        buttons.add(button(plugin, "Settlers may put in: " + (r[0] ? "On" : "Off"), r[0] ? NamedTextColor.GREEN : NamedTextColor.RED,
+                "May settlers put their harvest and other things in this chest?", w, pl -> {
+                    boolean[] cur = t.rule(chest);
+                    t.setRule(chest, new boolean[]{!cur[0], cur[1]});
+                    plugin.towns().save();
+                    chest(plugin, pl, t, chest);
+                }));
+        buttons.add(button(plugin, "Settlers may take out: " + (r[1] ? "On" : "Off"), r[1] ? NamedTextColor.GREEN : NamedTextColor.RED,
+                "May settlers take seeds, food, weapons and other things out of this chest?", w, pl -> {
+                    boolean[] cur = t.rule(chest);
+                    t.setRule(chest, new boolean[]{cur[0], !cur[1]});
+                    plugin.towns().save();
+                    chest(plugin, pl, t, chest);
+                }));
+        if (own) {
+            buttons.add(button(plugin, "Use settlement default", NamedTextColor.WHITE, "Forget this chest's own rules", w, pl -> {
+                t.setRule(chest, null);
+                plugin.towns().save();
+                chest(plugin, pl, t, chest);
+            }));
+        }
+        show(p, "Chest", body, List.of(), DialogType.multiAction(buttons).columns(1).exitAction(close(plugin)).build());
     }
 
     // ---- Workplace ----
 
     static void workplace(VillagerWorkersPlugin plugin, Player p, Town t, Town.Workplace wp) {
         Settings s = plugin.settings();
+        Worker.Job job = wp.job();
         Worker worker = wp.worker == null ? null : plugin.workers().get(wp.worker);
         String who = wp.worker == null ? "nobody" : worker != null ? worker.name : t.settlers.getOrDefault(wp.worker, "?") + " (far away)";
         List<DialogBody> body = new ArrayList<>();
         body.add(line("Works here: " + who + (worker != null && !worker.workStatus.isEmpty() ? " — " + worker.workStatus : ""), NamedTextColor.GRAY));
-        List<DialogInput> inputs = List.of(
-                DialogInput.numberRange("radius", Component.text("Work radius"), 2, s.maxRadius())
-                        .step(1f).initial((float) Math.min(wp.radius, s.maxRadius())).width(200).build(),
-                DialogInput.bool("enabled", Component.text("Workplace in use"), wp.enabled, "true", "false"));
+
+        // Sliders: applied when you click any button or close the window (no Save button).
+        List<DialogInput> inputs = new ArrayList<>();
+        if (job.usesArea) {
+            inputs.add(DialogInput.numberRange("radius", Component.text("Work radius"), 2, s.maxRadius())
+                    .step(1f).initial((float) Math.min(wp.radius, s.maxRadius())).width(220).build());
+        }
+        if (job == Worker.Job.HERDER) {
+            inputs.add(DialogInput.numberRange("herd", Component.text("Herd size (adults of each kind)"), 2, 20)
+                    .step(1f).initial((float) Math.max(2, Math.min(20, wp.herd))).width(220).build());
+        }
+        java.util.function.BiConsumer<DialogResponseView, Player> apply = (view, pl) -> {
+            boolean changed = false;
+            Float r = job.usesArea ? view.getFloat("radius") : null;
+            if (r != null && Math.round(r) != wp.radius) {
+                wp.radius = Math.max(2, Math.min(s.maxRadius(), Math.round(r)));
+                changed = true;
+                plugin.borders().flash(pl);
+            }
+            Float h = job == Worker.Job.HERDER ? view.getFloat("herd") : null;
+            if (h != null && Math.round(h) != wp.herd) {
+                wp.herd = Math.max(2, Math.min(20, Math.round(h)));
+                changed = true;
+            }
+            if (changed) plugin.towns().save();
+        };
+
         int w = 150;
         List<ActionButton> buttons = new ArrayList<>();
-        buttons.add(ActionButton.create(Component.text("Save", NamedTextColor.GREEN), null, w,
-                click(plugin, (view, audience) -> {
-                    Float radius = view.getFloat("radius");
-                    Boolean enabled = view.getBoolean("enabled");
-                    if (!(audience instanceof Player pl)) return;
-                    Bukkit.getScheduler().runTask(plugin, () -> {
-                        if (radius != null) wp.radius = Math.max(2, Math.min(s.maxRadius(), Math.round(radius)));
-                        if (enabled != null) wp.enabled = enabled;
-                        plugin.towns().save();
-                        pl.sendActionBar(Component.text("Workplace saved.", NamedTextColor.GREEN));
-                        plugin.borders().flash(pl);
-                    });
-                }, ONCE)));
-        buttons.add(button(plugin, "Show work area", NamedTextColor.WHITE, "Shows the work area for 10 seconds",
-                w, pl -> plugin.borders().flash(pl)));
-        buttons.add(button(plugin, "Choose settler…", NamedTextColor.WHITE, "Pick who works here", w, pl -> chooseWorker(plugin, pl, t, wp)));
+        buttons.add(wbutton(plugin, apply, "In use: " + (wp.enabled ? "On" : "Off"), wp.enabled ? NamedTextColor.GREEN : NamedTextColor.RED,
+                "Off: nobody works here", w, pl -> {
+                    wp.enabled = !wp.enabled;
+                    plugin.towns().save();
+                    workplace(plugin, pl, t, wp);
+                }));
+        if (job == Worker.Job.FURNACE_WORKER) {
+            for (FurnaceJob.Category c : FurnaceJob.Category.values()) {
+                boolean on = wp.isOn(c.name());
+                buttons.add(wbutton(plugin, apply, c.label + ": " + (on ? "On" : "Off"), on ? NamedTextColor.GREEN : NamedTextColor.RED,
+                        "May this furnace smelt " + c.label.toLowerCase(Locale.ROOT) + "?", w, pl -> {
+                            wp.options.put(c.name(), !wp.isOn(c.name()));
+                            plugin.towns().save();
+                            workplace(plugin, pl, t, wp);
+                        }));
+            }
+        }
+        if (job == Worker.Job.SMITH) {
+            buttons.add(wbutton(plugin, apply, "What to make", NamedTextColor.AQUA, "How many of each item to keep in storage (0 = don't make)",
+                    w, pl -> TargetsMenu.open(plugin, pl, t, SmithJob.PRODUCTS)));
+        }
+        if (job.usesArea) {
+            buttons.add(wbutton(plugin, apply, "Show work area", NamedTextColor.WHITE, "Shows the work area for 10 seconds",
+                    w, pl -> plugin.borders().flash(pl)));
+        }
+        buttons.add(wbutton(plugin, apply, "Choose settler", NamedTextColor.WHITE, "Pick who works here", w, pl -> chooseWorker(plugin, pl, t, wp)));
         if (wp.worker != null) {
-            buttons.add(button(plugin, "Send " + (worker != null ? worker.name : "worker") + " away", NamedTextColor.RED, "This settler stops working here", w, pl -> {
+            buttons.add(wbutton(plugin, apply, "Send " + (worker != null ? worker.name : "worker") + " away", NamedTextColor.RED, "This settler stops working here", w, pl -> {
                 Worker cur = wp.worker == null ? null : plugin.workers().get(wp.worker);
                 if (cur != null) cur.leaveWorkplace();
                 wp.worker = null;
@@ -349,7 +404,20 @@ final class Menus {
                 workplace(plugin, pl, t, wp);
             }));
         }
-        show(p, wp.job().title + "'s workplace", body, inputs, DialogType.multiAction(buttons).columns(2).exitAction(close(plugin)).build());
+        ActionButton close = wbutton(plugin, apply, "Close", null, null, 100, pl -> {});
+        show(p, job.title + "'s workplace", body, inputs, DialogType.multiAction(buttons).columns(2).exitAction(close).build());
+    }
+
+    /** A button that first applies the window's sliders. */
+    private static ActionButton wbutton(VillagerWorkersPlugin plugin, java.util.function.BiConsumer<DialogResponseView, Player> apply,
+                                        String text, NamedTextColor color, String tip, int width, Consumer<Player> onClick) {
+        return ActionButton.create(Component.text(text, color), tip == null ? null : Component.text(tip), width,
+                click(plugin, (view, audience) -> {
+                    if (audience instanceof Player p) Bukkit.getScheduler().runTask(plugin, () -> {
+                        apply.accept(view, p);
+                        onClick.accept(p);
+                    });
+                }, ONCE));
     }
 
     private static void chooseWorker(VillagerWorkersPlugin plugin, Player p, Town t, Town.Workplace wp) {
@@ -417,7 +485,7 @@ final class Menus {
                 buttons.add(button(plugin, "Guard radius: " + w.guardRadius, NamedTextColor.WHITE, "How far from its post it fights", width, pl -> guardRadius(plugin, pl, w)));
             }
         }
-        buttons.add(button(plugin, "Inventory", NamedTextColor.WHITE, "What it wears and carries", width, pl -> inventory(plugin, pl, w)));
+        buttons.add(button(plugin, "Inventory", NamedTextColor.WHITE, "What it wears and carries. Take things out or put things in.", width, pl -> SettlerInventory.open(pl, w)));
         if (wp != null) {
             buttons.add(button(plugin, "Leave workplace", NamedTextColor.WHITE, "Stops working here and looks for another workplace", width, pl -> {
                 w.leaveWorkplace();
@@ -465,25 +533,8 @@ final class Menus {
                 DialogType.confirmation(save, button(plugin, "Cancel", NamedTextColor.GRAY, null, 100, pl -> settler(plugin, pl, w))));
     }
 
-    /** What a settler wears and carries. */
-    private static void inventory(VillagerWorkersPlugin plugin, Player p, Worker w) {
-        List<String> armor = new ArrayList<>();
-        for (ItemStack it : w.body.getEquipment().getArmorContents()) {
-            if (it != null && !it.getType().isAir()) armor.add(FarmerJob.nice(it.getType()));
-        }
-        Collections.reverse(armor); // helmet first
-        List<String> weapons = new ArrayList<>();
-        for (ItemStack it : w.pockets.getContents()) {
-            if (it != null && (Combat.isBow(it.getType()) || Combat.damage(it.getType()) >= 2.5)) weapons.add(FarmerJob.nice(it.getType()));
-        }
-        int used = 0;
-        for (ItemStack it : w.pockets.getContents()) if (it != null && !it.getType().isAir()) used++;
-        List<DialogBody> body = new ArrayList<>();
-        body.add(line("Armor: " + (armor.isEmpty() ? "none" : String.join(", ", armor)), NamedTextColor.WHITE));
-        body.add(line("Weapons: " + (weapons.isEmpty() ? "none" : String.join(", ", weapons)), NamedTextColor.WHITE));
-        body.add(DialogBody.plainMessage(Component.text("Pockets (" + used + "/" + w.pockets.getSize() + "): " + carrying(w), NamedTextColor.WHITE), 300));
-        show(p, w.name + "'s inventory", body, List.of(),
-                DialogType.notice(button(plugin, "Back", NamedTextColor.GRAY, null, 100, pl -> settler(plugin, pl, w))));
+    private static String nice(String s) {
+        return s.isEmpty() ? s : Character.toUpperCase(s.charAt(0)) + s.substring(1);
     }
 
     private static String carrying(Worker w) {

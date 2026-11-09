@@ -15,13 +15,23 @@ final class Skins {
     /** Pick one from the config: "zuri:slim", "steve:wide" or "player:Name". */
     static String pick(List<String> options, Random random) {
         String s = options.get(random.nextInt(options.size())).trim();
-        if (s.toLowerCase(Locale.ROOT).startsWith("player:")) return s;
+        if (s.toLowerCase(Locale.ROOT).startsWith("player:") || s.toLowerCase(Locale.ROOT).startsWith("texture:")) return s;
         return s.toLowerCase(Locale.ROOT) + (random.nextBoolean() ? ":slim" : ":wide");
     }
 
     static ResolvableProfile profile(String spec) {
         if (spec.toLowerCase(Locale.ROOT).startsWith("player:")) {
             return ResolvableProfile.resolvableProfile().name(spec.substring(7)).build();
+        }
+        if (spec.toLowerCase(Locale.ROOT).startsWith("texture:")) {
+            // Your own skin from the server resource pack: "texture:namespace:path/to/skin" (+ ":slim").
+            String[] p = spec.split(":");
+            boolean slim = p.length > 3 && p[3].equals("slim");
+            String ns = p.length > 2 ? p[1] : "minecraft", path = p.length > 2 ? p[2] : p[1];
+            return ResolvableProfile.resolvableProfile()
+                    .skinPatch(patch -> patch.body(Key.key(ns, path))
+                            .model(slim ? PlayerTextures.SkinModel.SLIM : PlayerTextures.SkinModel.CLASSIC))
+                    .build();
         }
         String[] p = spec.split(":");
         boolean slim = p.length > 1 && p[1].equals("slim");

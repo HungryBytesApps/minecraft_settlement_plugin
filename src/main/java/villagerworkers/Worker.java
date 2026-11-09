@@ -21,20 +21,31 @@ import java.util.*;
 /** A settler: a player-like Mannequin that belongs to a settlement, works and lives its own life. */
 final class Worker {
     enum Job {
-        NONE("Settler", Material.AIR),
-        FARMER("Farmer", Material.IRON_HOE);
+        NONE("Settler", Material.AIR, null, false),
+        FARMER("Farmer", Material.IRON_HOE, Material.COMPOSTER, true),
+        COOK("Cook", Material.AIR, Material.SMOKER, false),
+        SMELTER("Smelter", Material.AIR, Material.BLAST_FURNACE, false),
+        FURNACE_WORKER("Furnace worker", Material.AIR, Material.FURNACE, false),
+        HERDER("Herder", Material.SHEARS, Material.LOOM, true),
+        LUMBERJACK("Lumberjack", Material.IRON_AXE, Material.FLETCHING_TABLE, true),
+        SMITH("Smith", Material.AIR, Material.SMITHING_TABLE, false);
 
         final String title;
-        final Material tool;
+        final Material tool;   // the kind of tool it holds (only when it really has one)
+        final Material block;  // its workplace block
+        final boolean usesArea; // works in an area around the workplace
 
-        Job(String title, Material tool) {
+        Job(String title, Material tool, Material block, boolean usesArea) {
             this.title = title;
             this.tool = tool;
+            this.block = block;
+            this.usesArea = usesArea;
         }
 
         /** Which job a workplace block stands for. */
         static Job forBlock(Material m) {
-            return m == Material.COMPOSTER ? FARMER : NONE;
+            for (Job j : values()) if (j.block == m) return j;
+            return NONE;
         }
     }
 
@@ -187,6 +198,12 @@ final class Worker {
         holdTool();
     }
 
+    void setSkin(String spec) {
+        skin = spec;
+        body.getPersistentDataContainer().set(Keys.SKIN, PersistentDataType.STRING, spec);
+        body.setProfile(Skins.profile(spec));
+    }
+
     String title() {
         return guard ? "Guard" : job().title;
     }
@@ -228,7 +245,7 @@ final class Worker {
         Material kind = job().tool;
         ItemStack held = null;
         if (!kind.isAir()) {
-            String suffix = kind.name().substring(kind.name().lastIndexOf('_'));
+            String suffix = kind.name().contains("_") ? kind.name().substring(kind.name().lastIndexOf('_')) : kind.name();
             for (ItemStack it : pockets.getContents()) {
                 if (it != null && it.getType().name().endsWith(suffix)) {
                     held = it.asOne();
@@ -360,7 +377,7 @@ final class Worker {
             wp.worker = body.getUniqueId();
             plugin.towns().save();
         }
-        if (wp == null) {
+        if (wp == null && t.autoJobs) {
             Town.Workplace free = t.freeWorkplace(body.getLocation());
             if (free != null) {
                 assign(free);
@@ -373,6 +390,14 @@ final class Worker {
 
     void tick() {
         ticks++;
+        // Someone is looking in its pockets: stand still and look at them.
+        org.bukkit.entity.Player looking = SettlerInventory.viewer(this);
+        if (looking != null) {
+            mover.stop();
+            if (ticks % 10 == 0) anim.look(looking.getEyeLocation());
+            anim.tick();
+            return;
+        }
         if (activity != null) {
             boolean done;
             try {
@@ -405,7 +430,7 @@ final class Worker {
             Activity work = workToDo();
             if (work != null) start(work); // back to work
         }
-        if (job() == Job.FARMER && --pickupCooldown <= 0) {
+        if ((job() == Job.FARMER || job() == Job.HERDER || job() == Job.LUMBERJACK) && --pickupCooldown <= 0) {
             pickupCooldown = 10;
             pickUpItems();
         }
@@ -464,8 +489,8 @@ final class Worker {
                 return;
             }
         }
-        if (job() == Job.FARMER) {
-            Activity a = FarmerJob.next(this, t, workplace());
+        if (job() != Job.NONE) {
+            Activity a = jobNext(t);
             if (a != null) {
                 start(a);
                 return;
@@ -476,12 +501,26 @@ final class Worker {
         start(Social.idle(this));
     }
 
+    /** The next thing to do for its job (or null: nothing to do now). */
+    private Activity jobNext(Town t) {
+        Town.Workplace wp = workplace();
+        if (wp == null) return null;
+        return switch (job()) {
+            case FARMER -> FarmerJob.next(this, t, wp);
+            case COOK, SMELTER, FURNACE_WORKER -> FurnaceJob.next(this, t, wp);
+            case HERDER -> HerderJob.next(this, t, wp);
+            case LUMBERJACK -> LumberjackJob.next(this, t, wp);
+            case SMITH -> SmithJob.next(this, t, wp);
+            case NONE -> null;
+        };
+    }
+
     /** Work that can be done right now (day, or night if allowed), or null. */
     private Activity workToDo() {
         Town t = town();
-        if (t == null || job() != Job.FARMER) return null;
+        if (t == null || job() == Job.NONE) return null;
         if (isNight() && !plugin.settings().workAtNight()) return null;
-        return FarmerJob.next(this, t, workplace());
+        return jobNext(t);
     }
 
     void start(Activity a) {
@@ -558,7 +597,16 @@ final class Worker {
         for (Entity e : body.getNearbyEntities(1.5, 1.0, 1.5)) {
             if (!(e instanceof Item item) || item.getPickupDelay() > 0) continue;
             ItemStack stack = item.getItemStack();
-            if (!FarmerJob.wanted(stack.getType())) continue;
+            Material type = stack.getType();
+            boolean want = switch (job()) {
+                case FARMER -> FarmerJob.wanted(type);
+                case HERDER -> HerderJob.wanted(type);
+                case LUMBERJACK -> LumberjackJob.wanted(type);
+                default -> false;
+            };
+            if (!want) continue;
+            Town.Workplace wp = workplace();
+            if (job() != Job.FARMER && (wp == null || !Work.inArea(wp, item.getLocation()))) continue;
             Map<Integer, ItemStack> left = pockets.addItem(stack.clone());
             if (left.isEmpty()) {
                 item.remove();

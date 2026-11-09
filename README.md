@@ -14,12 +14,19 @@ Bell menu → **Show border**: When holding ledger / On / Off.
 
 - **Recruit** at the bell (price in `recruit-cost`): a new settler walks into the settlement.
 - Or **hire** a wild villager: right-click it with the ledger. If it's far away, it follows you when you're near.
-- Right-click a settler: it says hi. With the ledger: its menu (rename, inventory, role worker/guard, guard settings, leave workplace, dismiss).
+- Right-click a settler: it says hi. With the ledger: its menu (rename, skin, inventory as a chest window, role worker/guard, guard settings, leave workplace, dismiss).
 
 ## Workplaces
 
-Place a **composter** anywhere in the settlement: that's a farm. A free settler takes it and becomes a farmer, working the
-fields around it (radius set with the ledger on the composter). Composters already there when you create the settlement count too.
+Place a workplace block in the settlement and choose who works there (ledger on it → Choose settler), or turn on "Free settlers take jobs" at the bell. Ledger on it: its settings (sliders apply when you close the window).
+- **Composter** – farmer: harvests, replants and plants the farmland in its work area.
+- **Smoker** – cook, **Blast furnace** – smelter, **Furnace** – furnace worker (choose: food, ores, stone & building, other):
+  fetch things to cook/smelt and fuel (coal, charcoal, wood) from storage, collect the results.
+- **Loom** – herder: keeps each kind of animal in its area at the herd size: breeds with food from storage, slaughters the extra adults,
+  shears sheep (shears from storage), throws eggs for chicks, brings meat, wool, leather, eggs and feathers to storage.
+- **Fletching table** – lumberjack: fells real trees (logs on dirt with natural leaves) with an axe from storage, replants saplings.
+- **Smithing table** – smith: makes weapons, armor, bows and arrows from storage materials, only what you ask for
+  (What to make: how many to keep in stock, 0 = don't make).
 
 ## Storage
 
@@ -32,13 +39,14 @@ Settlers use the chests and barrels in the settlement (on by default, `chests-al
 
 ## Storage targets
 
-Ledger menu → **Storage targets**: one row per product with its item icon, how much is in storage, and a field for the target.
-Empty = no limit (keep producing). Settlers stop making a product once storage holds the target (farmers keep replanting).
+Ledger menu → **Storage targets**: a grid of products (icon, in storage / target). Click one to change its target with −/+ buttons.
+No limit by default (keep producing). Settlers stop making a product once storage holds the target (farmers keep replanting).
 
 ## Settlers
 
 Settlers are player-like (Mannequins): their own skin (`skins` in the config), their job under their name,
-and only tools they really carry in hand. Look at a settler and it looks back at you. Old villager settlers are converted automatically.
+and only tools they really carry in hand. Look at a settler and it looks back at you. They turn their heads smoothly, glance around, nod while chatting, crouch to work the fields, really eat, draw their bows and blow their horns. Old villager settlers are converted automatically.
+Own skins: put them in the server resource pack and add `texture:namespace:path/to/skin` (or `...:slim`) to `skins` in the config.
 Hiring a wild villager turns it into a settler; dismissing a settler turns it back into a villager.
 
 ## Free time
@@ -61,7 +69,7 @@ settlers may take from. No weapon there → a warning, and "no weapon!" in the s
 - A guard that gets hit goes after its attacker. Guards keep guarding at night.
 
 Hostile mobs in the settlement ring the bell and you get a message. Other settlers react as set in the ledger:
-**Take cover** (run into the nearest building with a door and close it behind them; otherwise under a roof near the gathering spot) or **Call to arms** (borrow a weapon from storage, fight, bring it back;
+**Take cover** (run into the nearest building with a door and close it behind them; otherwise under a roof near the gathering spot; nowhere to hide: they run around the settlement, away from the monsters) or **Call to arms** (borrow a weapon from storage, fight, bring it back;
 no weapon → take cover).
 
 All settlers can be hurt and die, but never by players. They heal slowly (`regen-seconds`) and eat food from storage

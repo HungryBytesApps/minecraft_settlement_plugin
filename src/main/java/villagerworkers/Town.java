@@ -27,6 +27,16 @@ final class Town {
         int radius;
         boolean enabled = true;
         UUID worker;
+        /** Herder: how many adults of each kind to keep. */
+        int herd = 6;
+        /** On/off settings (furnace categories): key → on. */
+        final Map<String, Boolean> options = new HashMap<>();
+
+        boolean isOn(String key) {
+            Boolean v = options.get(key);
+            if (v != null) return v;
+            return !key.equals("BUILDING") && !key.equals("OTHER"); // furnace: food and ores by default
+        }
 
         Workplace(Location loc, int radius) {
             this.loc = loc;
@@ -60,6 +70,8 @@ final class Town {
 
     Reaction reaction = Reaction.TAKE_COVER;
     boolean mayEat = true;
+    /** Free settlers take empty workplaces by themselves. */
+    boolean autoJobs = false;
     boolean guardPotions = false;
 
     // Runtime (not saved): the alarm.

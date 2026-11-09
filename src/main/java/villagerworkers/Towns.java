@@ -83,6 +83,7 @@ final class Towns {
             s.set("chest-default", t.chestDefault);
             s.set("when-attacked", t.reaction.name());
             s.set("may-eat", t.mayEat);
+            s.set("auto-jobs", t.autoJobs);
             s.set("guard-potions", t.guardPotions);
             for (Map.Entry<String, boolean[]> e : t.chestRules.entrySet()) {
                 s.set("chests." + e.getKey().replace('.', '_'), List.of(e.getValue()[0], e.getValue()[1]));
@@ -97,6 +98,8 @@ final class Towns {
                 w.set("radius", wp.radius);
                 w.set("enabled", wp.enabled);
                 if (wp.worker != null) w.set("worker", wp.worker.toString());
+                w.set("herd", wp.herd);
+                for (Map.Entry<String, Boolean> o : wp.options.entrySet()) w.set("options." + o.getKey(), o.getValue());
             }
             for (Map.Entry<UUID, String> e : t.settlers.entrySet()) s.set("settlers." + e.getKey(), e.getValue());
         }
@@ -129,6 +132,7 @@ final class Towns {
             } catch (IllegalArgumentException ignored) {
             }
             t.mayEat = s.getBoolean("may-eat", true);
+            t.autoJobs = s.getBoolean("auto-jobs", false);
             t.guardPotions = s.getBoolean("guard-potions", false);
             ConfigurationSection chests = s.getConfigurationSection("chests");
             if (chests != null) {
@@ -153,6 +157,9 @@ final class Towns {
                     if (loc == null) continue;
                     Town.Workplace wp = new Town.Workplace(loc, w.getInt("radius", plugin.settings().defaultRadius()));
                     wp.enabled = w.getBoolean("enabled", true);
+                    wp.herd = w.getInt("herd", 6);
+                    ConfigurationSection opts = w.getConfigurationSection("options");
+                    if (opts != null) for (String k : opts.getKeys(false)) wp.options.put(k, opts.getBoolean(k));
                     try {
                         String worker = w.getString("worker");
                         if (worker != null) wp.worker = UUID.fromString(worker);

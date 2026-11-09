@@ -53,7 +53,8 @@ eat-below-health-percent: 60
 sit-height: 0.0
 
 # Settler skins, picked at random. Built-in skins: steve, alex, ari, efe, kai, makena, noor,
-# sunny, zuri. Use "player:Name" for a real player's skin.
+# sunny, zuri. Use "player:Name" for a real player's skin, or "texture:namespace:path/to/skin" (add ":slim"
+# for slim arms) for your own skin image in the server resource pack (assets/namespace/textures/path/to/skin.png).
 skins: [steve, alex, ari, efe, kai, makena, noor, sunny, zuri]
 
 # Farmers keep this many of each seed (seeds, carrots, potatoes, beetroot seeds) for replanting.
