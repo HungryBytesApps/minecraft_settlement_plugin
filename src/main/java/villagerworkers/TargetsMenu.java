@@ -49,9 +49,9 @@ final class TargetsMenu {
         return Menus.station(job);
     }
 
-    /** Smith products: 0 means "don't make" instead of "no limit". */
+    /** Smith and furnace products: made to order (no target or 0 = don't make). */
     private static boolean madeToOrder(Material m) {
-        return SmithJob.PRODUCTS.contains(m);
+        return SmithJob.PRODUCTS.contains(m) || FurnaceJob.furnaceProduct(m);
     }
 
     /** From the ledger: pick a workstation (or straight to its list if there's only one kind). */

@@ -26,18 +26,10 @@ import java.util.function.Predicate;
 final class FurnaceJob {
     private FurnaceJob() {}
 
-    /** Furnace categories (furnace worker only). */
-    enum Category {
-        FOOD("Food"), ORES("Ores"), BUILDING("Stone & building"), OTHER("Other");
-
-        final String label;
-
-        Category(String label) {
-            this.label = label;
-        }
-    }
-
     private static Map<Material, Material> smoking, blasting, smelting; // input → result
+    /** What only a plain furnace does (not what a smoker or blast furnace can do): the furnace worker's work. */
+    private static Map<Material, Material> furnaceOnly;
+    private static Set<Material> furnaceProducts;
 
     private static void loadRecipes() {
         if (smoking != null) return;
@@ -57,14 +49,20 @@ final class FurnaceJob {
                 map.putIfAbsent(in, cr.getResult().getType());
             }
         }
+        furnaceOnly = new HashMap<>();
+        Set<Material> elsewhere = new java.util.HashSet<>(smoking.values());
+        elsewhere.addAll(blasting.values());
+        for (Map.Entry<Material, Material> e : smelting.entrySet()) {
+            if (smoking.containsKey(e.getKey()) || blasting.containsKey(e.getKey()) || elsewhere.contains(e.getValue())) continue;
+            furnaceOnly.put(e.getKey(), e.getValue());
+        }
+        furnaceProducts = new java.util.HashSet<>(furnaceOnly.values());
     }
 
-    static Category category(Material in, Material out) {
-        String i = in.name(), o = out.name();
-        if (out.isEdible()) return Category.FOOD;
-        if (i.contains("ORE") || i.startsWith("RAW_") || o.endsWith("_INGOT") || o.endsWith("_NUGGET") || o.equals("NETHERITE_SCRAP")) return Category.ORES;
-        if (out.isBlock()) return Category.BUILDING;
-        return Category.OTHER;
+    /** Made by the furnace worker: made to order (only with a storage target above 0). */
+    static boolean furnaceProduct(Material m) {
+        loadRecipes();
+        return furnaceProducts.contains(m);
     }
 
     /** What this workplace may cook or smelt: input → result. */
@@ -73,13 +71,7 @@ final class FurnaceJob {
         return switch (wp.job()) {
             case COOK -> smoking;
             case SMELTER -> blasting;
-            case FURNACE_WORKER -> {
-                Map<Material, Material> out = new HashMap<>();
-                for (Map.Entry<Material, Material> e : smelting.entrySet()) {
-                    if (wp.isOn(category(e.getKey(), e.getValue()).name())) out.put(e.getKey(), e.getValue());
-                }
-                yield out;
-            }
+            case FURNACE_WORKER -> furnaceOnly;
             default -> Map.of();
         };
     }
@@ -90,7 +82,7 @@ final class FurnaceJob {
         Map<Material, Material> map = switch (job) {
             case COOK -> smoking;
             case SMELTER -> blasting;
-            case FURNACE_WORKER -> smelting;
+            case FURNACE_WORKER -> furnaceOnly;
             default -> Map.of();
         };
         return new TreeSet<>(map.values());
@@ -108,7 +100,15 @@ final class FurnaceJob {
         if (!(fb.getState(false) instanceof Furnace furnace)) return null;
         FurnaceInventory fi = furnace.getInventory();
         Map<Material, Material> recipes = recipes(wp);
-        Predicate<Material> wantedInput = m -> recipes.containsKey(m) && t.wants(recipes.get(m), w.plugin.settings().townRadius());
+        int radius = w.plugin.settings().townRadius();
+        boolean toOrder = wp.job() == Worker.Job.FURNACE_WORKER; // only what has a storage target
+        Predicate<Material> wantedInput = m -> {
+            Material o = recipes.get(m);
+            if (o == null) return false;
+            if (!toOrder) return t.wants(o, radius);
+            Integer target = t.targets.get(o);
+            return target != null && target > 0 && t.count(o, radius) < target;
+        };
         Predicate<Material> keep = m -> recipes.containsKey(m) || isFuel(m) || Work.gear(m);
 
         ItemStack in = fi.getSmelting(), fuel = fi.getFuel(), out = fi.getResult();
@@ -150,6 +150,7 @@ final class FurnaceJob {
         }
         if (hasInputHere) w.workStatus = capital(verb(wp)) + "ing";
         else if (recipes.isEmpty()) w.workStatus = "Nothing allowed to make here";
+        else if (toOrder && recipes.values().stream().noneMatch(o -> t.targets.getOrDefault(o, 0) > 0)) w.workStatus = "Nothing to make (set targets in Storage targets)";
         else w.workStatus = "Nothing to " + verb(wp) + " in storage";
         return null;
     }

@@ -336,8 +336,7 @@ final class WorkerListener implements Listener {
         }
         String name = w.name;
         plugin.forget(w);
-        Player owner = Bukkit.getPlayer(w.owner);
-        if (owner != null) owner.sendMessage(Component.text("✝ " + (w.guard ? "Guard " : "Settler ") + name + " has died. Their things lie where they fell.", NamedTextColor.RED));
+        Notify.send(w.owner, Notify.Kind.DEATH, "✝ " + (w.guard ? "Guard " : "Settler ") + name + " has died. Their things lie where they fell.", NamedTextColor.RED);
     }
 
     @EventHandler

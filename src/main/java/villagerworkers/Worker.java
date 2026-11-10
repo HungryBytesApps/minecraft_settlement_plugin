@@ -219,8 +219,11 @@ final class Worker {
             skin = Skins.skinFor(st, name, random);
             body.getPersistentDataContainer().set(Keys.SKIN, PersistentDataType.STRING, skin);
         }
+        // Skin: a job skin from the config, else the plugin's own settler skins (person + outfit), else the settler's own.
         String jobSkin = Skins.forJob(plugin.settings(), title(), body.getUniqueId());
-        body.setProfile(Skins.profile(jobSkin != null ? jobSkin : skin));
+        io.papermc.paper.datacomponent.item.ResolvableProfile own = jobSkin == null && plugin.getConfig().getBoolean("settler-skins", true)
+                ? SettlerSkins.profile(this, st) : null;
+        body.setProfile(own != null ? own : Skins.profile(jobSkin != null ? jobSkin : skin));
         Job job = job();
         body.setCustomNameVisible(plugin.settings().showNames());
         healthShown = -1;
@@ -395,10 +398,20 @@ final class Worker {
         if (now < storageWarnAt) return;
         storageWarnAt = now + 6000;
         Player p = Bukkit.getPlayer(owner);
-        if (p == null) return;
+        if (p == null || !Notify.on(p, Notify.Kind.STORAGE)) return;
         String what = m == null ? "its goods" : FarmerJob.nice(m);
         p.sendMessage(Component.text("📦 " + name + " has no room in storage for " + what + ". Add a chest or make space.", NamedTextColor.YELLOW));
         p.sendActionBar(Component.text(name + ": no room in storage!", NamedTextColor.YELLOW));
+    }
+
+    private int toolWarnAt;
+
+    /** Tell the owner (at most every 5 minutes) that this settler needs a tool that isn't in storage. */
+    void warnMissingTool(String what) {
+        int now = Bukkit.getCurrentTick();
+        if (now < toolWarnAt) return;
+        toolWarnAt = now + 6000;
+        Notify.send(owner, Notify.Kind.TOOLS, "🔧 " + name + " [" + title() + "] needs " + what + ". Put one in a chest settlers may take from.", NamedTextColor.YELLOW);
     }
 
     // ---- Torch in the dark (guards) ----

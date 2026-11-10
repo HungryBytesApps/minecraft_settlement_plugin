@@ -100,12 +100,12 @@ final class Defense {
     }
 
     private static void ring(Town t) {
+        if (!Notify.on(t.owner, Notify.Kind.BELL)) return;
         if (t.bell.getBlock().getState() instanceof org.bukkit.block.Bell bell) bell.ring();
     }
 
     private static void tell(Town t, String text, NamedTextColor color) {
-        Player owner = Bukkit.getPlayer(t.owner);
-        if (owner != null) owner.sendMessage(Component.text(text, color));
+        Notify.send(t.owner, Notify.Kind.ATTACK, text, color);
     }
 
     private static Worker nearestSettler(VillagerWorkersPlugin plugin, Town t, Location l, double max) {

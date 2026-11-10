@@ -133,8 +133,7 @@ final class Guard implements Activity {
             }
             if (noWeapon() && now >= warnAt) {
                 warnAt = now + 6000;
-                Player owner = Bukkit.getPlayer(w.owner);
-                if (owner != null) owner.sendMessage(Component.text("⚔ Guard " + w.name + " has no weapon. Put one in a chest settlers may take from.", NamedTextColor.YELLOW));
+                Notify.send(w.owner, Notify.Kind.TOOLS, "⚔ Guard " + w.name + " has no weapon. Put one in a chest settlers may take from.", NamedTextColor.YELLOW);
             }
         }
         rounds();

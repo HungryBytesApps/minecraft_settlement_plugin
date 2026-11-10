@@ -69,7 +69,7 @@ final class HerderJob {
         // Too many adults of a kind: slaughter one.
         for (Map.Entry<EntityType, List<Animals>> e : herd.entrySet()) {
             int size = wp.herdSize(e.getKey());
-            if (size <= 0) continue; // leave this kind alone
+            if (size < 0) continue; // switched off: leave this kind alone
             List<Animals> adults = adults(e.getValue());
             if (adults.size() > size) {
                 List<Animals> free = new ArrayList<>();
@@ -86,6 +86,7 @@ final class HerderJob {
                 if (!Work.hasTool(w, "SHEARS")) {
                     Activity f = Work.fetchTool(w, t, "SHEARS", "shears");
                     if (f != null) return f;
+                    w.warnMissingTool("shears");
                     break; // no shears in storage: no shearing
                 }
                 w.hold(Material.SHEARS);
@@ -119,10 +120,18 @@ final class HerderJob {
             return new Work.GoToEntity(w, a, 2.0, "Feeding the " + e.getKey().name().toLowerCase(Locale.ROOT) + "s",
                     en -> feed(w, (Animals) en, feed));
         }
-        // Too few chickens: throw eggs into their pen.
+        // Too few chickens: throw eggs into their pen, only spare ones (the eggs' storage target is reached).
         List<Animals> chickens = herd.getOrDefault(EntityType.CHICKEN, List.of());
         int chickenSize = wp.herdSize(EntityType.CHICKEN);
-        if (!chickens.isEmpty() && chickens.size() < chickenSize && w.count(Material.EGG) > 0) {
+        int radius = w.plugin.settings().townRadius();
+        Integer eggTarget = t.targets.get(Material.EGG);
+        int spare = eggTarget == null ? 0 : t.count(Material.EGG, radius) - eggTarget;
+        boolean throwEggs = wp.isOn("EGGS") && eggTarget != null && !chickens.isEmpty() && chickens.size() < chickenSize;
+        if (throwEggs && w.count(Material.EGG) == 0 && spare > 0) {
+            Activity f = Work.fetch(w, t, m -> m == Material.EGG, Math.min(4, spare), "Getting eggs for chicks");
+            if (f != null) return f;
+        }
+        if (throwEggs && spare >= 0 && w.count(Material.EGG) > 0) {
             Animals hen = chickens.get(w.random.nextInt(chickens.size()));
             List<Location> pen = pen(hen);
             w.workStatus = "Throwing eggs for chicks";

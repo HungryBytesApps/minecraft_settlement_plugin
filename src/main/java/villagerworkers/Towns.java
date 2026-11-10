@@ -99,8 +99,8 @@ final class Towns {
                 List<String> ids = new ArrayList<>();
                 for (UUID id : wp.workers) ids.add(id.toString());
                 w.set("workers", ids);
-                w.set("herd", wp.herd);
-                for (Map.Entry<String, Integer> h : wp.herds.entrySet()) w.set("herds." + h.getKey(), h.getValue());
+                w.set("herd-size", wp.herd);
+                for (Map.Entry<String, Integer> h : wp.herds.entrySet()) w.set("herd-sizes." + h.getKey(), h.getValue());
                 for (Map.Entry<String, Boolean> o : wp.options.entrySet()) w.set("options." + o.getKey(), o.getValue());
             }
             for (Map.Entry<UUID, String> e : t.settlers.entrySet()) s.set("settlers." + e.getKey(), e.getValue());
@@ -163,9 +163,12 @@ final class Towns {
                     if (loc == null) continue;
                     Town.Workplace wp = new Town.Workplace(loc, w.getInt("radius", plugin.settings().defaultRadius()));
                     wp.enabled = w.getBoolean("enabled", true);
-                    wp.herd = w.getInt("herd", 6);
-                    ConfigurationSection herds = w.getConfigurationSection("herds");
+                    // Older saves: 0 meant "leave alone", that is ∞ (-1) now.
+                    wp.herd = w.contains("herd-size") ? w.getInt("herd-size") : (w.getInt("herd", 6) == 0 ? -1 : w.getInt("herd", 6));
+                    ConfigurationSection herds = w.getConfigurationSection("herd-sizes");
                     if (herds != null) for (String kind : herds.getKeys(false)) wp.herds.put(kind, herds.getInt(kind));
+                    else if ((herds = w.getConfigurationSection("herds")) != null) // older: 0 = leave alone
+                        for (String kind : herds.getKeys(false)) wp.herds.put(kind, herds.getInt(kind) == 0 ? -1 : herds.getInt(kind));
                     ConfigurationSection opts = w.getConfigurationSection("options");
                     if (opts != null) for (String opt : opts.getKeys(false)) wp.options.put(opt, opts.getBoolean(opt));
                     try {

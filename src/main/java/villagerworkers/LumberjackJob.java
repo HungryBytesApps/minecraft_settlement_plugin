@@ -67,6 +67,7 @@ final class LumberjackJob {
                 Activity f = Work.fetchTool(w, t, "_AXE", "an axe");
                 if (f != null) return f;
                 w.workStatus = "Needs an axe (none in storage)";
+                w.warnMissingTool("an axe");
                 return null;
             }
             List<Block> logs = tree(base);

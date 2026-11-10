@@ -64,7 +64,11 @@ eat-below-health-percent: 60
 # Height of sitting settlers relative to the top of the seat (raise if they sink in).
 sit-height: 0.0
 
-# Settler skins, picked at random. Built-in skins: steve, alex, ari, efe, kai, makena, noor,
+# The plugin's own settler skins (8 people, an outfit for every job). The images must be in the
+# server resource pack: assets/settlers/textures/skins/<person>_<outfit>.png. Off: use skins and job-skins below.
+settler-skins: true
+
+# Settler skins, picked at random (when settler-skins is off or not uploaded yet). Built-in skins: steve, alex, ari, efe, kai, makena, noor,
 # sunny, zuri. Use "player:Name" for a real player's skin, or "texture:namespace:path/to/skin" (add ":slim"
 # for slim arms) for your own skin image in the server resource pack (assets/namespace/textures/path/to/skin.png).
 skins: [steve, alex, ari, efe, kai, makena, noor, sunny, zuri]

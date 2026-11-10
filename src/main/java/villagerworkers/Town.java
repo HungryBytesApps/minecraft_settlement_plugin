@@ -30,11 +30,23 @@ final class Town {
         final Set<UUID> workers = new LinkedHashSet<>();
         /** Herder: how many adults of each kind to keep. */
         int herd = 6;
-        /** Herder: herd size per kind of animal (EntityType name). 0 = leave that kind alone. */
+        /** Herder: adults to keep per kind of animal (EntityType name, 2-20): breeds up to it, slaughters the extra. Off (checkbox): leave that kind alone. */
         final Map<String, Integer> herds = new HashMap<>();
 
+        /** Adults to keep of this kind (2-20), or -1 when the herder leaves this kind alone. */
         int herdSize(org.bukkit.entity.EntityType type) {
-            return herds.getOrDefault(type.name(), herd);
+            return herding(type) ? herdSetting(type) : -1;
+        }
+
+        /** The slider value (2-20), also while switched off. */
+        int herdSetting(org.bukkit.entity.EntityType type) {
+            int v = herds.getOrDefault(type.name(), herd);
+            return Math.max(2, Math.min(20, v < 0 ? 6 : v));
+        }
+
+        /** The checkbox: does the herder look after this kind at all? */
+        boolean herding(org.bukkit.entity.EntityType type) {
+            return options.getOrDefault("HERD_" + type.name(), true) && herds.getOrDefault(type.name(), herd) >= 0;
         }
         /** On/off settings (furnace categories): key → on. */
         final Map<String, Boolean> options = new HashMap<>();
