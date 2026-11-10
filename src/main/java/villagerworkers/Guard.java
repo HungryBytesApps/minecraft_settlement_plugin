@@ -214,7 +214,7 @@ final class Guard implements Activity {
         if (target instanceof org.bukkit.entity.Creeper creeper) {
             boolean hissing = creeper.getFuseTicks() > 0;
             if (bow != null && arrows) {
-                if (d < 6 || hissing) retreatFrom(creeper, 7);
+                if (d < 6 || (hissing && d < 9)) retreatFrom(creeper, hissing ? 9 : 7);
                 else {
                     w.body.getEquipment().setItemInMainHand(bow.clone());
                     Combat.shoot(w, creeper, bow);
@@ -222,8 +222,13 @@ final class Guard implements Activity {
                 return;
             }
             if (melee != null) {
-                if (hissing || now < w.attackReady - 5) retreatFrom(creeper, 5);
-                else Combat.melee(w, creeper, melee);
+                // Hit once (knocked far back), then step back; when it hisses: run until well out of range.
+                if (hissing) {
+                    if (d < 9) retreatFrom(creeper, 9);
+                    else { w.mover.stop(); w.anim.look(creeper.getEyeLocation()); label = "Waiting for the creeper to calm down"; }
+                } else if (now < w.attackReady - 5) {
+                    if (d < 5) retreatFrom(creeper, 5);
+                } else Combat.melee(w, creeper, melee);
                 return;
             }
         }
@@ -268,7 +273,8 @@ final class Guard implements Activity {
         int top = to.getWorld().getHighestBlockYAt(to.getBlockX(), to.getBlockZ(), org.bukkit.HeightMap.MOTION_BLOCKING_NO_LEAVES) + 1;
         if (Math.abs(top - me.getY()) <= 3) to.setY(top);
         else to.setY(me.getY());
-        if (!w.mover.moving() || time % 10 == 0) w.mover.go(to, 1.0, w.plugin.settings().workSpeed() * 1.4);
+        double fast = w.plugin.settings().workSpeed() * (e instanceof org.bukkit.entity.Creeper c && c.getFuseTicks() > 0 ? 2.0 : 1.4);
+        if (!w.mover.moving() || time % 10 == 0) w.mover.go(to, 1.0, fast);
         w.anim.look(e.getEyeLocation());
         label = "Keeping away from a creeper";
     }
