@@ -1,10 +1,16 @@
 # VillagerWorkers settings
 
 # ---- Settlements ----
-# Right-click a bell to create a settlement there. Everything happens within this radius of the bell.
+# Right-click a bell to create a settlement there. The settlement is a square around the bell,
+# this many blocks to every side (48 = a 97 x 97 square).
 max-settlements-per-player: 1
 settlement-radius: 48
 max-settlers-per-settlement: 10
+
+# Keep settlements working while nobody is near: their chunks stay loaded, so settlers keep working,
+# crops keep growing and furnaces keep burning while you're away. (About 49 chunks per settlement
+# at radius 48; no monsters spawn there without players nearby.)
+keep-settlements-loaded: true
 
 # Can settlers use chests and barrels in the settlement unless you switch them off with the ledger?
 chests-allowed-by-default: true

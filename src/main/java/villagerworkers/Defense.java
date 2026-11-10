@@ -39,9 +39,16 @@ final class Defense {
             World world = t.world();
             if (world == null || !world.isChunkLoaded(t.bell.getBlockX() >> 4, t.bell.getBlockZ() >> 4)) continue;
             Location c = t.bell.clone().add(0.5, 0.5, 0.5);
+            t.unreachable.values().removeIf(until -> now > until);
+            java.util.Set<java.util.UUID> seen = new java.util.HashSet<>();
             for (LivingEntity e : world.getNearbyLivingEntities(c, r, Math.min(r, 32), r)) {
-                if (Combat.hostile(e) && t.contains(e.getLocation(), r) && aboveGround(e)) t.hostiles.add(e);
+                if (!Combat.hostile(e) || !t.contains(e.getLocation(), r) || !aboveGround(e)) continue;
+                seen.add(e.getUniqueId());
+                if (harmless(plugin, t, e, now)) continue; // can't get to anyone: no reason for alarm
+                t.hostiles.add(e);
             }
+            t.stuckSpot.keySet().retainAll(seen);
+            t.stuckSince.keySet().retainAll(seen);
             for (LivingEntity h : t.hostiles) {
                 if (h instanceof Mob m && m.getTarget() == null) {
                     Worker near = nearestSettler(plugin, t, h.getLocation(), 16);
@@ -64,6 +71,24 @@ final class Defense {
                 if (Boolean.TRUE.equals(messaged.remove(t.id))) tell(t, "✔ " + t.name + ": all clear.", NamedTextColor.GREEN);
             }
         }
+    }
+
+    /**
+     * A monster that can't get to anyone: a guard couldn't reach it, or it has hardly moved for a minute
+     * without coming near a settler (stuck in a pit, in water, behind a fence).
+     */
+    private static boolean harmless(VillagerWorkersPlugin plugin, Town t, LivingEntity e, int now) {
+        Worker near = nearestSettler(plugin, t, e.getLocation(), 6);
+        if (near != null) return false; // close to someone: a real threat
+        if (t.unreachable.containsKey(e.getUniqueId())) return true;
+        Location at = e.getLocation();
+        Location first = t.stuckSpot.get(e.getUniqueId());
+        if (first == null || first.getWorld() != at.getWorld() || first.distanceSquared(at) > 4 * 4) {
+            t.stuckSpot.put(e.getUniqueId(), at);
+            t.stuckSince.put(e.getUniqueId(), now);
+            return false;
+        }
+        return now - t.stuckSince.getOrDefault(e.getUniqueId(), now) > 1200;
     }
 
     /** Monsters in caves under the settlement don't count: only ones on the surface or in buildings. */
@@ -222,9 +247,14 @@ final class Defense {
                 if (!w.mover.go(spot, 0.8, w.plugin.settings().workSpeed() * 1.2)) unreachable.add(Keys.ser(spot));
             } else if (!w.mover.moving() && time % 40 == 0 && w.body.getLocation().distanceSquared(spot) > 2 * 2) {
                 w.mover.go(spot, 0.8, w.plugin.settings().workSpeed() * 1.2);
+            } else if (!doorsShut && !w.mover.moving() && w.body.getLocation().distanceSquared(spot) <= 2 * 2) {
+                doorsShut = true;
+                closeDoorsNear(w, spot, 5); // inside: shut the doors, like villagers
             }
             return false;
         }
+
+        private boolean doorsShut;
 
         /** Run to a spot in the settlement away from the monsters; pick a new one when there or when one comes close. */
         private boolean flee() {
@@ -390,7 +420,7 @@ final class Defense {
         int bx = t.bell.getBlockX(), by = t.bell.getBlockY(), bz = t.bell.getBlockZ();
         for (int x = bx - r; x <= bx + r; x++) {
             for (int z = bz - r; z <= bz + r; z++) {
-                if ((x - bx) * (x - bx) + (z - bz) * (z - bz) > r * r) continue;
+                if (Math.abs(x - bx) > r || Math.abs(z - bz) > r) continue;
                 if (!world.isChunkLoaded(x >> 4, z >> 4)) continue;
                 for (int y = by - 8; y <= by + 8; y++) {
                     Block b = world.getBlockAt(x, y, z);
@@ -429,6 +459,26 @@ final class Defense {
             }
         }
         return walls >= 3;
+    }
+
+    /** Shut the open doors (that you open by hand) around this spot, with the sound. */
+    static void closeDoorsNear(Worker w, Location at, int r) {
+        World world = at.getWorld();
+        for (int x = -r; x <= r; x++) {
+            for (int y = -1; y <= 2; y++) {
+                for (int z = -r; z <= r; z++) {
+                    Block b = world.getBlockAt(at.getBlockX() + x, at.getBlockY() + y, at.getBlockZ() + z);
+                    if (!Mover.handDoor(b.getType()) && !org.bukkit.Tag.FENCE_GATES.isTagged(b.getType())) continue;
+                    if (!(b.getBlockData() instanceof org.bukkit.block.data.Openable o) || !o.isOpen()) continue;
+                    if (b.getBlockData() instanceof org.bukkit.block.data.Bisected bi && bi.getHalf() == org.bukkit.block.data.Bisected.Half.TOP) continue;
+                    o.setOpen(false);
+                    b.setBlockData(o, true);
+                    world.playSound(b.getLocation().add(0.5, 0.5, 0.5), Mover.handDoor(b.getType()) ? "minecraft:block.wooden_door.close"
+                            : "minecraft:block.fence_gate.close", org.bukkit.SoundCategory.BLOCKS, 0.8f, 1f);
+                    w.body.swingMainHand();
+                }
+            }
+        }
     }
 
     private static boolean roofed(World world, int x, int y, int z) {

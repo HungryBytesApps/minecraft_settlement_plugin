@@ -16,7 +16,7 @@ import java.util.*;
 final class Fields {
     private Fields() {}
 
-    private record Scan(List<Block> farmland, List<Block> trees, List<Block> plants, int at) {}
+    private record Scan(List<Block> farmland, List<Block> trees, List<Block> plants, List<Block> jukeboxes, int at) {}
 
     private static final Map<String, Scan> inside = new HashMap<>(), outside = new HashMap<>();
     private static final int OUTSIDE_WIDTH = 24; // how far past the border lumberjacks look
@@ -25,6 +25,11 @@ final class Fields {
     /** All farmland in the settlement. */
     static List<Block> farmland(Town t, int radius) {
         return get(t, radius, false).farmland();
+    }
+
+    /** Jukeboxes in the settlement. */
+    static List<Block> jukeboxes(Town t, int radius) {
+        return get(t, radius, false).jukeboxes();
     }
 
     /** Melons, pumpkins, the bottom of sugar cane / cactus / bamboo, berry bushes and cocoa in the settlement. */
@@ -55,12 +60,11 @@ final class Fields {
 
     private static Scan scan(Town t, int radius, boolean ring, int now) {
         World w = t.world();
-        List<Block> farmland = new ArrayList<>(), trees = new ArrayList<>(), plants = new ArrayList<>();
-        if (w == null) return new Scan(farmland, trees, plants, now);
+        List<Block> farmland = new ArrayList<>(), trees = new ArrayList<>(), plants = new ArrayList<>(), jukeboxes = new ArrayList<>();
+        if (w == null) return new Scan(farmland, trees, plants, jukeboxes, now);
         int cx = t.bell.getBlockX(), cz = t.bell.getBlockZ(), cy = t.bell.getBlockY();
         int outer = ring ? radius + OUTSIDE_WIDTH : radius;
         int minY = Math.max(w.getMinHeight() + 1, cy - (ring ? 24 : 12)), maxY = Math.min(w.getMaxHeight() - 1, cy + (ring ? 32 : 16));
-        long inner2 = (long) radius * radius, outer2 = (long) outer * outer;
         for (int chx = (cx - outer) >> 4; chx <= (cx + outer) >> 4; chx++) {
             for (int chz = (cz - outer) >> 4; chz <= (cz + outer) >> 4; chz++) {
                 if (!w.isChunkLoaded(chx, chz)) continue;
@@ -68,12 +72,13 @@ final class Fields {
                 for (int lx = 0; lx < 16; lx++) {
                     for (int lz = 0; lz < 16; lz++) {
                         int x = (chx << 4) + lx, z = (chz << 4) + lz;
-                        long d2 = (long) (x - cx) * (x - cx) + (long) (z - cz) * (z - cz);
-                        if (ring ? (d2 <= inner2 || d2 > outer2) : d2 > inner2) continue;
+                        int d = Math.max(Math.abs(x - cx), Math.abs(z - cz)); // square
+                        if (ring ? (d <= radius || d > outer) : d > radius) continue;
                         Material below = snap.getBlockType(lx, minY - 1, lz);
                         for (int y = minY; y <= maxY; y++) {
                             Material m = snap.getBlockType(lx, y, lz);
                             if (!ring && m == Material.FARMLAND) farmland.add(w.getBlockAt(x, y, z));
+                            else if (!ring && m == Material.JUKEBOX) jukeboxes.add(w.getBlockAt(x, y, z));
                             else if (!ring && (m == Material.MELON || m == Material.PUMPKIN || m == Material.SWEET_BERRY_BUSH || m == Material.COCOA
                                     || ((m == Material.SUGAR_CANE || m == Material.CACTUS || m == Material.BAMBOO) && below != m))) plants.add(w.getBlockAt(x, y, z));
                             else if (Tag.LOGS.isTagged(m) && !m.name().startsWith("STRIPPED_")
@@ -84,6 +89,6 @@ final class Fields {
                 }
             }
         }
-        return new Scan(farmland, trees, plants, now);
+        return new Scan(farmland, trees, plants, jukeboxes, now);
     }
 }

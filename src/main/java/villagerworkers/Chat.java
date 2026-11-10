@@ -130,14 +130,17 @@ final class Chat {
                     lines.add(s);
                 }
             }
-            // Stand in a little circle around the middle.
-            Location mid = lead.body.getLocation().clone();
-            for (int i = 1; i < group.size(); i++) mid.add(group.get(i).body.getLocation());
-            mid.multiply(1.0 / group.size());
-            double r = group.size() == 2 ? 0.9 : 1.3, base = lead.random.nextDouble() * Math.PI * 2;
-            for (int i = 0; i < group.size(); i++) {
-                double a = base + i * Math.PI * 2 / group.size();
-                spots[i] = mid.clone().add(Math.cos(a) * r, 0, Math.sin(a) * r);
+            // Stand close together: the others come to the one who started it (face to face, or a little triangle).
+            Location here = lead.body.getLocation().clone();
+            double base = lead.random.nextDouble() * Math.PI * 2, d = 1.6;
+            spots[0] = here;
+            if (group.size() == 2) {
+                spots[1] = here.clone().add(Math.cos(base) * d, 0, Math.sin(base) * d);
+            } else {
+                for (int i = 1; i < group.size(); i++) {
+                    double a = base + (i == 1 ? -0.52 : 0.52);
+                    spots[i] = here.clone().add(Math.cos(a) * d, 0, Math.sin(a) * d);
+                }
             }
         }
 
@@ -190,18 +193,25 @@ final class Chat {
                 return;
             }
             if (!talking) {
+                Location lead = group.get(0).body.getLocation();
                 boolean all = true;
-                for (int i = 0; i < group.size(); i++) {
+                for (int i = 1; i < group.size(); i++) {
                     Worker w = group.get(i);
                     Location l = w.body.getLocation();
-                    if (l.getWorld() != spots[i].getWorld() || horizontal(l, spots[i]) > 1.1) {
-                        all = false;
-                        if (t % 30 == 1 && !w.mover.moving()) {
-                            if (!w.mover.go(spots[i], 0.4, w.plugin.settings().walkSpeed()) && t > 60) spots[i] = l; // can't get there: talk from here
-                        }
+                    boolean close = l.getWorld() == lead.getWorld() && (horizontal(l, spots[i]) <= 0.9
+                            || (t > 200 && horizontal(l, lead) <= 2.5)); // close enough after a while
+                    if (close) continue;
+                    all = false;
+                    if (t % 30 == 1 && !w.mover.moving()) {
+                        if (!w.mover.go(spots[i], 0.4, w.plugin.settings().walkSpeed()))
+                            w.mover.go(lead, 1.6, w.plugin.settings().walkSpeed()); // the spot can't be reached: just next to them
                     }
                 }
-                if (all || t > 300) {
+                if (t > 600) { // couldn't get together
+                    done = true;
+                    return;
+                }
+                if (all) {
                     talking = true;
                     for (Worker w : group) w.mover.stop();
                     nextLine = t + 15;

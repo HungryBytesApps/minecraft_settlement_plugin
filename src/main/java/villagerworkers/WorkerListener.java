@@ -177,9 +177,10 @@ final class WorkerListener implements Listener {
         if (w != null) {
             e.setCancelled(true);
             if (w.canManage(p)) { // your own settler: its menu (no ledger needed)
-                w.anim.look(p.getEyeLocation());
+                w.pauseFor(p, 1200); // waits while you're in its menu
                 Menus.settler(plugin, p, w);
             } else {
+                w.pauseFor(p, 60);
                 String hi = GREETINGS.get(w.random.nextInt(GREETINGS.size()));
                 Bubbles.say(plugin, w.body, hi, 40);
                 Voice.speak(w, hi);
@@ -278,6 +279,9 @@ final class WorkerListener implements Listener {
             if (w == null) return;
             if (Combat.blocks(w, e.getDamager())) { // blocked with the shield
                 e.setCancelled(true);
+                org.bukkit.inventory.ItemStack shield = w.body.getEquipment().getItemInOffHand();
+                Work.wear(w, shield);
+                w.body.getEquipment().setItemInOffHand(shield.getAmount() > 0 ? shield : null);
                 victim.getWorld().playSound(victim.getLocation(), "minecraft:item.shield.block", org.bukkit.SoundCategory.NEUTRAL, 1f, 0.9f + w.random.nextFloat() * 0.2f);
                 if (e.getDamager() instanceof org.bukkit.entity.Projectile pr) pr.remove();
                 if (src instanceof org.bukkit.entity.LivingEntity le && Combat.hostile(le)) w.lastAttacker = le;

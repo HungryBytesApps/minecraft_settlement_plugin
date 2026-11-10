@@ -56,11 +56,33 @@ public final class VillagerWorkersPlugin extends JavaPlugin {
         borders = new Borders(this);
         getServer().getScheduler().runTaskTimer(this, borders::tick, 20L, 10L);
         getServer().getScheduler().runTaskTimer(this, () -> Defense.tick(this), 40L, 20L);
+        for (Town t : towns.all()) keepLoaded(t, true);
         getLogger().info("Build " + BUILD + " enabled, " + workers.all().size() + " settlers running.");
     }
 
+    /**
+     * keep-settlements-loaded: hold the settlement's chunks loaded (a chunk ticket), so it keeps working
+     * while nobody is near. Off: let go of them.
+     */
+    void keepLoaded(Town t, boolean on) {
+        org.bukkit.World w = t.world();
+        if (w == null) return;
+        int r = settings.townRadius();
+        int cx = t.bell.getBlockX(), cz = t.bell.getBlockZ();
+        int n = 0;
+        for (int x = (cx - r) >> 4; x <= (cx + r) >> 4; x++) {
+            for (int z = (cz - r) >> 4; z <= (cz + r) >> 4; z++) {
+                if (on && !settings.keepLoaded()) continue;
+                if (on) w.addPluginChunkTicket(x, z, this);
+                else w.removePluginChunkTicket(x, z, this);
+                n++;
+            }
+        }
+        if (on && n > 0) getLogger().info("Keeping " + n + " chunks of " + t.name + " loaded.");
+    }
+
     /** Changes with every version I send, to check the right jar is installed. */
-    static final String BUILD = "2026-11-10 #38";
+    static final String BUILD = "2026-11-10 #45";
 
     @Override
     public boolean onCommand(org.bukkit.command.CommandSender sender, org.bukkit.command.Command cmd, String label, String[] args) {
@@ -167,6 +189,7 @@ public final class VillagerWorkersPlugin extends JavaPlugin {
         if (bell.getType() != Material.BELL || towns.atBell(bell) != null || !canFoundTown(p, bell, true)) return;
         if (name == null || name.isBlank()) name = p.getName() + "'s Settlement";
         Town t = towns.create(p.getUniqueId(), name.trim(), bell.getLocation());
+        keepLoaded(t, true);
         registerComposters(t);
         bell.getWorld().playSound(bell.getLocation(), "minecraft:ui.toast.challenge_complete", SoundCategory.BLOCKS, 0.6f, 1.2f);
         p.sendActionBar(Component.text(t.name + " has been created! Here's your Settlement Ledger.", NamedTextColor.GREEN));
@@ -197,6 +220,7 @@ public final class VillagerWorkersPlugin extends JavaPlugin {
 
     void disband(Town t) {
         for (Worker w : workers.all()) if (t.id.equals(w.townId)) dismiss(w);
+        keepLoaded(t, false);
         towns.remove(t);
     }
 
@@ -326,7 +350,7 @@ public final class VillagerWorkersPlugin extends JavaPlugin {
     private Location exitPoint(Town t, Location from) {
         if (t == null || t.bell.getWorld() != from.getWorld()) return from.clone().add(20, 0, 0);
         double dx = from.getX() - t.bell.getX(), dz = from.getZ() - t.bell.getZ();
-        double len = Math.sqrt(dx * dx + dz * dz);
+        double len = Math.max(Math.abs(dx), Math.abs(dz)); // the settlement is a square
         if (len < 1) {
             double a = random.nextDouble() * Math.PI * 2;
             dx = Math.cos(a);

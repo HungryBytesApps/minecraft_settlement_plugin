@@ -18,6 +18,7 @@ final class Shelter implements Activity {
     private final Set<String> unreachable = new HashSet<>();
     private Location spot;
     private int time, tries;
+    private boolean doorsShut;
 
     Shelter(Worker w, Town t, boolean storm) {
         this.w = w;
@@ -69,6 +70,10 @@ final class Shelter implements Activity {
             return false;
         }
         if (w.mover.moving()) return false;
+        if (!doorsShut && w.body.getLocation().distanceSquared(spot) <= 2.5 * 2.5) {
+            doorsShut = true;
+            Defense.closeDoorsNear(w, spot, 5); // inside: shut the doors behind them
+        }
         // Waiting it out: look around, now and then a word.
         if (time % 60 == 0) w.anim.glance();
         if (time % 300 == 150 && w.random.nextInt(3) == 0) {

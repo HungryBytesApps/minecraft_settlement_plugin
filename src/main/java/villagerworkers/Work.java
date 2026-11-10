@@ -138,6 +138,45 @@ final class Work {
 
     // ---- Tools ----
 
+    /** Use up one point of a tool's durability (Unbreaking helps, like for players). The tool breaks when worn out. */
+    static void wear(Worker w, ItemStack tool) {
+        if (tool == null || tool.getType().getMaxDurability() <= 0) return;
+        if (!(tool.getItemMeta() instanceof org.bukkit.inventory.meta.Damageable dm) || dm.isUnbreakable()) return;
+        int unbreaking = tool.getEnchantmentLevel(org.bukkit.enchantments.Enchantment.UNBREAKING);
+        if (unbreaking > 0 && w.random.nextInt(unbreaking + 1) != 0) return;
+        dm.setDamage(dm.getDamage() + 1);
+        if (dm.getDamage() >= tool.getType().getMaxDurability()) {
+            tool.setAmount(0); // broken
+            w.body.getWorld().playSound(w.body.getLocation(), "minecraft:entity.item.break", org.bukkit.SoundCategory.NEUTRAL, 0.8f, 1f);
+        } else {
+            tool.setItemMeta(dm);
+        }
+    }
+
+    /** Wear the first tool in the pockets whose name ends with this ("_AXE", "SHEARS"...). */
+    static void wearTool(Worker w, String suffix) {
+        for (int i = 0; i < w.pockets.getSize(); i++) {
+            ItemStack it = w.pockets.getItem(i);
+            if (it == null || !it.getType().name().endsWith(suffix)) continue;
+            wear(w, it);
+            w.pockets.setItem(i, it.getAmount() > 0 ? it : null);
+            w.holdTool();
+            return;
+        }
+    }
+
+    /** Wear this item in the pockets (the one similar to the given copy, e.g. the weapon in hand). */
+    static void wearSimilar(Worker w, ItemStack copy) {
+        if (copy == null) return;
+        for (int i = 0; i < w.pockets.getSize(); i++) {
+            ItemStack it = w.pockets.getItem(i);
+            if (it == null || !it.isSimilar(copy)) continue;
+            wear(w, it);
+            w.pockets.setItem(i, it.getAmount() > 0 ? it : null);
+            return;
+        }
+    }
+
     /** Does it carry a tool whose name ends with this (e.g. "_AXE", "SHEARS")? */
     static boolean hasTool(Worker w, String suffix) {
         for (ItemStack it : w.pockets.getContents()) if (it != null && it.getType().name().endsWith(suffix)) return true;

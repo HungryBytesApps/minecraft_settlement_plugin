@@ -43,7 +43,7 @@ final class Town {
             Boolean v = options.get(key);
             if (v != null) return v;
             return !key.equals("BUILDING") && !key.equals("OTHER") && !key.equals("OUTSIDE") && !key.equals("BONEMEAL")
-                    && !key.equals("COMPOST") && !key.equals("COMPOST_ALL"); // furnace: food and ores; lumberjack: inside; no bone meal
+                    && !key.equals("COMPOST") && !key.equals("COMPOST_ALL"); // REPLANT: on by default // furnace: food and ores; lumberjack: inside; no bone meal
         }
 
         Workplace(Location loc, int radius) {
@@ -107,6 +107,11 @@ final class Town {
     // Runtime (not saved): the alarm.
     boolean alarm;
     final List<org.bukkit.entity.LivingEntity> hostiles = new ArrayList<>();
+    /** Monsters nobody can get to (in a pit, deep water): they don't count as an attack (monster → until tick). */
+    final Map<UUID, Integer> unreachable = new HashMap<>();
+    /** Where each monster was first seen standing (to notice ones that are stuck and can't get anywhere). */
+    final Map<UUID, Location> stuckSpot = new HashMap<>();
+    final Map<UUID, Integer> stuckSince = new HashMap<>();
     int quietTicks;
 
     /** All settlers of this town (also the ones in unloaded chunks): id → name. */
@@ -131,8 +136,9 @@ final class Town {
 
     boolean contains(Location l, int radius) {
         if (l == null || l.getWorld() != bell.getWorld()) return false;
-        double dx = l.getX() - bell.getX(), dz = l.getZ() - bell.getZ();
-        return dx * dx + dz * dz <= (double) radius * radius && Math.abs(l.getY() - bell.getY()) <= 64;
+        // A square around the bell: "radius" blocks to every side.
+        double dx = Math.abs(l.getX() - (bell.getX() + 0.5)), dz = Math.abs(l.getZ() - (bell.getZ() + 0.5));
+        return dx <= radius + 0.5 && dz <= radius + 0.5 && Math.abs(l.getY() - bell.getY()) <= 64;
     }
 
     // ---- Chest rules ----

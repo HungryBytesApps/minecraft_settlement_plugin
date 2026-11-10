@@ -40,7 +40,8 @@ record Settings(
         String voiceSound,
         String laughSound,
         java.util.TreeMap<Integer, List<ItemStack>> recruitTiers,
-        int recruitIncrease
+        int recruitIncrease,
+        boolean keepLoaded
 ) {
     /** What the next settler costs, with this many settlers already living there. */
     List<ItemStack> recruitCostFor(int settlers) {
@@ -129,7 +130,8 @@ record Settings(
                 c.getString("voice-sound", "minecraft:entity.villager.ambient"),
                 c.getString("laugh-sound", "minecraft:entity.villager.yes"),
                 tiers,
-                (int) clamp(c.getInt("recruit-cost-increase", 20), 0, 1000)
+                (int) clamp(c.getInt("recruit-cost-increase", 20), 0, 1000),
+                c.getBoolean("keep-settlements-loaded", true)
         );
     }
 

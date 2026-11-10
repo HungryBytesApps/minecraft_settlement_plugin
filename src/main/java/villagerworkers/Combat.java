@@ -327,6 +327,7 @@ final class Combat {
         w.body.swingMainHand();
         raiseShield(w, false); // shield down to strike
         target.damage(damage(weapon.getType()), w.body);
+        Work.wearSimilar(w, weapon);
         w.body.getWorld().playSound(me, "minecraft:entity.player.attack.strong", SoundCategory.NEUTRAL, 0.8f, 1f);
         w.body.getWorld().spawnParticle(Particle.CRIT, target.getLocation().add(0, target.getHeight() / 2, 0), 6, 0.3, 0.3, 0.3, 0.1);
         if (target instanceof Mob m && m.getTarget() == null) m.setTarget(w.body);
@@ -366,6 +367,7 @@ final class Combat {
         Arrow arrow = w.body.launchProjectile(Arrow.class, to);
         arrow.setPickupStatus(AbstractArrow.PickupStatus.DISALLOWED);
         w.take(Material.ARROW, 1);
+        Work.wearSimilar(w, bow);
         w.body.getWorld().playSound(eye, bow.getType() == Material.CROSSBOW ? "minecraft:item.crossbow.shoot" : "minecraft:entity.arrow.shoot",
                 SoundCategory.NEUTRAL, 0.8f, 1f);
         return true;

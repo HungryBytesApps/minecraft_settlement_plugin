@@ -54,6 +54,12 @@ final class Guard implements Activity {
     private int lootAt = 100;
     private int time, gearCheckAt = 20, warnAt, calmUntil;
     private Location patrolTo;
+    private LivingEntity chasing;
+    private double closest;
+    private int progressAt;
+    private final java.util.Map<java.util.UUID, Integer> ignored = new java.util.HashMap<>(); // out of reach for now
+    private boolean patrolPause;
+    private int patrolWait, patrolGiveUp, patrolDir = 1;
     private String label = "On guard";
 
     Guard(Worker w, Town t) {
@@ -153,6 +159,31 @@ final class Guard implements Activity {
         ItemStack bow = Combat.bow(w), melee = Combat.bestMelee(w);
         boolean arrows = w.count(Material.ARROW) > 0;
         double d = w.body.getLocation().distance(target.getLocation());
+        // Can't get to it (down a cliff, in deep water)? Shoot it if possible, else leave it be for a while.
+        if (target != chasing) {
+            chasing = target;
+            closest = d;
+            progressAt = time;
+        } else if (d < closest - 0.5) {
+            closest = d;
+            progressAt = time;
+        }
+        boolean stuck = d > 3 && time - progressAt > 100;
+        if (stuck && bow != null && arrows && w.body.hasLineOfSight(target)) {
+            Combat.raiseShield(w, false);
+            w.body.getEquipment().setItemInMainHand(bow.clone());
+            Combat.shoot(w, target, bow);
+            return;
+        }
+        if (stuck) {
+            ignored.put(target.getUniqueId(), time + 600);
+            t.unreachable.put(target.getUniqueId(), now + 1200); // and no alarm for it
+            target = null;
+            chasing = null;
+            w.mover.stop();
+            Combat.raiseShield(w, false);
+            return;
+        }
         // Shield: up against archers while closing in, and up close between strikes. Down to shoot or strike.
         if (Combat.hasShield(w)) {
             boolean ranged = target instanceof org.bukkit.entity.AbstractSkeleton || target instanceof org.bukkit.entity.Pillager
@@ -161,6 +192,40 @@ final class Guard implements Activity {
             boolean shooting = bow != null && arrows && (w.weapon == Weapon.RANGED || (w.weapon == Weapon.AUTO && (d > 5 || melee == null)));
             boolean waiting = now < w.attackReady - 3;
             Combat.raiseShield(w, !shooting && ((ranged && d > 3) || (d < 4.5 && waiting)));
+        }
+        // Up high (a spider on a ceiling or wall): go below it, into the room, and shoot it down.
+        double up = target.getLocation().getY() - w.body.getLocation().getY();
+        if (up > 2.5 && bow != null && arrows) {
+            if (w.body.hasLineOfSight(target) && d <= 16) {
+                w.mover.stop();
+                w.body.getEquipment().setItemInMainHand(bow.clone());
+                Combat.raiseShield(w, false);
+                Combat.shoot(w, target, bow);
+                progressAt = time; // shooting counts as getting somewhere
+            } else if (!w.mover.moving() && time % 20 == 0) {
+                Location below = floorBelow(target.getLocation());
+                if (below != null) w.mover.go(below, 3.0, w.plugin.settings().workSpeed());
+            }
+            label = "Shooting down a " + target.getType().name().toLowerCase(java.util.Locale.ROOT).replace('_', ' ');
+            return;
+        }
+        // Creepers: never let them get close. Shoot from a distance; with only a sword: hit (it gets knocked
+        // back) and step back at once, and back off whenever it starts to hiss.
+        if (target instanceof org.bukkit.entity.Creeper creeper) {
+            boolean hissing = creeper.getFuseTicks() > 0;
+            if (bow != null && arrows) {
+                if (d < 6 || hissing) retreatFrom(creeper, 7);
+                else {
+                    w.body.getEquipment().setItemInMainHand(bow.clone());
+                    Combat.shoot(w, creeper, bow);
+                }
+                return;
+            }
+            if (melee != null) {
+                if (hissing || now < w.attackReady - 5) retreatFrom(creeper, 5);
+                else Combat.melee(w, creeper, melee);
+                return;
+            }
         }
         switch (w.weapon) {
             case RANGED -> {
@@ -181,6 +246,31 @@ final class Guard implements Activity {
                 else noWeaponNow();
             }
         }
+    }
+
+    /** The floor under a spot (where you can stand), up to 12 blocks down. */
+    private Location floorBelow(Location l) {
+        World world = l.getWorld();
+        int x = l.getBlockX(), z = l.getBlockZ();
+        for (int y = l.getBlockY(); y >= l.getBlockY() - 12; y--) {
+            if (PathFinder.walkable(world, x, y, z)) return new Location(world, x + 0.5, y, z + 0.5);
+        }
+        return null;
+    }
+
+    /** Step back from something, a few blocks straight away from it. */
+    private void retreatFrom(LivingEntity e, double dist) {
+        Location me = w.body.getLocation();
+        org.bukkit.util.Vector away = me.toVector().subtract(e.getLocation().toVector()).setY(0);
+        if (away.lengthSquared() < 0.01) away = new org.bukkit.util.Vector(1, 0, 0);
+        away.normalize().multiply(dist);
+        Location to = me.clone().add(away);
+        int top = to.getWorld().getHighestBlockYAt(to.getBlockX(), to.getBlockZ(), org.bukkit.HeightMap.MOTION_BLOCKING_NO_LEAVES) + 1;
+        if (Math.abs(top - me.getY()) <= 3) to.setY(top);
+        else to.setY(me.getY());
+        if (!w.mover.moving() || time % 10 == 0) w.mover.go(to, 1.0, w.plugin.settings().workSpeed() * 1.4);
+        w.anim.look(e.getEyeLocation());
+        label = "Keeping away from a creeper";
     }
 
     private void restockArrowsNow() {
@@ -249,29 +339,55 @@ final class Guard implements Activity {
         }
     }
 
+    /**
+     * Patrol: walk a round along the inside of the border (now and then a stretch through the middle),
+     * a good distance at a time, then stop and look around for a bit before walking on.
+     */
     private void patrol(double speed) {
         label = "On patrol";
         if (w.mover.moving()) return;
-        if (patrolTo != null && w.body.getLocation().distanceSquared(patrolTo) > 2 * 2 && !w.mover.failed() && time % 40 != 0) return;
+        if (time < patrolWait) return;
+        boolean there = patrolTo != null && w.body.getLocation().distanceSquared(patrolTo) <= 3 * 3;
+        if (patrolTo != null && !there && !w.mover.failed() && time < patrolGiveUp) return; // still on the way
+        if (there && patrolPause) { // arrived: a short look around first
+            patrolPause = false;
+            patrolWait = time + 40 + w.random.nextInt(60);
+            w.anim.glance();
+            return;
+        }
         World world = t.bell.getWorld();
         int r = w.plugin.settings().townRadius();
-        for (int tries = 0; tries < 10; tries++) {
-            double a = w.random.nextDouble() * Math.PI * 2;
-            double dist = w.random.nextInt(10) < 7 ? r - 6 - w.random.nextInt(6) : w.random.nextInt(Math.max(1, r - 6));
-            int x = (int) Math.floor(t.bell.getX() + Math.cos(a) * dist), z = (int) Math.floor(t.bell.getZ() + Math.sin(a) * dist);
+        Location me = w.body.getLocation();
+        double cur = Math.atan2(me.getZ() - t.bell.getZ(), me.getX() - t.bell.getX());
+        for (int tries = 0; tries < 12; tries++) {
+            boolean middle = w.random.nextInt(10) < 2;
+            // Along the border: onwards in the same direction, 25-50 degrees further.
+            double a = middle ? w.random.nextDouble() * Math.PI * 2 : cur + patrolDir * Math.toRadians(25 + w.random.nextInt(25));
+            double dist = middle ? w.random.nextInt(Math.max(1, r / 2)) : r - 5 - w.random.nextInt(4);
+            // The settlement is a square: along the border means along its sides.
+            double k = middle ? 1 : Math.max(Math.abs(Math.cos(a)), Math.abs(Math.sin(a)));
+            int x = (int) Math.floor(t.bell.getX() + Math.cos(a) * dist / k), z = (int) Math.floor(t.bell.getZ() + Math.sin(a) * dist / k);
             if (!world.isChunkLoaded(x >> 4, z >> 4)) continue;
-            for (int y = t.bell.getBlockY() + 8; y >= t.bell.getBlockY() - 12; y--) {
-                if (PathFinder.walkable(world, x, y, z)) {
-                    patrolTo = new Location(world, x + 0.5, y, z + 0.5);
-                    if (w.mover.go(patrolTo, 1.5, speed)) return;
-                    break;
+            int top = world.getHighestBlockYAt(x, z, org.bukkit.HeightMap.MOTION_BLOCKING_NO_LEAVES) + 1;
+            for (int y = top; y >= top - 3; y--) {
+                if (!PathFinder.walkable(world, x, y, z)) continue;
+                Location to = new Location(world, x + 0.5, y, z + 0.5);
+                if (to.distanceSquared(me) < 8 * 8) break; // too close: pick something further
+                if (w.mover.go(to, 1.5, speed)) {
+                    patrolTo = to;
+                    patrolPause = true;
+                    patrolGiveUp = time + 900;
+                    return;
                 }
+                break;
             }
         }
+        patrolDir = -patrolDir; // nothing that way: turn around
+        patrolWait = time + 40;
     }
 
     private LivingEntity findTarget() {
-        if (w.lastAttacker != null && w.lastAttacker.isValid() && !w.lastAttacker.isDead()
+        if (w.lastAttacker != null && w.lastAttacker.isValid() && !w.lastAttacker.isDead() && !ignored.containsKey(w.lastAttacker.getUniqueId())
                 && w.lastAttacker.getLocation().distanceSquared(w.body.getLocation()) <= 32 * 32) return w.lastAttacker;
         Location from = switch (w.stance) {
             case DEFENSIVE -> w.post != null ? w.post : t.bell;
@@ -283,8 +399,9 @@ final class Guard implements Activity {
         };
         LivingEntity best = null;
         double bestD = Double.MAX_VALUE;
+        ignored.values().removeIf(until -> time > until);
         for (LivingEntity h : t.hostiles) {
-            if (!h.isValid() || !inRange(h)) continue;
+            if (!h.isValid() || !inRange(h) || ignored.containsKey(h.getUniqueId())) continue;
             double d = h.getLocation().distanceSquared(from);
             if (d < bestD) {
                 bestD = d;
@@ -293,7 +410,7 @@ final class Guard implements Activity {
         }
         if (best == null) {
             for (Entity e : w.body.getNearbyEntities(12, 6, 12)) {
-                if (e instanceof LivingEntity le && Combat.hostile(e) && inRange(le)) {
+                if (e instanceof LivingEntity le && Combat.hostile(e) && inRange(le) && !ignored.containsKey(le.getUniqueId())) {
                     double d = e.getLocation().distanceSquared(from);
                     if (d < bestD) {
                         bestD = d;

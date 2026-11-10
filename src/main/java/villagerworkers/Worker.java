@@ -77,6 +77,9 @@ final class Worker {
     private int regenTimer, healthShown = -1, defenseCheck = 20, foodCheck = 100;
 
     int errorLoggedUntil;
+    /** Talking to a player (menu open): waits for them, then carries on. */
+    org.bukkit.entity.Player pausedFor;
+    int pauseUntil;
     /** Farmer: planting round (after a harvest round), and how much it harvested this round. */
     boolean planting;
     int harvestRound;
@@ -422,6 +425,24 @@ final class Worker {
         body.getPersistentDataContainer().remove(key);
     }
 
+    /** A player talks to it: stop, turn to them, wait (at most this long, or until the menu closes), then carry on. */
+    void pauseFor(org.bukkit.entity.Player p, int ticks) {
+        if (activity instanceof Defense.Reaction || (activity instanceof Guard g && !g.idle())) return; // not in a fight
+        pausedFor = p;
+        pauseUntil = Bukkit.getCurrentTick() + ticks;
+        mover.stop();
+        if (activity != null) { // pick the work up again afterwards (fresh, so nothing gets stuck half-way)
+            activity.stop();
+            activity = null;
+        }
+        anim.look(p.getEyeLocation());
+    }
+
+    /** The player closed the menu: everyone waiting for them carries on. */
+    static void release(VillagerWorkersPlugin plugin, org.bukkit.entity.Player p) {
+        for (Worker w : plugin.workers().all()) if (w.pausedFor != null && w.pausedFor.equals(p)) w.pausedFor = null;
+    }
+
     /** Guard without anything to fight with. */
     boolean unarmed() {
         return Combat.bestMelee(this) == null && (Combat.bow(this) == null || count(Material.ARROW) == 0);
@@ -452,6 +473,18 @@ final class Worker {
 
     void tick() {
         ticks++;
+        // Someone is talking to it (its menu is open): stand still and look at them.
+        if (pausedFor != null) {
+            int nowT = Bukkit.getCurrentTick();
+            if (pausedFor.isOnline() && pausedFor.getWorld() == body.getWorld() && nowT < pauseUntil
+                    && pausedFor.getLocation().distanceSquared(body.getLocation()) < 10 * 10) {
+                mover.stop();
+                if (ticks % 10 == 0) anim.look(pausedFor.getEyeLocation());
+                anim.tick();
+                return;
+            }
+            pausedFor = null;
+        }
         // Someone is looking in its pockets: stand still and look at them.
         org.bukkit.entity.Player looking = SettlerInventory.viewer(this);
         if (looking != null) {
@@ -534,25 +567,23 @@ final class Worker {
             start(new Social.LookAround(this, 100));
             return;
         }
-        // Far away (just recruited or hired): walk to the settlement, or follow the owner.
-        if (!t.contains(body.getLocation(), plugin.settings().socialRadius() + 12)) {
-            start(new Social.GoHome(this, t));
-            return;
-        }
+        int townR = plugin.settings().townRadius();
+        boolean outside = !t.contains(body.getLocation(), townR + 2);
         if (guard) {
             workStatus = "";
-            start(new Guard(this, t));
+            if (outside) start(new Social.GoHome(this, t));
+            else start(new Guard(this, t));
             return;
         }
         checkWorkplace(t);
         boolean night = isNight();
-        if (night) {
+        if (night && (!plugin.settings().workAtNight() || job() == Job.NONE)) {
             workStatus = job() == Job.NONE ? "" : "Done for the day";
-            if (!plugin.settings().workAtNight() || job() == Job.NONE) {
-                start(Social.evening(this, t));
-                return;
-            }
+            if (outside) start(new Social.GoHome(this, t));
+            else start(Social.evening(this, t));
+            return;
         }
+        // Work first (a lumberjack may work outside the settlement); only then walk back or take free time.
         if (job() != Job.NONE) {
             Activity a = jobNext(t);
             if (a != null) {
@@ -561,6 +592,10 @@ final class Worker {
             }
         } else {
             workStatus = "No workplace";
+        }
+        if (outside) {
+            start(new Social.GoHome(this, t)); // just recruited or hired, or done outside: back to the settlement
+            return;
         }
         start(Social.idle(this));
     }

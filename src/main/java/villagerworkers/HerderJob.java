@@ -178,6 +178,7 @@ final class HerderJob {
     private static void shear(Worker w, Sheep s) {
         if (s.isSheared() || !s.isAdult()) return;
         s.setSheared(true);
+        Work.wearTool(w, "SHEARS");
         DyeColor color = s.getColor() == null ? DyeColor.WHITE : s.getColor();
         Material wool = Material.matchMaterial(color.name() + "_WOOL");
         if (wool == null) wool = Material.WHITE_WOOL;

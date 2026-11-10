@@ -43,7 +43,7 @@ final class LumberjackJob {
         // Replant spots where a tree stood.
         int radius = w.plugin.settings().townRadius();
         boolean outside = wp.isOn("OUTSIDE");
-        Block spot = Work.nearestOf(w, Replant.all(), b -> b.getType().isAir() && plantable(b.getRelative(BlockFace.DOWN))
+        Block spot = !wp.isOn("REPLANT") ? null : Work.nearestOf(w, Replant.all(), b -> b.getType().isAir() && plantable(b.getRelative(BlockFace.DOWN))
                 && b.getWorld() == t.world() && b.getLocation().distanceSquared(t.bell) <= (radius + 30.0) * (radius + 30.0));
         if (spot != null) {
             Material sapling = Replant.wanted(spot);
@@ -72,7 +72,7 @@ final class LumberjackJob {
             List<Block> logs = tree(base);
             if (logs != null) {
                 w.workStatus = "Felling a tree";
-                return new Chop(w, base, logs);
+                return new Chop(w, base, logs, wp.isOn("REPLANT"));
             }
             w.skip(base, 6000);
         }
@@ -156,9 +156,13 @@ final class LumberjackJob {
         private final Block base;
         private final List<Block> logs;
         private final Material kind;
-        private int phase, time, wait;
+        private int phase, time, wait, hits;
+        private Block current;
+        private final boolean replant;
+        private static final int HITS = 5; // swings per log
 
-        Chop(Worker w, Block base, List<Block> logs) {
+        Chop(Worker w, Block base, List<Block> logs, boolean replant) {
+            this.replant = replant;
             this.w = w;
             this.base = base;
             this.logs = new ArrayList<>(logs);
@@ -188,21 +192,38 @@ final class LumberjackJob {
                 }
                 return false;
             }
-            // Chopping.
-            if (--wait > 0) return false;
-            wait = 7;
-            while (!logs.isEmpty() && logs.get(0).getType() != kind) logs.remove(0);
-            if (logs.isEmpty()) {
-                Replant.add(base, saplingFor(kind));
-                return true;
+            // Chopping: axe in hand, swing after swing, cracks growing in the log, then it breaks.
+            if (current == null) {
+                while (!logs.isEmpty() && logs.get(0).getType() != kind) logs.remove(0);
+                if (logs.isEmpty()) {
+                    if (replant) Replant.add(base, saplingFor(kind));
+                    return true;
+                }
+                if (!Work.hasTool(w, "_AXE")) return true; // the axe broke
+                w.holdTool();
+                current = logs.remove(0);
+                hits = 0;
             }
-            Block log = logs.remove(0);
-            w.anim.look(log.getLocation().add(0.5, 0.5, 0.5));
+            if (--wait > 0) return false;
+            wait = 5;
+            w.anim.look(current.getLocation().add(0.5, 0.5, 0.5));
             w.body.swingMainHand();
+            hits++;
+            float progress = Math.min(0.9f, hits / (float) HITS);
+            for (org.bukkit.entity.Player p : current.getWorld().getPlayers()) {
+                if (p.getLocation().distanceSquared(current.getLocation()) < 48 * 48) p.sendBlockDamage(current.getLocation(), progress, w.body.getEntityId());
+            }
+            current.getWorld().playSound(current.getLocation(), "minecraft:block.wood.hit", SoundCategory.BLOCKS, 0.7f, 0.9f + w.random.nextFloat() * 0.2f);
+            if (hits < HITS) return false;
+            Block log = current;
+            current = null;
+            for (org.bukkit.entity.Player p : log.getWorld().getPlayers()) {
+                if (p.getLocation().distanceSquared(log.getLocation()) < 48 * 48) p.sendBlockDamage(log.getLocation(), 0f, w.body.getEntityId());
+            }
             log.getWorld().playEffect(log.getLocation(), Effect.STEP_SOUND, log.getBlockData());
-            log.getWorld().playSound(log.getLocation(), "minecraft:block.wood.break", SoundCategory.BLOCKS, 0.9f, 0.9f + w.random.nextFloat() * 0.2f);
             log.setType(Material.AIR);
             w.give(List.of(new ItemStack(kind)), w.body.getLocation());
+            Work.wearTool(w, "_AXE");
             return false;
         }
 

@@ -109,12 +109,15 @@ final class Borders {
         World w = t.bell.getWorld();
         int r = plugin.settings().townRadius();
         double cx = t.bell.getBlockX() + 0.5, cz = t.bell.getBlockZ() + 0.5;
-        int points = (int) Math.ceil(2 * Math.PI * r / STEP);
         ParticleBuilder pb = new ParticleBuilder(plugin.settings().borderParticle()).receivers(p).force(true).count(1).offset(0, 0, 0).extra(0);
         Location me = p.getLocation();
-        for (int i = 0; i < points; i++) {
-            double a = 2 * Math.PI * i / points;
-            post(w, pb, cx + Math.cos(a) * r, cz + Math.sin(a) * r, me, HEIGHTS);
+        // The square around the bell: its four sides.
+        double x0 = cx - r - 0.5, x1 = cx + r + 0.5, z0 = cz - r - 0.5, z1 = cz + r + 0.5;
+        for (double d = 0; d <= x1 - x0; d += STEP) {
+            post(w, pb, x0 + d, z0, me, HEIGHTS);
+            post(w, pb, x0 + d, z1, me, HEIGHTS);
+            post(w, pb, x0, z0 + d, me, HEIGHTS);
+            post(w, pb, x1, z0 + d, me, HEIGHTS);
         }
     }
 

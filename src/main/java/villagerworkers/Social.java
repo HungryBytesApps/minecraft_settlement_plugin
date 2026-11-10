@@ -41,6 +41,9 @@ final class Social {
         } else if (r < 83) {
             Activity p = Potter.start(w);
             if (p != null) return p;
+        } else if (r < 89) {
+            Activity j = JukeboxTime.start(w);
+            if (j != null) return j;
         }
         Activity walk = stroll(w);
         if (walk != null) return walk;
@@ -73,9 +76,12 @@ final class Social {
                 if (seat != null) return new Sit(w, seat, Mode.READ, 600 + w.random.nextInt(800), null);
                 return new GoThen(w, home, new Read(w, 400 + w.random.nextInt(400)), "Relaxing at home");
             }
-        } else if (r < 90) {
+        } else if (r < 86) {
             Activity walk = stroll(w);
             if (walk != null) return walk;
+        } else if (r < 92) {
+            Activity j = JukeboxTime.start(w);
+            if (j != null) return j;
         } else if (r < 96) {
             Activity p = Potter.start(w);
             if (p != null) return p;

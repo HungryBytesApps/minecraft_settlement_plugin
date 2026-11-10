@@ -88,3 +88,11 @@ Push to GitHub: the workflow builds it under Actions → Artifacts.
 
 
 Above each settler: its name and job, e.g. "Emma [Farmer]" (and health when hurt), under it what it's doing. Rename it in its menu.
+
+Tools wear out: axes per log, shears per sheep, swords per hit, bows per shot, shields per blocked hit (Unbreaking helps).
+Right-click a settler: it stops and turns to you while its menu is open, then carries on.
+Workstations: Workers (n) lists who works there (✖ takes one off), with Add worker on top. Lumberjack: Replant saplings On/Off.
+Music: bands of 2 to 5 play real old songs (melody, bass, drums, octaves). Jukebox: settlers put on a record from storage, listen, and put it away after.
+Taking cover or sheltering from the weather: they shut the doors behind them.
+
+Settlements keep working while you're away (`keep-settlements-loaded: true` in the config): their chunks stay loaded, so settlers work, crops grow and furnaces burn. Set it to false to let them pause when nobody is near.
