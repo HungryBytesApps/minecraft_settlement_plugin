@@ -327,11 +327,10 @@ final class Combat {
         w.body.swingMainHand();
         raiseShield(w, false); // shield down to strike
         target.damage(damage(weapon.getType()), w.body);
-        // Knockback like a player's hit (a creeper gets pushed back hard: that's how you fight them).
+        // The hit itself gives normal knockback; a creeper gets a little extra push to make room.
         org.bukkit.util.Vector push = them.toVector().subtract(me.toVector()).setY(0);
-        if (push.lengthSquared() > 0.001 && !target.isDead()) {
-            double power = target instanceof org.bukkit.entity.Creeper ? 1.1 : 0.45;
-            target.setVelocity(target.getVelocity().add(push.normalize().multiply(power).setY(target instanceof org.bukkit.entity.Creeper ? 0.4 : 0.3)));
+        if (target instanceof org.bukkit.entity.Creeper && push.lengthSquared() > 0.001 && !target.isDead()) {
+            target.setVelocity(target.getVelocity().add(push.normalize().multiply(0.3)));
         }
         Work.wearSimilar(w, weapon);
         w.body.getWorld().playSound(me, "minecraft:entity.player.attack.strong", SoundCategory.NEUTRAL, 0.8f, 1f);

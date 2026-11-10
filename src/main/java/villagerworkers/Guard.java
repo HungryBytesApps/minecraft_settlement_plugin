@@ -78,6 +78,12 @@ final class Guard implements Activity {
             lootAt = time + 40;      // and pick up what they dropped
             Combat.raiseShield(w, false);
         }
+        if (target != null && leftBehind()) { // escorting: the owner ran far away from the fight, go with them
+            target = null;
+            chasing = null;
+            w.mover.stop();
+            Combat.raiseShield(w, false);
+        }
         if (target == null && time % 10 == 0 && time >= calmUntil) target = findTarget();
 
         if (target != null) {
@@ -164,7 +170,7 @@ final class Guard implements Activity {
             chasing = target;
             closest = d;
             progressAt = time;
-        } else if (d < closest - 0.5) {
+        } else if (d < closest - 0.5 || d <= 3.5) {
             closest = d;
             progressAt = time;
         }
@@ -218,6 +224,7 @@ final class Guard implements Activity {
                 else {
                     w.body.getEquipment().setItemInMainHand(bow.clone());
                     Combat.shoot(w, creeper, bow);
+                    if (w.body.hasLineOfSight(creeper)) progressAt = time;
                 }
                 return;
             }
@@ -225,7 +232,7 @@ final class Guard implements Activity {
                 // Hit once (knocked far back), then step back; when it hisses: run until well out of range.
                 if (hissing) {
                     if (d < 9) retreatFrom(creeper, 9);
-                    else { w.mover.stop(); w.anim.look(creeper.getEyeLocation()); label = "Waiting for the creeper to calm down"; }
+                    else { w.mover.stop(); w.anim.look(creeper.getEyeLocation()); label = "Waiting for the creeper to calm down"; progressAt = time; }
                 } else if (now < w.attackReady - 5) {
                     if (d < 5) retreatFrom(creeper, 5);
                 } else Combat.melee(w, creeper, melee);
@@ -277,6 +284,8 @@ final class Guard implements Activity {
         if (!w.mover.moving() || time % 10 == 0) w.mover.go(to, 1.0, fast);
         w.anim.look(e.getEyeLocation());
         label = "Keeping away from a creeper";
+        progressAt = time; // backing off on purpose is not being stuck
+        closest = me.distance(e.getLocation());
     }
 
     private void restockArrowsNow() {
@@ -334,8 +343,11 @@ final class Guard implements Activity {
                 Player owner = Bukkit.getPlayer(w.owner);
                 if (owner != null && t.contains(owner.getLocation(), w.plugin.settings().townRadius())) {
                     label = "Escorting " + owner.getName();
-                    if (time % 20 == 0 && owner.getLocation().distanceSquared(w.body.getLocation()) > 4 * 4) {
-                        w.mover.go(owner.getLocation(), 2.5, w.plugin.settings().workSpeed());
+                    double far = owner.getLocation().distance(w.body.getLocation());
+                    if (far > 4 && (time % 20 == 0 || (far > 10 && time % 10 == 0))) {
+                        // The further behind, the faster: up to running to catch up.
+                        double sp = w.plugin.settings().workSpeed() * (far > 16 ? 2.0 : far > 8 ? 1.5 : 1.0);
+                        w.mover.go(owner.getLocation(), 2.5, sp);
                     }
                     return;
                 }
@@ -439,6 +451,15 @@ final class Guard implements Activity {
             }
             case PATROL, ESCORT -> t.contains(e.getLocation(), w.plugin.settings().townRadius() + 8);
         };
+    }
+
+    /** Escort: the owner fled far from this fight (and the monster isn't after them). */
+    private boolean leftBehind() {
+        if (w.stance != Stance.ESCORT || target.equals(w.lastAttacker) && target.getLocation().distanceSquared(w.body.getLocation()) < 4 * 4) return false;
+        Player owner = Bukkit.getPlayer(w.owner);
+        if (owner == null || owner.getWorld() != w.body.getWorld()) return false;
+        Location o = owner.getLocation();
+        return o.distanceSquared(w.body.getLocation()) > 28 * 28 && o.distanceSquared(target.getLocation()) > 20 * 20;
     }
 
     private boolean hurt() {
