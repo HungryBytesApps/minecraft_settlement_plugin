@@ -13,13 +13,13 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
 /**
- * Guard duty: stands at its post (defensive), walks rounds (patrol) or follows the owner (escort),
+ * Guard duty: stands at its post (defensive), or walks rounds (patrol),
  * and fights hostile mobs. Restocks gear/arrows from storage after a fight (archers: when out),
  * eats when hurt, drinks healing potions in a fight if the settlement allows it.
  */
 final class Guard implements Activity {
     enum Stance {
-        DEFENSIVE("Defensive"), PATROL("Patrol"), ESCORT("Escort");
+        DEFENSIVE("Defensive"), PATROL("Patrol");
 
         final String label;
 
@@ -76,12 +76,6 @@ final class Guard implements Activity {
             target = null;
             gearCheckAt = time + 40; // restock after the fight
             lootAt = time + 40;      // and pick up what they dropped
-            Combat.raiseShield(w, false);
-        }
-        if (target != null && leftBehind()) { // escorting: the owner ran far away from the fight, go with them
-            target = null;
-            chasing = null;
-            w.mover.stop();
             Combat.raiseShield(w, false);
         }
         if (target == null && time % 10 == 0 && time >= calmUntil) target = findTarget();
@@ -317,7 +311,7 @@ final class Guard implements Activity {
         w.mover.stop();
     }
 
-    /** Defensive: stand at the post. Patrol: walk rounds (mostly along the border). Escort: follow the owner. */
+    /** Defensive: stand at the post. Patrol: walk rounds (mostly along the border). */
     private void rounds() {
         double speed = w.plugin.settings().walkSpeed();
         if (noWeapon()) {
@@ -338,20 +332,6 @@ final class Guard implements Activity {
                 } else if (time % 60 == 0) {
                     w.anim.glance();
                 }
-            }
-            case ESCORT -> {
-                Player owner = Bukkit.getPlayer(w.owner);
-                if (owner != null && t.contains(owner.getLocation(), w.plugin.settings().townRadius())) {
-                    label = "Escorting " + owner.getName();
-                    double far = owner.getLocation().distance(w.body.getLocation());
-                    if (far > 4 && (time % 20 == 0 || (far > 10 && time % 10 == 0))) {
-                        // The further behind, the faster: up to running to catch up.
-                        double sp = w.plugin.settings().workSpeed() * (far > 16 ? 2.0 : far > 8 ? 1.5 : 1.0);
-                        w.mover.go(owner.getLocation(), 2.5, sp);
-                    }
-                    return;
-                }
-                patrol(speed);
             }
             case PATROL -> patrol(speed);
         }
@@ -409,10 +389,6 @@ final class Guard implements Activity {
                 && w.lastAttacker.getLocation().distanceSquared(w.body.getLocation()) <= 32 * 32) return w.lastAttacker;
         Location from = switch (w.stance) {
             case DEFENSIVE -> w.post != null ? w.post : t.bell;
-            case ESCORT -> {
-                Player owner = Bukkit.getPlayer(w.owner);
-                yield owner != null && owner.getWorld() == w.body.getWorld() ? owner.getLocation() : w.body.getLocation();
-            }
             case PATROL -> w.body.getLocation();
         };
         LivingEntity best = null;
@@ -449,17 +425,8 @@ final class Guard implements Activity {
                 double r = w.guardRadius;
                 yield post.getWorld() == e.getWorld() && e.getLocation().distanceSquared(post) <= r * r;
             }
-            case PATROL, ESCORT -> t.contains(e.getLocation(), w.plugin.settings().townRadius() + 8);
+            case PATROL -> t.contains(e.getLocation(), w.plugin.settings().townRadius() + 8);
         };
-    }
-
-    /** Escort: the owner fled far from this fight (and the monster isn't after them). */
-    private boolean leftBehind() {
-        if (w.stance != Stance.ESCORT || target.equals(w.lastAttacker) && target.getLocation().distanceSquared(w.body.getLocation()) < 4 * 4) return false;
-        Player owner = Bukkit.getPlayer(w.owner);
-        if (owner == null || owner.getWorld() != w.body.getWorld()) return false;
-        Location o = owner.getLocation();
-        return o.distanceSquared(w.body.getLocation()) > 28 * 28 && o.distanceSquared(target.getLocation()) > 20 * 20;
     }
 
     private boolean hurt() {

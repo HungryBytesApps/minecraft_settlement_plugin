@@ -126,7 +126,8 @@ final class Worker {
         skin = pdc.get(Keys.SKIN, PersistentDataType.STRING);
         guard = "guard".equals(pdc.get(Keys.ROLE, PersistentDataType.STRING));
         try {
-            stance = Guard.Stance.valueOf(pdc.getOrDefault(Keys.STANCE, PersistentDataType.STRING, "DEFENSIVE"));
+            String st = pdc.getOrDefault(Keys.STANCE, PersistentDataType.STRING, "DEFENSIVE");
+            stance = "ESCORT".equals(st) ? Guard.Stance.PATROL : Guard.Stance.valueOf(st); // escort was removed
         } catch (IllegalArgumentException ignored) {
         }
         try {

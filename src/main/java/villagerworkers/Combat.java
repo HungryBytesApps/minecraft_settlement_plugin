@@ -342,15 +342,21 @@ final class Combat {
     static boolean shoot(Worker w, LivingEntity target, ItemStack bow) {
         if (w.count(Material.ARROW) <= 0) return false;
         if (!w.body.getEquipment().getItemInMainHand().isSimilar(bow)) w.body.getEquipment().setItemInMainHand(bow.clone());
-        w.mover.stop();
-        Mover.lookAt(w.body, target.getEyeLocation());
-        if (!w.body.hasLineOfSight(target)) {
-            if (w.chaseRepath-- <= 0) {
+        // Out of sight or too far: walk closer (keep walking: don't stop every tick).
+        double far = w.body.getLocation().distance(target.getLocation());
+        if (!w.body.hasLineOfSight(target) || far > 20) {
+            if (w.drawing) {
+                w.drawing = false;
+                w.anim.stopUsing();
+            }
+            if (!w.mover.moving() || w.chaseRepath-- <= 0) {
                 w.chaseRepath = 10;
-                w.mover.go(target.getLocation(), 6, w.plugin.settings().workSpeed() * 1.2);
+                w.mover.go(target.getLocation(), far > 20 ? 14 : 6, w.plugin.settings().workSpeed() * 1.2);
             }
             return true;
         }
+        w.mover.stop();
+        Mover.lookAt(w.body, target.getEyeLocation());
         int now = Bukkit.getCurrentTick();
         // Draw the bow first (the real animation), then let go.
         if (w.drawing && now - w.drawStart > 40) w.drawing = false; // lost the target while drawing

@@ -251,7 +251,7 @@ final class Menus {
         text(body, "Make a settler a guard in its menu. Guards take the best weapons, armor, bows and arrows (" + s.arrowsToCarry()
                 + ") from chests settlers may take from. Without a weapon there, you get a warning.");
         text(body, "Stance: Defensive guards stay at their post (Set post here) and fight mobs within their radius (default " + s.guardRadius()
-                + "). Patrol guards walk along the border and through the settlement. Escort guards follow you inside the settlement.");
+                + "). Patrol guards walk along the border and through the settlement.");
         text(body, "Weapon: Auto (bow at range, melee up close), Melee or Archer. Archers fetch arrows as soon as they run out; others refill after the fight.");
         text(body, "Hostile mobs in the settlement ring the bell. Other settlers then hide in a building with a door (and close it), or with Call to arms grab a weapon from storage and fight (and bring it back after).");
         text(body, "Everyone can be hurt and die, but never by players. They heal slowly by themselves. Settlers consumption (bell): Off, Food only (food that fits their wounds), or Food & Potions (guards also drink healing potions in a fight). Guards go first.");
@@ -589,7 +589,7 @@ final class Menus {
             settler(plugin, pl, w);
         }));
         if (w.guard) {
-            buttons.add(button(plugin, "Stance: " + w.stance.label, NamedTextColor.WHITE, "Defensive: stays at its post. Patrol: walks the border. Escort: follows you.", width, pl -> {
+            buttons.add(button(plugin, "Stance: " + w.stance.label, NamedTextColor.WHITE, "Defensive: stays at its post. Patrol: walks the border.", width, pl -> {
                 w.stance = w.stance.next();
                 w.save();
                 settler(plugin, pl, w);
