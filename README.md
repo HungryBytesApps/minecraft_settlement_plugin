@@ -88,5 +88,3 @@ Push to GitHub: the workflow builds it under Actions → Artifacts.
 
 
 Above each settler: its name and job, e.g. "Emma [Farmer]" (and health when hurt), under it what it's doing. Rename it in its menu.
-
-At night (and anywhere really dark) guards carry a free torch in the main hand, for dynamic-light mods, and keep their shield. The weapon comes back as soon as a monster comes within 16 blocks (skeleton range).
