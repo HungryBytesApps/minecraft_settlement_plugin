@@ -82,14 +82,13 @@ final class Towns {
             s.set("bell", Keys.ser(t.bell));
             s.set("chest-default", t.chestDefault);
             s.set("when-attacked", t.reaction.name());
-            s.set("may-eat", t.mayEat);
+            s.set("consumption", t.consumption.name());
             s.set("auto-jobs", t.autoJobs);
-            s.set("guard-potions", t.guardPotions);
             for (Map.Entry<String, boolean[]> e : t.chestRules.entrySet()) {
                 s.set("chests." + e.getKey().replace('.', '_'), List.of(e.getValue()[0], e.getValue()[1]));
             }
             for (Map.Entry<Material, Integer> e : t.targets.entrySet()) {
-                if (e.getValue() > 0) s.set("targets." + e.getKey().name(), e.getValue());
+                s.set("targets." + e.getKey().name(), Math.max(0, e.getValue()));
             }
             int i = 0;
             for (Town.Workplace wp : t.workplaces.values()) {
@@ -134,9 +133,13 @@ final class Towns {
                 t.reaction = Town.Reaction.valueOf(s.getString("when-attacked", "TAKE_COVER"));
             } catch (IllegalArgumentException ignored) {
             }
-            t.mayEat = s.getBoolean("may-eat", true);
+            try {
+                if (s.contains("consumption")) t.consumption = Town.Consumption.valueOf(s.getString("consumption"));
+                else t.consumption = !s.getBoolean("may-eat", true) ? Town.Consumption.OFF
+                        : s.getBoolean("guard-potions", false) ? Town.Consumption.ALL : Town.Consumption.FOOD; // older versions
+            } catch (IllegalArgumentException ignored) {
+            }
             t.autoJobs = s.getBoolean("auto-jobs", false);
-            t.guardPotions = s.getBoolean("guard-potions", false);
             ConfigurationSection chests = s.getConfigurationSection("chests");
             if (chests != null) {
                 for (String k : chests.getKeys(false)) {

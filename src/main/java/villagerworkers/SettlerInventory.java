@@ -39,10 +39,10 @@ final class SettlerInventory implements InventoryHolder {
         this.inv = Bukkit.createInventory(this, 18, Component.text(w.name));
         ItemStack filler = new ItemStack(Material.GRAY_STAINED_GLASS_PANE);
         filler.editMeta(m -> m.displayName(Component.text(" ")));
-        for (int i = 4; i < 9; i++) inv.setItem(i, filler);
+        for (int i = 5; i < 9; i++) inv.setItem(i, filler);
         ItemStack label = new ItemStack(Material.LIGHT_GRAY_STAINED_GLASS_PANE);
-        label.editMeta(m -> m.displayName(Component.text("← Armor   ·   Pockets ↓", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false)));
-        inv.setItem(4, label);
+        label.editMeta(m -> m.displayName(Component.text("← Armor, shield   ·   Pockets ↓", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false)));
+        inv.setItem(5, label);
         load();
     }
 
@@ -56,6 +56,7 @@ final class SettlerInventory implements InventoryHolder {
     }
 
     static void open(Player p, Worker w) {
+        w.showTorch(false); // the real shield, not the torch
         SettlerInventory si = open.computeIfAbsent(w.body.getUniqueId(), k -> new SettlerInventory(w));
         si.load();
         Menus.markShown(p);
@@ -79,6 +80,8 @@ final class SettlerInventory implements InventoryHolder {
             ItemStack it = eq.getItem(ARMOR[i]);
             inv.setItem(i, it == null || it.getType().isAir() ? null : it.clone());
         }
+        ItemStack off = eq.getItemInOffHand();
+        inv.setItem(4, off.getType() == Material.SHIELD ? off.clone() : null);
         for (int i = 0; i < POCKETS; i++) {
             ItemStack it = w.pockets.getItem(i);
             inv.setItem(9 + i, it == null ? null : it.clone());
@@ -92,6 +95,8 @@ final class SettlerInventory implements InventoryHolder {
             ItemStack it = inv.getItem(i);
             eq.setItem(ARMOR[i], it == null ? null : it.clone());
         }
+        ItemStack shield = inv.getItem(4);
+        eq.setItemInOffHand(shield == null ? null : shield.clone());
         for (int i = 0; i < POCKETS; i++) {
             ItemStack it = inv.getItem(9 + i);
             w.pockets.setItem(i, it == null ? null : it.clone());
@@ -103,6 +108,7 @@ final class SettlerInventory implements InventoryHolder {
     private static boolean fits(int slot, ItemStack it) {
         if (it == null || it.getType().isAir()) return true;
         if (slot < 4) return Combat.armorSlot(it.getType()) == ARMOR[slot];
+        if (slot == 4) return it.getType() == Material.SHIELD;
         return slot >= 9;
     }
 
@@ -124,7 +130,7 @@ final class SettlerInventory implements InventoryHolder {
             boolean top = e.getClickedInventory() == si.inv;
             if (top) {
                 int slot = e.getSlot();
-                if (slot >= 4 && slot < 9) {
+                if (slot >= 5 && slot < 9) {
                     e.setCancelled(true);
                     return;
                 }
@@ -138,7 +144,7 @@ final class SettlerInventory implements InventoryHolder {
                 // From your inventory: armor to its slot if free, the rest into the pockets.
                 e.setCancelled(true);
                 ItemStack it = e.getCurrentItem().clone();
-                for (int i = 0; i < 4 && it.getAmount() > 0; i++) {
+                for (int i = 0; i < 5 && it.getAmount() > 0; i++) {
                     if (fits(i, it) && si.inv.getItem(i) == null) {
                         si.inv.setItem(i, it.asOne());
                         it.subtract();
@@ -168,7 +174,7 @@ final class SettlerInventory implements InventoryHolder {
                     e.setCancelled(true);
                     return;
                 }
-                if (raw >= 4 && raw < 9) {
+                if (raw >= 5 && raw < 9) {
                     e.setCancelled(true);
                     return;
                 }

@@ -59,7 +59,7 @@ public final class VillagerWorkersPlugin extends JavaPlugin {
     }
 
     /** Changes with every version I send, to check the right jar is installed. */
-    static final String BUILD = "2026-11-09 #23";
+    static final String BUILD = "2026-11-10 #28";
 
     @Override
     public boolean onCommand(org.bukkit.command.CommandSender sender, org.bukkit.command.Command cmd, String label, String[] args) {
@@ -203,7 +203,8 @@ public final class VillagerWorkersPlugin extends JavaPlugin {
     /** Pay the price; a new settler appears some distance away and walks into town. */
     void recruit(Player p, Town t) {
         if (!hasRoom(p, t)) return;
-        for (ItemStack cost : settings.recruitCost()) {
+        List<ItemStack> price = settings.recruitCostFor(t.settlers.size());
+        for (ItemStack cost : price) {
             if (!p.getInventory().containsAtLeast(cost, cost.getAmount())) {
                 p.sendActionBar(Component.text("You need " + cost.getAmount() + " " + FarmerJob.nice(cost.getType()) + ".", NamedTextColor.RED));
                 return;
@@ -214,7 +215,7 @@ public final class VillagerWorkersPlugin extends JavaPlugin {
             p.sendActionBar(Component.text("No room for a new settler to arrive.", NamedTextColor.RED));
             return;
         }
-        for (ItemStack cost : settings.recruitCost()) p.getInventory().removeItem(cost.clone());
+        for (ItemStack cost : price) p.getInventory().removeItem(cost.clone());
         String name = makeSettler(spawn, t, p.getUniqueId(), null).name;
         p.sendActionBar(Component.text(name + " heard about " + t.name + " and is on the way!", NamedTextColor.GREEN));
     }
@@ -283,10 +284,13 @@ public final class VillagerWorkersPlugin extends JavaPlugin {
     /** Dismissed: the settler leaves and a normal villager stands in its place. */
     void dismiss(Worker w) {
         SettlerInventory.close(w);
+        w.showTorch(false);
         Location at = w.body.getLocation();
         for (ItemStack it : w.pockets.getContents()) if (it != null && !it.getType().isAir()) at.getWorld().dropItemNaturally(at, it);
         w.pockets.clear();
         for (ItemStack it : w.body.getEquipment().getArmorContents()) if (it != null && !it.getType().isAir()) at.getWorld().dropItemNaturally(at, it);
+        ItemStack off = w.body.getEquipment().getItemInOffHand();
+        if (off.getType() == Material.SHIELD) at.getWorld().dropItemNaturally(at, off);
         forget(w);
         becomeVillager(w.body);
     }

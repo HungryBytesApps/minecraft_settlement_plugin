@@ -51,6 +51,7 @@ final class Guard implements Activity {
     private LivingEntity target;
     private Activity sub;           // a trip to a chest (gear, arrows, food)
     private boolean arrowRun;       // archer fetching arrows mid-fight
+    private int lootAt = 100;
     private int time, gearCheckAt = 20, warnAt, calmUntil;
     private Location patrolTo;
     private String label = "On guard";
@@ -68,10 +69,13 @@ final class Guard implements Activity {
         if (target != null && (!target.isValid() || target.isDead() || !inRange(target))) {
             target = null;
             gearCheckAt = time + 40; // restock after the fight
+            lootAt = time + 40;      // and pick up what they dropped
+            Combat.raiseShield(w, false);
         }
         if (target == null && time % 10 == 0 && time >= calmUntil) target = findTarget();
 
         if (target != null) {
+            w.showTorch(false); // shield back in hand
             if (sub != null) {
                 if (arrowRun) return runSub(); // archers fetch arrows as soon as they run out
                 sub.stop();                    // anything else waits until after the fight
@@ -84,11 +88,30 @@ final class Guard implements Activity {
 
         // Not fighting: heal up, restock, then do the rounds.
         if (time % 40 == 0 && hurt()) {
-            if (Combat.eat(w)) return false;
-            if (t.mayEat) {
+            if (t.mayEat()) {
+                if (Combat.eat(w)) return false;
                 Activity food = Defense.fetchFood(w, t);
                 if (food != null) {
                     sub = food;
+                    return false;
+                }
+            }
+        }
+        // In the dark (and no fight): a torch in the off hand instead of the shield.
+        if (time % 20 == 0) w.showTorch(!t.alarm && w.body.getEyeLocation().getBlock().getLightLevel() < 8);
+        // After a fight: pick up what the monsters dropped, and bring a good load of it to storage.
+        if (time >= lootAt && !t.alarm) {
+            lootAt = time + 100;
+            Activity pick = Work.collectDrops(w, t, Guard::loot, 16);
+            if (pick != null) {
+                sub = pick;
+                lootAt = time + 10;
+                return false;
+            }
+            if (Work.needsDeposit(w, Work::gear, false) || (Work.needsDeposit(w, Work::gear, true) && w.random.nextInt(4) == 0)) {
+                Activity d = Work.deposit(w, t, Work::gear);
+                if (d != null) {
+                    sub = d;
                     return false;
                 }
             }
@@ -99,7 +122,7 @@ final class Guard implements Activity {
             if (chest != null) {
                 sub = new GoAndDo(w, chest, 2.0, "Getting gear", b -> true,
                         b -> {
-                            Combat.gearUp(w, b, wantsBow(), arrowsWanted(), t.guardPotions ? 2 : 0);
+                            Combat.gearUp(w, b, wantsBow(), arrowsWanted(), t.guardPotions() ? 2 : 0);
                             w.holdTool();
                             w.save();
                         });
@@ -127,12 +150,21 @@ final class Guard implements Activity {
 
     private void fight(int now) {
         label = "Fighting";
-        if (t.guardPotions && w.body.getHealth() < Combat.maxHealth(w.body) * 0.35 && now >= w.potionReady) {
+        if (t.guardPotions() && w.body.getHealth() < Combat.maxHealth(w.body) * 0.35 && now >= w.potionReady) {
             if (Combat.drinkPotion(w)) w.potionReady = now + 600;
         }
         ItemStack bow = Combat.bow(w), melee = Combat.bestMelee(w);
         boolean arrows = w.count(Material.ARROW) > 0;
         double d = w.body.getLocation().distance(target.getLocation());
+        // Shield: up against archers while closing in, and up close between strikes. Down to shoot or strike.
+        if (Combat.hasShield(w)) {
+            boolean ranged = target instanceof org.bukkit.entity.AbstractSkeleton || target instanceof org.bukkit.entity.Pillager
+                    || target instanceof org.bukkit.entity.Witch || target instanceof org.bukkit.entity.Blaze || target instanceof org.bukkit.entity.Ghast
+                    || target instanceof org.bukkit.entity.Creeper;
+            boolean shooting = bow != null && arrows && (w.weapon == Weapon.RANGED || (w.weapon == Weapon.AUTO && (d > 5 || melee == null)));
+            boolean waiting = now < w.attackReady - 3;
+            Combat.raiseShield(w, !shooting && ((ranged && d > 3) || (d < 4.5 && waiting)));
+        }
         switch (w.weapon) {
             case RANGED -> {
                 if (bow != null && arrows) Combat.shoot(w, target, bow);
@@ -307,7 +339,7 @@ final class Guard implements Activity {
         double bestD = Double.MAX_VALUE;
         for (Block b : t.containers(w.plugin.settings().townRadius())) {
             if (!t.rule(b)[1]) continue;
-            if (!Combat.hasUpgrade(w, b, wantsBow(), arrowsWanted(), t.guardPotions ? 2 : 0)) continue;
+            if (!Combat.hasUpgrade(w, b, wantsBow(), arrowsWanted(), t.guardPotions() ? 2 : 0)) continue;
             double d = b.getLocation().distanceSquared(w.body.getLocation());
             if (d < bestD) {
                 bestD = d;
@@ -315,6 +347,16 @@ final class Guard implements Activity {
             }
         }
         return best;
+    }
+
+    /** What monsters drop that guards pick up (and bring to storage; arrows they keep). */
+    static boolean loot(Material m) {
+        return switch (m) {
+            case ROTTEN_FLESH, BONE, ARROW, STRING, SPIDER_EYE, GUNPOWDER, ENDER_PEARL, SLIME_BALL, PHANTOM_MEMBRANE,
+                 BLAZE_ROD, MAGMA_CREAM, GHAST_TEAR, PRISMARINE_SHARD, IRON_INGOT, COPPER_INGOT, GOLD_NUGGET, EMERALD,
+                 GLASS_BOTTLE, GLOWSTONE_DUST, REDSTONE, SUGAR, STICK, TRIDENT, NAUTILUS_SHELL, RABBIT_HIDE, FEATHER -> true;
+            default -> false;
+        };
     }
 
     /** Not fighting or fetching anything (may look at a player). */
@@ -326,6 +368,8 @@ final class Guard implements Activity {
     public void stop() {
         if (sub != null) sub.stop();
         w.mover.stop();
+        Combat.raiseShield(w, false);
+        w.showTorch(false);
         w.holdTool();
     }
 

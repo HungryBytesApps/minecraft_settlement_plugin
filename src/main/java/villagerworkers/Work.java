@@ -149,6 +149,51 @@ final class Work {
         return fetch(w, t, m -> m.name().endsWith(suffix), 1, "Getting " + what);
     }
 
+    // ---- Picking things up ----
+
+    /** Walk to the nearest dropped item it wants (within range, in the settlement) and pick up everything wanted there. */
+    static Activity collectDrops(Worker w, Town t, Predicate<Material> wanted, double range) {
+        Location me = w.body.getLocation();
+        org.bukkit.entity.Item best = null;
+        double bestD = Double.MAX_VALUE;
+        // Anywhere in the settlement, plus close around the worker (a lumberjack outside).
+        int r = w.plugin.settings().townRadius();
+        java.util.Set<org.bukkit.entity.Item> items = new java.util.HashSet<>();
+        if (t.bell.getWorld() == me.getWorld()) items.addAll(me.getWorld().getNearbyEntitiesByType(org.bukkit.entity.Item.class, t.bell, r, 16, r));
+        items.addAll(me.getWorld().getNearbyEntitiesByType(org.bukkit.entity.Item.class, me, range, 8, range));
+        for (org.bukkit.entity.Item it : items) {
+            if (!it.isValid() || it.getPickupDelay() > 20 || !wanted.test(it.getItemStack().getType())) continue;
+            if (!t.contains(it.getLocation(), r) && it.getLocation().distanceSquared(me) > range * range) continue;
+            if (taken(w, it.getUniqueId())) continue;
+            double d = it.getLocation().distanceSquared(me);
+            if (d < bestD) {
+                bestD = d;
+                best = it;
+            }
+        }
+        if (best == null || w.pockets.firstEmpty() == -1) return null;
+        claim(w, best.getUniqueId());
+        Block at = best.getLocation().getBlock();
+        return new GoAndDo(w, at, 1.3, "Picking things up", b -> true, b -> pickUp(w, b.getLocation().add(0.5, 0.5, 0.5), 2.5, wanted));
+    }
+
+    /** Put wanted items lying around this spot into the pockets. */
+    static void pickUp(Worker w, Location at, double r, Predicate<Material> wanted) {
+        boolean any = false;
+        for (org.bukkit.entity.Item it : at.getWorld().getNearbyEntitiesByType(org.bukkit.entity.Item.class, at, r, 2, r)) {
+            ItemStack stack = it.getItemStack();
+            if (!it.isValid() || !wanted.test(stack.getType())) continue;
+            Map<Integer, ItemStack> left = w.pockets.addItem(stack.clone());
+            if (left.isEmpty()) it.remove();
+            else it.setItemStack(left.values().iterator().next());
+            any = true;
+        }
+        if (any) {
+            at.getWorld().playSound(at, "minecraft:entity.item.pickup", org.bukkit.SoundCategory.NEUTRAL, 0.4f, 1.4f);
+            w.savePockets();
+        }
+    }
+
     // ---- Sharing the work: what someone is busy with ----
 
     private record Claim(java.util.UUID who, int until) {}

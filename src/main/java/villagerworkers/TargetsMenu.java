@@ -46,7 +46,7 @@ final class TargetsMenu {
     }
 
     private static String station(Worker.Job job) {
-        return job.title + " (" + Work.nice(job.block) + ")";
+        return Menus.station(job);
     }
 
     /** Smith products: 0 means "don't make" instead of "no limit". */
@@ -75,58 +75,54 @@ final class TargetsMenu {
         list(plugin, p, t, Worker.Job.SMITH, false);
     }
 
-    /** One workstation's products: rows with the real item icon, then a button per product. */
+    /** One workstation's products, a row each: icon, name, in storage / target, then − and + right after it. */
     private static void list(VillagerWorkersPlugin plugin, Player p, Town t, Worker.Job job, boolean fromLedger) {
         int radius = plugin.settings().townRadius();
-        List<DialogBody> body = new ArrayList<>();
-        List<ActionButton> buttons = new ArrayList<>();
+        List<ActionButton> cells = new ArrayList<>();
         for (Material m : products(t, job)) {
-            int target = t.targets.getOrDefault(m, 0);
+            Integer target = t.targets.get(m); // none = no limit (smith: don't make); 0 = keep none
             int stored = t.count(m, radius);
-            boolean reached = target > 0 && stored >= target;
+            boolean reached = target != null && stored >= target && (target > 0 || !madeToOrder(m));
             String none = madeToOrder(m) ? "off" : "∞";
-            Component text = Component.text(nice(m) + "   ", NamedTextColor.WHITE)
-                    .append(Component.text(stored + " / " + (target > 0 ? target : none), reached ? NamedTextColor.GREEN : NamedTextColor.GRAY));
-            body.add(DialogBody.item(new ItemStack(m)).description(DialogBody.plainMessage(text, 220))
-                    .showDecorations(false).showTooltip(true).width(16).height(16).build());
-            buttons.add(Menus.button(plugin, nice(m), NamedTextColor.WHITE, "Change the target", 110,
-                    pl -> item(plugin, pl, t, m, job, fromLedger)));
+            Component label = icon(m).append(Component.text(" " + nice(m) + "  ", NamedTextColor.WHITE))
+                    .append(Component.text(stored + " / " + (target != null ? target : none), reached ? NamedTextColor.GREEN : NamedTextColor.GRAY));
+            Component tip = Component.text(nice(m) + ": " + stored + " in storage, target "
+                    + (target == null ? (madeToOrder(m) ? "don't make" : "no limit") : target == 0 ? (madeToOrder(m) ? "don't make" : "none (don't keep any)") : target));
+            cells.add(ActionButton.create(label, tip, 180, Menus.click(plugin, (view, audience) -> {
+                if (audience instanceof Player pl) org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> list(plugin, pl, t, job, fromLedger));
+            }, Menus.ONCE)));
+            for (int step : new int[]{-64, -16, 16, 64}) {
+                cells.add(Menus.button(plugin, (step > 0 ? "+" : "−") + Math.abs(step), step > 0 ? NamedTextColor.GREEN : NamedTextColor.RED,
+                        null, 34, pl -> {
+                            int now = Math.max(0, t.targets.getOrDefault(m, 0) + step);
+                            t.targets.put(m, now); // 0 = don't keep any (∞ removes the target)
+                            plugin.towns().save();
+                            list(plugin, pl, t, job, fromLedger);
+                        }));
+            }
+            cells.add(Menus.button(plugin, none, NamedTextColor.WHITE, madeToOrder(m) ? "Don't make" : "No limit", 30, pl -> {
+                t.targets.remove(m);
+                plugin.towns().save();
+                list(plugin, pl, t, job, fromLedger);
+            }));
         }
         ActionButton back = Menus.button(plugin, "Back", NamedTextColor.GRAY, null, 100, pl -> {
             if (fromLedger && jobs(t).size() > 1) open(plugin, pl, t);
             else Menus.ledger(plugin, pl, t);
         });
-        String title = fromLedger ? "Storage targets: " + job.title : "What to make";
-        Menus.show(p, title, body, List.of(),
-                DialogType.multiAction(buttons).columns(Math.min(3, Math.max(1, buttons.size()))).exitAction(back).build());
+        String title = fromLedger ? "Storage targets: " + station(job) : "What to make";
+        Menus.show(p, title, List.of(), List.of(), DialogType.multiAction(cells).columns(6).exitAction(back).build());
     }
 
-    /** One product: change its target in steps, applied at once. */
-    private static void item(VillagerWorkersPlugin plugin, Player p, Town t, Material m, Worker.Job job, boolean fromLedger) {
-        int target = t.targets.getOrDefault(m, 0);
-        int stored = t.count(m, plugin.settings().townRadius());
-        List<DialogBody> body = List.of(
-                DialogBody.item(new ItemStack(m)).description(DialogBody.plainMessage(Component.text(nice(m), NamedTextColor.WHITE)))
-                        .showDecorations(false).showTooltip(true).width(16).height(16).build(),
-                Menus.line("In storage: " + stored + "   ·   Target: " + (target > 0 ? target : madeToOrder(m) ? "don't make" : "no limit"), NamedTextColor.GRAY));
-        List<ActionButton> buttons = new ArrayList<>();
-        for (int step : new int[]{-64, -16, 16, 64}) {
-            buttons.add(Menus.button(plugin, (step > 0 ? "+" : "−") + Math.abs(step), NamedTextColor.WHITE, null, 70, pl -> {
-                int now = Math.max(0, t.targets.getOrDefault(m, 0) + step);
-                if (now == 0) t.targets.remove(m);
-                else t.targets.put(m, now);
-                plugin.towns().save();
-                item(plugin, pl, t, m, job, fromLedger);
-            }));
-        }
-        buttons.add(Menus.button(plugin, madeToOrder(m) ? "Don't make" : "No limit", NamedTextColor.WHITE,
-                madeToOrder(m) ? "The smith stops making this" : "Keep producing, whatever is in storage", 140, pl -> {
-                    t.targets.remove(m);
-                    plugin.towns().save();
-                    item(plugin, pl, t, m, job, fromLedger);
-                }));
-        buttons.add(Menus.button(plugin, "Back", NamedTextColor.GRAY, null, 140, pl -> list(plugin, pl, t, job, fromLedger)));
-        Menus.show(p, nice(m), body, List.of(), DialogType.multiAction(buttons).columns(4).build());
+    /** The item's own (small) icon inside the text. */
+    static Component icon(Material m) {
+        String name = m.getKey().getKey();
+        if (m == Material.SHIELD) return Component.empty(); // drawn as a 3D model, no flat texture
+        if (m == Material.CROSSBOW) name = "crossbow_standby";
+        if (m.isBlock() && m.isSolid()) return Component.object(net.kyori.adventure.text.object.ObjectContents.sprite(
+                net.kyori.adventure.key.Key.key("minecraft", "blocks"), net.kyori.adventure.key.Key.key("minecraft", "block/" + name)));
+        return Component.object(net.kyori.adventure.text.object.ObjectContents.sprite(
+                net.kyori.adventure.key.Key.key("minecraft", "items"), net.kyori.adventure.key.Key.key("minecraft", "item/" + name)));
     }
 
     static String nice(Material m) {

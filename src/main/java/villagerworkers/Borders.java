@@ -35,8 +35,8 @@ final class Borders {
         }
     }
 
-    private static final double STEP = 1.5;
-    private static final double[] HEIGHTS = {0.4, 1.4};
+    private static final double STEP = 0.6;               // close together: a real line
+    private static final double[] HEIGHTS = {0.3};
     private static final double[] WORK_HEIGHTS = {0.4};
     private static final double VIEW = 64;
 

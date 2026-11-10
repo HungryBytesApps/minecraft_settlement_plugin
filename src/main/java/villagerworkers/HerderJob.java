@@ -61,6 +61,9 @@ final class HerderJob {
             Activity d = Work.deposit(w, t, keep);
             if (d != null) return d;
         }
+        // Meat, wool, leather, eggs, feathers lying around (after slaughtering, shearing, chickens laying): pick them up first.
+        Activity pick = Work.collectDrops(w, t, HerderJob::wanted, 24);
+        if (pick != null) return pick;
         Map<EntityType, List<Animals>> herd = herd(t, w.plugin.settings().townRadius());
 
         // Too many adults of a kind: slaughter one.

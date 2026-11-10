@@ -29,7 +29,7 @@ final class Social {
             Activity band = Music.start(w);
             if (band != null) return band;
         } else if (r < 54) {
-            Block seat = Seats.nearestFree(w.body.getLocation(), 12, w);
+            Block seat = Seats.nearestFree(w.body.getLocation(), 24, w);
             if (seat != null && w.town() != null && w.town().contains(seat.getLocation(), w.plugin.settings().socialRadius() + 8)) {
                 return new Sit(w, seat, w.random.nextBoolean() ? Mode.READ : Mode.IDLE, 300 + w.random.nextInt(400), null);
             }

@@ -16,7 +16,7 @@ import java.util.*;
 final class Fields {
     private Fields() {}
 
-    private record Scan(List<Block> farmland, List<Block> trees, int at) {}
+    private record Scan(List<Block> farmland, List<Block> trees, List<Block> plants, int at) {}
 
     private static final Map<String, Scan> inside = new HashMap<>(), outside = new HashMap<>();
     private static final int OUTSIDE_WIDTH = 24; // how far past the border lumberjacks look
@@ -25,6 +25,11 @@ final class Fields {
     /** All farmland in the settlement. */
     static List<Block> farmland(Town t, int radius) {
         return get(t, radius, false).farmland();
+    }
+
+    /** Melons, pumpkins, the bottom of sugar cane / cactus / bamboo, berry bushes and cocoa in the settlement. */
+    static List<Block> plants(Town t, int radius) {
+        return get(t, radius, false).plants();
     }
 
     /** Tree bases (a log on dirt) inside the settlement, or in a ring just outside it. */
@@ -50,8 +55,8 @@ final class Fields {
 
     private static Scan scan(Town t, int radius, boolean ring, int now) {
         World w = t.world();
-        List<Block> farmland = new ArrayList<>(), trees = new ArrayList<>();
-        if (w == null) return new Scan(farmland, trees, now);
+        List<Block> farmland = new ArrayList<>(), trees = new ArrayList<>(), plants = new ArrayList<>();
+        if (w == null) return new Scan(farmland, trees, plants, now);
         int cx = t.bell.getBlockX(), cz = t.bell.getBlockZ(), cy = t.bell.getBlockY();
         int outer = ring ? radius + OUTSIDE_WIDTH : radius;
         int minY = Math.max(w.getMinHeight() + 1, cy - (ring ? 24 : 12)), maxY = Math.min(w.getMaxHeight() - 1, cy + (ring ? 32 : 16));
@@ -69,6 +74,8 @@ final class Fields {
                         for (int y = minY; y <= maxY; y++) {
                             Material m = snap.getBlockType(lx, y, lz);
                             if (!ring && m == Material.FARMLAND) farmland.add(w.getBlockAt(x, y, z));
+                            else if (!ring && (m == Material.MELON || m == Material.PUMPKIN || m == Material.SWEET_BERRY_BUSH || m == Material.COCOA
+                                    || ((m == Material.SUGAR_CANE || m == Material.CACTUS || m == Material.BAMBOO) && below != m))) plants.add(w.getBlockAt(x, y, z));
                             else if (Tag.LOGS.isTagged(m) && !m.name().startsWith("STRIPPED_")
                                     && (Tag.DIRT.isTagged(below) || below == Material.GRASS_BLOCK)) trees.add(w.getBlockAt(x, y, z));
                             below = m;
@@ -77,6 +84,6 @@ final class Fields {
                 }
             }
         }
-        return new Scan(farmland, trees, now);
+        return new Scan(farmland, trees, plants, now);
     }
 }

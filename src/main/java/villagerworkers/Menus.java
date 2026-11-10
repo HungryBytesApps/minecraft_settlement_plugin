@@ -106,30 +106,58 @@ final class Menus {
 
     // ---- Town menu ----
 
-    /** Right-clicking the bell: stats, recruiting, border, ledger, rename, disband. */
+    /** The bell: the settlement's rules and settings (recruiting, border, jobs, chests, defense, consumption). */
     static void bell(VillagerWorkersPlugin plugin, Player p, Town t) {
         Settings s = plugin.settings();
         List<DialogBody> body = new ArrayList<>();
         body.add(stats(t, s));
+        boolean chestsOn = t.chestDefault && t.chestRules.isEmpty();
 
-        int w = 150;
+        int w = 160;
         List<ActionButton> buttons = new ArrayList<>();
-        buttons.add(button(plugin, "Recruit settler", NamedTextColor.GREEN, "Costs " + costText(s.recruitCost()),
-                w, pl -> plugin.recruit(pl, t)));
+        buttons.add(button(plugin, "Recruit settler", NamedTextColor.GREEN, "Costs " + costText(s.recruitCostFor(t.settlers.size()))
+                + ". Every new settler costs a bit more.", w, pl -> {
+            plugin.recruit(pl, t);
+            bell(plugin, pl, t);
+        }));
+        buttons.add(button(plugin, "Rename settlement", NamedTextColor.WHITE, "Give the settlement a new name", w, pl -> renameTown(plugin, pl, t)));
         Borders.Mode border = plugin.borders().mode(p);
         buttons.add(button(plugin, "Show border: " + border.label,
                 border == Borders.Mode.OFF ? NamedTextColor.RED : NamedTextColor.GREEN, "Click to switch: When holding ledger / On / Off", w, pl -> {
                     plugin.borders().cycle(pl);
                     bell(plugin, pl, t);
                 }));
-        buttons.add(button(plugin, "Free settlers take jobs: " + (t.autoJobs ? "On" : "Off"), t.autoJobs ? NamedTextColor.GREEN : NamedTextColor.RED,
-                "On: a settler without a job takes an empty workplace by itself. Off: you choose who works where (ledger on the workplace).",
+        buttons.add(button(plugin, "Auto assign jobs: " + (t.autoJobs ? "On" : "Off"), t.autoJobs ? NamedTextColor.GREEN : NamedTextColor.RED,
+                "On: a settler without a job joins the workstation with the fewest workers. Off: you choose who works where.",
                 w, pl -> {
                     t.autoJobs = !t.autoJobs;
                     plugin.towns().save();
                     bell(plugin, pl, t);
                 }));
-        buttons.add(button(plugin, "Get a ledger", NamedTextColor.WHITE, "The book to manage your settlement", w, pl -> {
+        buttons.add(button(plugin, "Use all chests: " + (chestsOn ? "On" : "Off"), chestsOn ? NamedTextColor.GREEN : NamedTextColor.RED,
+                "On: settlers use every chest. Off: only the chests you allow (ledger on a chest).", w, pl -> {
+                    boolean now = !(t.chestDefault && t.chestRules.isEmpty());
+                    t.allChests(now);
+                    plugin.towns().save();
+                    bell(plugin, pl, t);
+                }));
+        buttons.add(button(plugin, "When attacked: " + t.reaction.label,
+                t.reaction == Town.Reaction.CALL_TO_ARMS ? NamedTextColor.GOLD : NamedTextColor.WHITE,
+                "What workers do when monsters come: hide (take cover), or grab a weapon from storage and fight (call to arms)", w, pl -> {
+                    t.reaction = t.reaction == Town.Reaction.TAKE_COVER ? Town.Reaction.CALL_TO_ARMS : Town.Reaction.TAKE_COVER;
+                    plugin.towns().save();
+                    bell(plugin, pl, t);
+                }));
+        buttons.add(button(plugin, "Settlers consumption: " + t.consumption.label,
+                t.consumption == Town.Consumption.OFF ? NamedTextColor.RED : NamedTextColor.GREEN,
+                "What hurt settlers may take from storage to heal. Off: nothing, they only heal slowly by themselves. "
+                        + "Food only: food that fits their wounds. Food & Potions: guards also drink healing potions in a fight. Guards always go first.",
+                w, pl -> {
+                    t.consumption = t.consumption.next();
+                    plugin.towns().save();
+                    bell(plugin, pl, t);
+                }));
+        buttons.add(button(plugin, "Get a ledger", NamedTextColor.WHITE, "The book to manage your settlers, workstations and storage", w, pl -> {
             if (Ledger.has(pl)) {
                 pl.sendActionBar(Component.text("You already have a Settlement Ledger.", NamedTextColor.YELLOW));
                 return;
@@ -137,49 +165,55 @@ final class Menus {
             for (ItemStack left : pl.getInventory().addItem(Ledger.create()).values()) pl.getWorld().dropItem(pl.getLocation(), left);
             pl.sendActionBar(Component.text("Here's your Settlement Ledger.", NamedTextColor.GREEN));
         }));
-        buttons.add(button(plugin, "Rename settlement", NamedTextColor.WHITE, "Give the settlement a new name", w, pl -> renameTown(plugin, pl, t)));
         buttons.add(button(plugin, "Tutorial", NamedTextColor.AQUA, "How everything works", w, pl -> tutorial(plugin, pl, t, true)));
         buttons.add(button(plugin, "Disband settlement", NamedTextColor.RED, "Removes the settlement. Settlers become villagers again.", w, pl -> disband(plugin, pl, t)));
         show(p, t.name, body, List.of(), DialogType.multiAction(buttons).columns(2).exitAction(close(plugin)).build());
     }
 
-    /** The ledger's own menu: stats, targets, chests, settlers. */
+    /** The ledger: running the settlement day to day (settlers, workstations, storage). */
     static void ledger(VillagerWorkersPlugin plugin, Player p, Town t) {
         Settings s = plugin.settings();
-        boolean on = t.chestDefault && t.chestRules.isEmpty();
         List<DialogBody> body = new ArrayList<>();
         body.add(stats(t, s));
 
-        int w = 150;
+        int w = 160;
         List<ActionButton> buttons = new ArrayList<>();
+        buttons.add(button(plugin, "Settlers", NamedTextColor.WHITE, "All settlers: name, job, health, what they do", w, pl -> settlers(plugin, pl, t)));
+        buttons.add(button(plugin, "Workstations", NamedTextColor.WHITE, "All workstations and who works there", w, pl -> workstations(plugin, pl, t)));
         buttons.add(button(plugin, "Storage targets", NamedTextColor.WHITE, "How much of each product to keep in storage", w, pl -> TargetsMenu.open(plugin, pl, t)));
-        buttons.add(button(plugin, "Use all chests: " + (on ? "On" : "Off"), on ? NamedTextColor.GREEN : NamedTextColor.RED, "On: settlers use every chest. Off: only the chests you allow with the ledger.", w, pl -> {
-            boolean now = !(t.chestDefault && t.chestRules.isEmpty());
-            t.allChests(now);
-            plugin.towns().save();
-            pl.sendActionBar(Component.text(now ? "Settlers may now use all chests in the settlement."
-                    : "Settlers may no longer use chests in the settlement.", now ? NamedTextColor.GREEN : NamedTextColor.YELLOW));
-            ledger(plugin, pl, t);
-        }));
-        buttons.add(button(plugin, "Settlers", NamedTextColor.WHITE, "All settlers: job, what they do, health", w, pl -> settlers(plugin, pl, t)));
-        buttons.add(button(plugin, "When attacked: " + t.reaction.label,
-                t.reaction == Town.Reaction.CALL_TO_ARMS ? NamedTextColor.GOLD : NamedTextColor.WHITE, "What workers do when monsters come: hide, or grab a weapon and fight", w, pl -> {
-                    t.reaction = t.reaction == Town.Reaction.TAKE_COVER ? Town.Reaction.CALL_TO_ARMS : Town.Reaction.TAKE_COVER;
-                    plugin.towns().save();
-                    ledger(plugin, pl, t);
-                }));
-        buttons.add(button(plugin, "Settlers may eat: " + (t.mayEat ? "On" : "Off"), t.mayEat ? NamedTextColor.GREEN : NamedTextColor.RED, "Hurt settlers eat food from storage. Guards first.", w, pl -> {
-            t.mayEat = !t.mayEat;
-            plugin.towns().save();
-            ledger(plugin, pl, t);
-        }));
-        buttons.add(button(plugin, "Guards use potions: " + (t.guardPotions ? "On" : "Off"), t.guardPotions ? NamedTextColor.GREEN : NamedTextColor.RED, "Guards take healing potions from storage and drink them in a fight", w, pl -> {
-            t.guardPotions = !t.guardPotions;
-            plugin.towns().save();
-            ledger(plugin, pl, t);
-        }));
         buttons.add(button(plugin, "Tutorial", NamedTextColor.AQUA, "How everything works", w, pl -> tutorial(plugin, pl, t, false)));
         show(p, t.name, body, List.of(), DialogType.multiAction(buttons).columns(2).exitAction(close(plugin)).build());
+    }
+
+    /** All workstations: click one for its menu. */
+    static void workstations(VillagerWorkersPlugin plugin, Player p, Town t) {
+        List<ActionButton> buttons = new ArrayList<>();
+        for (Town.Workplace wp : t.workplaces.values()) {
+            if (wp.job() == Worker.Job.NONE) continue;
+            String label = station(wp.job()) + " — " + (wp.workers.isEmpty() ? "nobody" : wp.workers.size() + (wp.workers.size() == 1 ? " worker" : " workers"))
+                    + (wp.enabled ? "" : " (off)");
+            buttons.add(button(plugin, label, wp.enabled ? NamedTextColor.WHITE : NamedTextColor.GRAY, "At " + Keys.pos(wp.loc), 300,
+                    pl -> workplace(plugin, pl, t, wp)));
+        }
+        List<DialogBody> body = buttons.isEmpty() ? List.of(line("No workstations yet. Place one in the settlement.", NamedTextColor.GRAY)) : List.of();
+        show(p, "Workstations", body, List.of(), DialogType.multiAction(buttons.isEmpty()
+                ? List.of(button(plugin, "Back", NamedTextColor.GRAY, null, 100, pl -> ledger(plugin, pl, t))) : buttons)
+                .columns(1).exitAction(button(plugin, "Back", NamedTextColor.GRAY, null, 100, pl -> ledger(plugin, pl, t))).build());
+    }
+
+    /** "Farmer (Composter)", "Smith (Smithing Table)". */
+    static String station(Worker.Job job) {
+        return job.title + " (" + titleCase(FarmerJob.nice(job.block)) + ")";
+    }
+
+    static String titleCase(String s) {
+        StringBuilder b = new StringBuilder();
+        for (String part : s.split(" ")) {
+            if (part.isEmpty()) continue;
+            if (b.length() > 0) b.append(' ');
+            b.append(Character.toUpperCase(part.charAt(0))).append(part.substring(1));
+        }
+        return b.toString();
     }
 
     // ---- Tutorial ----
@@ -189,7 +223,7 @@ final class Menus {
         List<DialogBody> body = new ArrayList<>();
         head(body, "Settlement");
         text(body, "Your settlement is everything within " + s.townRadius() + " blocks of this bell. Settlers live, work and sleep here.");
-        text(body, "Bell: recruit settlers (" + costText(s.recruitCost()) + "), show the border, get a ledger, rename or disband.");
+        text(body, "Bell (the settlement's rules): recruit settlers (" + costText(s.recruitCostFor(t.settlers.size())) + ", more for every settler), rename, border, auto assign jobs, use all chests, when attacked, settlers consumption, get a ledger, disband.");
         text(body, "Show border: particles mark the settlement. When holding ledger / On / Off.");
         head(body, "Settlement Ledger");
         text(body, "One per player. Right-click with it:");
@@ -197,13 +231,13 @@ final class Menus {
         text(body, "• a workstation: who works there (as many as you like), on/off and its settings.");
         text(body, "• (right-click a settler, no ledger needed) its menu: rename, inventory (take things out or put things in), worker or guard, guard settings, leave workplace, dismiss.");
         text(body, "• a wild villager: hire it. It walks to the settlement, or follows you if it's far away.");
-        text(body, "• anything else: storage targets, chests, settlers, defense settings.");
+        text(body, "• anything else: the ledger menu: settlers (click one for its menu), workstations, storage targets.");
         head(body, "Settlers");
-        text(body, "Choose who works where: ledger on a workplace → Choose settler. With Free settlers take jobs: On (bell) they take empty workplaces by themselves. A composter is a farm: the farmer harvests, replants and plants the fields around it.");
+        text(body, "Choose who works where: ledger on a workstation → Add settler. With Auto assign jobs: On (bell), settlers without a job pick one by themselves.");
         text(body, "They fetch seeds from chests they may take from, and bring the harvest to a chest that already has that item (or the nearest one with room). No room left: they keep it in their pockets and you get a message.");
         head(body, "Workplaces");
         text(body, "Place one in the settlement and add as many settlers as you like; they all work in the whole settlement. Right-click it with the ledger for its settings.");
-        text(body, "• Composter: farmer. Harvests and replants all farmland in the settlement.");
+        text(body, "• Composter: farmer. Harvests (crops, melons and pumpkins from stems, sugar cane, cactus, bamboo, sweet berries, cocoa) and replants all farmland in the settlement. Makes melon blocks from slices when you set a target for them. Make compost: surplus harvest into bone meal. Use bone meal: on crops still needed.");
         text(body, "• Smoker: cook. Cooks raw food from storage. Blast furnace: smelter. Smelts ores and raw metal.");
         text(body, "• Furnace: furnace worker. Choose what it may smelt: food, ores, stone & building, other.");
         text(body, "• Loom: herder. Keeps each kind of animal in the settlement at its own herd size (0 = leave that kind alone): breeds (with food from storage), slaughters the extra adults, shears sheep (shears from storage), throws eggs into the chickens' pen for chicks.");
@@ -219,12 +253,11 @@ final class Menus {
                 + "). Patrol guards walk along the border and through the settlement. Escort guards follow you inside the settlement.");
         text(body, "Weapon: Auto (bow at range, melee up close), Melee or Archer. Archers fetch arrows as soon as they run out; others refill after the fight.");
         text(body, "Hostile mobs in the settlement ring the bell. Other settlers then hide in a building with a door (and close it), or with Call to arms grab a weapon from storage and fight (and bring it back after).");
-        text(body, "Everyone can be hurt and die, but never by players. They heal slowly, and eat food from storage when hurt (Settlers may eat). Guards eat first.");
-        text(body, "Guards use potions: guards carry and drink healing potions from storage in a fight. Off by default.");
+        text(body, "Everyone can be hurt and die, but never by players. They heal slowly by themselves. Settlers consumption (bell): Off, Food only (food that fits their wounds), or Food & Potions (guards also drink healing potions in a fight). Guards go first.");
         text(body, "When they die, they drop what they carried and wore.");
         head(body, "Storage and targets");
-        text(body, "Use all chests: On lets settlers use every chest; Off only the ones you allow with the ledger.");
-        text(body, "Storage targets: settlers stop making a product once the chests hold that many (no limit by default). Farmers keep replanting.");
+        text(body, "Use all chests (bell): On lets settlers use every chest; Off only the ones you allow with the ledger.");
+        text(body, "Storage targets: settlers stop making a product once the chests hold that many. ∞ = no limit (the default), 0 = don't keep any. Farmers keep replanting.");
         ActionButton back = button(plugin, "Back", NamedTextColor.GRAY, null, 100,
                 pl -> { if (fromBell) bell(plugin, pl, t); else ledger(plugin, pl, t); });
         show(p, "Tutorial", body, List.of(), DialogType.notice(back));
@@ -283,20 +316,36 @@ final class Menus {
 
     // ---- Settlers overview ----
 
+    /** All settlers as a table: name, job, health, what they're doing. Click a row for the settler's menu. */
     static void settlers(VillagerWorkersPlugin plugin, Player p, Town t) {
-        List<DialogBody> body = new ArrayList<>();
+        List<ActionButton> cells = new ArrayList<>();
+        for (String h : new String[]{"Name", "Job", "Health", "Doing"}) {
+            cells.add(button(plugin, h, NamedTextColor.GOLD, null, h.equals("Doing") ? 220 : 90, pl -> settlers(plugin, pl, t)));
+        }
         for (Map.Entry<UUID, String> e : t.settlers.entrySet()) {
             Worker w = plugin.workers().get(e.getKey());
             if (w == null) {
-                body.add(line(e.getValue() + " — far away (not loaded)", NamedTextColor.DARK_GRAY));
-            } else {
-                Component c = Component.text(w.name + " — " + w.title() + " — " + w.doing() + "  ", NamedTextColor.WHITE)
-                        .append(Component.text(w.healthText(), w.hurtBelow(50) ? NamedTextColor.RED : NamedTextColor.GRAY));
-                if (w.guard && w.unarmed()) c = c.append(Component.text("  no weapon!", NamedTextColor.RED));
-                body.add(DialogBody.plainMessage(c, 300));
+                Consumer<Player> none = pl -> {
+                    pl.sendActionBar(Component.text(e.getValue() + " is too far away.", NamedTextColor.GRAY));
+                    settlers(plugin, pl, t);
+                };
+                cells.add(button(plugin, e.getValue(), NamedTextColor.DARK_GRAY, null, 90, none));
+                cells.add(button(plugin, "?", NamedTextColor.DARK_GRAY, null, 90, none));
+                cells.add(button(plugin, "?", NamedTextColor.DARK_GRAY, null, 90, none));
+                cells.add(button(plugin, "far away", NamedTextColor.DARK_GRAY, null, 220, none));
+                continue;
             }
+            Consumer<Player> open = pl -> settler(plugin, pl, w);
+            String tip = "Open " + w.name + "'s menu";
+            String doing = w.doing() + (w.guard && w.unarmed() ? " — no weapon!" : "");
+            if (doing.length() > 34) doing = doing.substring(0, 33) + "…";
+            cells.add(button(plugin, w.name, NamedTextColor.WHITE, tip, 90, open));
+            cells.add(button(plugin, w.title(), w.guard ? NamedTextColor.GOLD : NamedTextColor.GRAY, tip, 90, open));
+            cells.add(button(plugin, w.healthText(), w.hurtBelow(50) ? NamedTextColor.RED : w.hurtBelow(100) ? NamedTextColor.YELLOW : NamedTextColor.GREEN, tip, 90, open));
+            cells.add(button(plugin, doing, w.guard && w.unarmed() ? NamedTextColor.RED : NamedTextColor.GRAY, tip, 220, open));
         }
-        show(p, "Settlers (" + t.settlers.size() + ")", body, List.of(), DialogType.notice(button(plugin, "Back", NamedTextColor.GRAY, null, 100, pl -> ledger(plugin, pl, t))));
+        show(p, "Settlers (" + t.settlers.size() + ")", List.of(), List.of(), DialogType.multiAction(cells).columns(4)
+                .exitAction(button(plugin, "Back", NamedTextColor.GRAY, null, 100, pl -> ledger(plugin, pl, t))).build());
     }
 
     // ---- Chest ----
@@ -391,6 +440,24 @@ final class Menus {
             buttons.add(wbutton(plugin, apply, "What to make", NamedTextColor.AQUA, "How many of each item to keep in storage (0 = don't make)",
                     w, pl -> TargetsMenu.smith(plugin, pl, t)));
         }
+        if (job == Worker.Job.FARMER) {
+            FarmerJob.Compost compost = FarmerJob.compost(wp);
+            buttons.add(wbutton(plugin, apply, "Make compost: " + compost.label, compost == FarmerJob.Compost.OFF ? NamedTextColor.RED : NamedTextColor.GREEN,
+                    "Turns harvest into bone meal at this composter (only what the farmers harvested themselves, never things from storage). "
+                            + "Off: no compost. On: keeps harvesting after the targets are reached, to make bone meal up to its storage target. "
+                            + "Overflow only: just the harvest (and seeds) above the storage targets.", w, pl -> {
+                        FarmerJob.setCompost(wp, FarmerJob.compost(wp).next());
+                        plugin.towns().save();
+                        workplace(plugin, pl, t, wp);
+                    }));
+            boolean on = wp.isOn("BONEMEAL");
+            buttons.add(wbutton(plugin, apply, "Use bone meal: " + (on ? "On" : "Off"), on ? NamedTextColor.GREEN : NamedTextColor.RED,
+                    "Farmers use bone meal from storage on growing crops, only while the settlement still needs that crop", w, pl -> {
+                        wp.options.put("BONEMEAL", !wp.isOn("BONEMEAL"));
+                        plugin.towns().save();
+                        workplace(plugin, pl, t, wp);
+                    }));
+        }
         if (job == Worker.Job.LUMBERJACK) {
             boolean outside = wp.isOn("OUTSIDE");
             buttons.add(wbutton(plugin, apply, "Cut trees: " + (outside ? "Outside settlement" : "Inside settlement"), NamedTextColor.WHITE,
@@ -437,25 +504,41 @@ final class Menus {
                 .exitAction(button(plugin, "Back", NamedTextColor.GRAY, null, 100, pl -> workplace(plugin, pl, t, wp))).build());
     }
 
+    /** Add a settler: the free ones first; settlers with another job are in a separate list. */
     private static void chooseWorker(VillagerWorkersPlugin plugin, Player p, Town t, Town.Workplace wp) {
+        chooseWorker(plugin, p, t, wp, false);
+    }
+
+    private static void chooseWorker(VillagerWorkersPlugin plugin, Player p, Town t, Town.Workplace wp, boolean busy) {
         List<ActionButton> buttons = new ArrayList<>();
+        int others = 0;
         for (Worker w : plugin.workers().all()) {
-            if (!t.id.equals(w.townId)) continue;
-            String current = w.guard ? "now guard" : w.job() == Worker.Job.NONE ? "no workplace" : "now " + w.job().title.toLowerCase(Locale.ROOT);
-            if (wp.workers.contains(w.body.getUniqueId())) continue; // already works here
-            buttons.add(button(plugin, w.name + " (" + current + ")", NamedTextColor.WHITE, null, 200, pl -> {
+            if (!t.id.equals(w.townId) || wp.workers.contains(w.body.getUniqueId())) continue;
+            boolean free = !w.guard && w.job() == Worker.Job.NONE;
+            if (!free) others++;
+            if (free == busy) continue;
+            String label = busy ? w.name + " (" + w.title() + ")" : w.name;
+            String tip = busy ? w.name + " stops being a " + w.title().toLowerCase(Locale.ROOT) + " and works here instead" : w.name + " has no job yet";
+            buttons.add(button(plugin, label, busy ? NamedTextColor.YELLOW : NamedTextColor.GREEN, tip, 200, pl -> {
                 w.assign(wp);
                 pl.sendActionBar(Component.text(w.name + " now works here.", NamedTextColor.GREEN));
                 workplace(plugin, pl, t, wp);
             }));
         }
+        if (!busy && others > 0) {
+            buttons.add(button(plugin, "Settlers with another job (" + others + ")", NamedTextColor.WHITE,
+                    "They would leave their job to work here", 200, pl -> chooseWorker(plugin, pl, t, wp, true)));
+        }
+        List<DialogBody> body = new ArrayList<>();
+        body.add(line(busy ? "These settlers leave their current job to work here." : "Free settlers (no job):", NamedTextColor.GRAY));
+        if (buttons.isEmpty()) body.add(line(busy ? "Nobody else." : "Nobody is free.", NamedTextColor.DARK_GRAY));
+        ActionButton back = button(plugin, "Back", NamedTextColor.GRAY, null, 100,
+                pl -> { if (busy) chooseWorker(plugin, pl, t, wp, false); else workplace(plugin, pl, t, wp); });
         if (buttons.isEmpty()) {
-            show(p, "Choose settler", List.of(line("No settlers nearby.", NamedTextColor.GRAY)), List.of(),
-                    DialogType.notice(button(plugin, "Back", NamedTextColor.GRAY, null, 100, pl -> workplace(plugin, pl, t, wp))));
+            show(p, "Add settler", body, List.of(), DialogType.notice(back));
             return;
         }
-        show(p, "Choose settler", List.of(), List.of(), DialogType.multiAction(buttons).columns(1)
-                .exitAction(button(plugin, "Back", NamedTextColor.GRAY, null, 100, pl -> workplace(plugin, pl, t, wp))).build());
+        show(p, busy ? "Settlers with another job" : "Add settler", body, List.of(), DialogType.multiAction(buttons).columns(1).exitAction(back).build());
     }
 
     // ---- Settler ----

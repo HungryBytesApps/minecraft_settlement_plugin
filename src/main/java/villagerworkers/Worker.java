@@ -71,12 +71,14 @@ final class Worker {
     int guardRadius;
 
     // Combat (runtime)
-    int attackReady, chaseRepath, potionReady, lastHurt = -10000, drawStart;
-    boolean drawing;
+    int attackReady, chaseRepath, potionReady, lastHurt = -10000, drawStart, shieldSince;
+    boolean drawing, shieldUp;
     org.bukkit.entity.LivingEntity lastAttacker;
     private int regenTimer, healthShown = -1, defenseCheck = 20, foodCheck = 100;
 
     int errorLoggedUntil;
+    /** What it harvested itself (only that may go into the composter; never things taken from storage). */
+    final java.util.Map<Material, Integer> harvested = new java.util.HashMap<>();
     long ticks;               // diagnostics: how often tick() ran
     int lastClickSeen = -1;   // diagnostics: tick of the last right-click event
     Activity activity;
@@ -182,6 +184,7 @@ final class Worker {
 
     /** Skin, name, job under the name, tool in hand. */
     void applyLook() {
+        if (!torchShown) restoreStoredShield();
         body.setInvulnerable(false); // mobs can hurt settlers (players can't, see WorkerListener)
         body.setRemoveWhenFarAway(false);
         body.setPersistent(true);
@@ -197,9 +200,9 @@ final class Worker {
         String jobSkin = Skins.forJob(plugin.settings(), title(), body.getUniqueId());
         body.setProfile(Skins.profile(jobSkin != null ? jobSkin : skin));
         Job job = job();
-        body.customName(Component.text(name, NamedTextColor.WHITE));
         body.setCustomNameVisible(plugin.settings().showNames());
         healthShown = -1;
+        shownTag = null;
         updateDescription();
         holdTool();
     }
@@ -223,20 +226,29 @@ final class Worker {
     }
 
     /** Job under the name, plus health when hurt (red when badly hurt). */
+    /** Above the head: the job (and health when hurt); under it: what it's doing. No names. */
     private void updateDescription() {
         int hp = (int) Math.ceil(body.getHealth());
-        if (hp == healthShown) return;
+        String doing = doing();
+        String tag = hp + "|" + doing + "|" + title();
+        if (tag.equals(shownTag)) return;
+        shownTag = tag;
         healthShown = hp;
         boolean hurt = body.getHealth() < Combat.maxHealth(body) - 0.01;
         boolean bad = hurtBelow(50);
         if (!plugin.settings().showNames() && !bad) {
+            body.customName(null);
             body.setDescription(null);
             return;
         }
-        Component d = Component.text(title(), NamedTextColor.GRAY);
-        if (hurt) d = d.append(Component.text("  " + healthText(), bad ? NamedTextColor.RED : NamedTextColor.GOLD));
-        body.setDescription(d);
+        Component top = Component.text(title(), NamedTextColor.WHITE);
+        if (hurt) top = top.append(Component.text("  " + healthText(), bad ? NamedTextColor.RED : NamedTextColor.GOLD));
+        body.customName(top);
+        body.setCustomNameVisible(true);
+        body.setDescription(Component.text(doing, NamedTextColor.GRAY));
     }
+
+    private String shownTag;
 
     /** Put the job's tool (or a guard's weapon) in hand (after reading, playing music...). */
     void holdTool() {
@@ -337,6 +349,7 @@ final class Worker {
     /** Worker ↔ guard. A guard leaves its workplace. */
     void setGuard(boolean g) {
         if (g == guard) return;
+        showTorch(false);
         if (g) leaveWorkplace();
         guard = g;
         save();
@@ -356,6 +369,40 @@ final class Worker {
         String what = m == null ? "its goods" : FarmerJob.nice(m);
         p.sendMessage(Component.text("📦 " + name + " has no room in storage for " + what + ". Add a chest or make space.", NamedTextColor.YELLOW));
         p.sendActionBar(Component.text(name + ": no room in storage!", NamedTextColor.YELLOW));
+    }
+
+    // ---- Torch in the dark (guards) ----
+
+    private boolean torchShown;
+    private ItemStack storedShield;
+
+    /** A torch in the off hand (free, just for light); the shield is kept aside meanwhile, also over a restart. */
+    void showTorch(boolean on) {
+        if (on == torchShown) return;
+        org.bukkit.inventory.EntityEquipment eq = body.getEquipment();
+        org.bukkit.NamespacedKey key = new org.bukkit.NamespacedKey(plugin, "stored_shield");
+        if (on) {
+            ItemStack off = eq.getItemInOffHand();
+            storedShield = off.getType().isAir() ? null : off.clone();
+            body.getPersistentDataContainer().set(key, PersistentDataType.BYTE_ARRAY,
+                    storedShield == null ? new byte[0] : storedShield.serializeAsBytes());
+            eq.setItemInOffHand(new ItemStack(Material.TORCH));
+            torchShown = true;
+        } else {
+            eq.setItemInOffHand(storedShield);
+            storedShield = null;
+            body.getPersistentDataContainer().remove(key);
+            torchShown = false;
+        }
+    }
+
+    /** After a restart while the torch was shown: put the shield back. */
+    private void restoreStoredShield() {
+        org.bukkit.NamespacedKey key = new org.bukkit.NamespacedKey(plugin, "stored_shield");
+        byte[] b = body.getPersistentDataContainer().get(key, PersistentDataType.BYTE_ARRAY);
+        if (b == null) return;
+        body.getEquipment().setItemInOffHand(b.length == 0 ? null : ItemStack.deserializeBytes(b));
+        body.getPersistentDataContainer().remove(key);
     }
 
     /** Guard without anything to fight with. */
@@ -420,6 +467,7 @@ final class Worker {
             Town t = town();
             if (t != null && !guard && !(activity instanceof Defense.Reaction)) {
                 Activity r = Defense.react(this, t);
+                if (r == null) r = Shelter.check(this, t); // rain / thunder
                 if (r != null) start(r);
             }
         }
@@ -455,8 +503,9 @@ final class Worker {
         Town t = town();
         if (t == null || t.alarm || !hurtBelow(plugin.settings().eatBelowPercent())) return;
         if (activity != null && !activity.freeTime() && !(activity instanceof Social.LookAround)) return;
+        if (!t.mayEat()) return; // Settlers consumption: Off (they only heal slowly by themselves)
         if (Combat.eat(this)) return;
-        if (!t.mayEat || Defense.guardNeedsFood(this, t)) return; // guards eat first
+        if (Defense.guardNeedsFood(this, t)) return; // guards eat first
         Activity food = Defense.fetchFood(this, t);
         if (food != null) start(food);
     }

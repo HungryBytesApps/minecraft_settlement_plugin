@@ -42,7 +42,8 @@ final class Town {
         boolean isOn(String key) {
             Boolean v = options.get(key);
             if (v != null) return v;
-            return !key.equals("BUILDING") && !key.equals("OTHER") && !key.equals("OUTSIDE"); // furnace: food and ores; lumberjack: inside
+            return !key.equals("BUILDING") && !key.equals("OTHER") && !key.equals("OUTSIDE") && !key.equals("BONEMEAL")
+                    && !key.equals("COMPOST") && !key.equals("COMPOST_ALL"); // furnace: food and ores; lumberjack: inside; no bone meal
         }
 
         Workplace(Location loc, int radius) {
@@ -76,10 +77,32 @@ final class Town {
     }
 
     Reaction reaction = Reaction.TAKE_COVER;
-    boolean mayEat = true;
+    /** What settlers may take from storage to heal. */
+    enum Consumption {
+        OFF("Off"), FOOD("Food only"), ALL("Food & Potions");
+
+        final String label;
+
+        Consumption(String label) {
+            this.label = label;
+        }
+
+        Consumption next() {
+            return values()[(ordinal() + 1) % values().length];
+        }
+    }
+
+    Consumption consumption = Consumption.FOOD;
     /** Free settlers take empty workplaces by themselves. */
     boolean autoJobs = false;
-    boolean guardPotions = false;
+
+    boolean mayEat() {
+        return consumption != Consumption.OFF;
+    }
+
+    boolean guardPotions() {
+        return consumption == Consumption.ALL;
+    }
 
     // Runtime (not saved): the alarm.
     boolean alarm;
@@ -223,8 +246,8 @@ final class Town {
 
     /** Below the town's target for this item (or no target set)? */
     boolean wants(Material item, int radius) {
-        int target = targets.getOrDefault(item, 0);
-        return target <= 0 || count(item, radius) < target;
+        Integer target = targets.get(item); // none set = no limit; 0 = don't want any
+        return target == null || count(item, radius) < target;
     }
 
     /** Where to put this item: an allowed chest that already has it, else the nearest allowed one with space. */

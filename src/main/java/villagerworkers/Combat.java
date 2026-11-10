@@ -160,6 +160,7 @@ final class Combat {
      * Old gear goes back into the chest. Returns true if anything changed.
      */
     static boolean gearUp(Worker w, Block chest, boolean wantBow, int arrows, int potions) {
+        w.showTorch(false);
         Inventory inv = Town.inventory(chest);
         if (inv == null) return false;
         boolean changed = false;
@@ -200,6 +201,18 @@ final class Combat {
                 changed = true;
             }
         }
+        if (!hasShield(w)) {
+            for (int i = 0; i < inv.getSize(); i++) {
+                ItemStack it = inv.getItem(i);
+                if (it == null || it.getType() != Material.SHIELD) continue;
+                ItemStack one = it.asOne();
+                it.subtract();
+                inv.setItem(i, it.getAmount() > 0 ? it : null);
+                eq.setItemInOffHand(one);
+                changed = true;
+                break;
+            }
+        }
         if (wantBow && bow(w) == null) changed |= takeFirst(w, inv, it -> isBow(it.getType()), 1);
         if (arrows > 0) {
             int need = arrows - w.count(Material.ARROW);
@@ -228,6 +241,8 @@ final class Combat {
             } else if (!isBow(it.getType()) && damage(it.getType()) >= 2.5 && damage(it.getType()) > have) {
                 return true;
             } else if (wantBow && isBow(it.getType()) && bow(w) == null) {
+                return true;
+            } else if (it.getType() == Material.SHIELD && !hasShield(w)) {
                 return true;
             } else if (arrows > 0 && it.getType() == Material.ARROW && w.count(Material.ARROW) < arrows) {
                 return true;
@@ -264,6 +279,35 @@ final class Combat {
     // ---- Fighting ----
 
     /** Hit the target with the best melee weapon if close enough and ready. */
+    // ---- Shield ----
+
+    static boolean hasShield(Worker w) {
+        return w.body.getEquipment().getItemInOffHand().getType() == Material.SHIELD;
+    }
+
+    /** Raise or lower the shield (in the off hand). */
+    static void raiseShield(Worker w, boolean up) {
+        if (up == w.shieldUp) return;
+        if (up && !hasShield(w)) return;
+        try {
+            if (up) w.body.startUsingItem(org.bukkit.inventory.EquipmentSlot.OFF_HAND);
+            else w.body.clearActiveItem();
+        } catch (RuntimeException ignored) {
+        }
+        w.shieldUp = up;
+        w.shieldSince = Bukkit.getCurrentTick();
+    }
+
+    /** Does the raised shield stop a hit from here (it must be up a moment and face the attacker)? */
+    static boolean blocks(Worker w, org.bukkit.entity.Entity from) {
+        if (!w.shieldUp || !hasShield(w) || Bukkit.getCurrentTick() - w.shieldSince < 5 || from == null) return false;
+        if (from.getWorld() != w.body.getWorld()) return false;
+        org.bukkit.util.Vector facing = w.body.getLocation().getDirection().setY(0);
+        org.bukkit.util.Vector to = from.getLocation().toVector().subtract(w.body.getLocation().toVector()).setY(0);
+        if (facing.lengthSquared() < 1e-6 || to.lengthSquared() < 1e-6) return true;
+        return facing.normalize().dot(to.normalize()) > 0.1; // in front of it
+    }
+
     static void melee(Worker w, LivingEntity target, ItemStack weapon) {
         Location me = w.body.getLocation(), them = target.getLocation();
         if (!w.body.getEquipment().getItemInMainHand().isSimilar(weapon)) w.body.getEquipment().setItemInMainHand(weapon.clone());
@@ -281,6 +325,7 @@ final class Combat {
         if (now < w.attackReady) return;
         w.attackReady = now + cooldown(weapon.getType());
         w.body.swingMainHand();
+        raiseShield(w, false); // shield down to strike
         target.damage(damage(weapon.getType()), w.body);
         w.body.getWorld().playSound(me, "minecraft:entity.player.attack.strong", SoundCategory.NEUTRAL, 0.8f, 1f);
         w.body.getWorld().spawnParticle(Particle.CRIT, target.getLocation().add(0, target.getHeight() / 2, 0), 6, 0.3, 0.3, 0.3, 0.1);
@@ -328,8 +373,16 @@ final class Combat {
 
     /** Drink a healing potion from the pockets (guards, when allowed). */
     static boolean drinkPotion(Worker w) {
+        // A strong one only when the damage is big enough (or it's all there is).
+        boolean wantStrong = missing(w.body) >= 8;
+        ItemStack choice = null;
         for (ItemStack it : w.pockets.getContents()) {
             if (!isHealingPotion(it)) continue;
+            boolean strong = ((PotionMeta) it.getItemMeta()).getBasePotionType() == PotionType.STRONG_HEALING;
+            if (choice == null || strong == wantStrong) choice = it;
+            if (strong == wantStrong) break;
+        }
+        for (ItemStack it : choice == null ? new ItemStack[0] : new ItemStack[]{choice}) {
             boolean strong = ((PotionMeta) it.getItemMeta()).getBasePotionType() == PotionType.STRONG_HEALING;
             w.pockets.removeItem(it.asOne());
             heal(w.body, strong ? 8 : 4);
@@ -341,9 +394,31 @@ final class Combat {
     }
 
     /** Eat food from the pockets. Returns false if there's nothing to eat. */
+    /**
+     * The food that fits the damage best: the biggest that doesn't heal more than is missing,
+     * or else the smallest there is. Null if none.
+     */
+    static Material fittingFood(Iterable<Material> foods, double missing) {
+        Material best = null, smallest = null;
+        for (Material m : foods) {
+            int v = foodValue(m);
+            if (v <= 0) continue;
+            if (v <= missing + 0.5 && (best == null || v > foodValue(best))) best = m;
+            if (smallest == null || v < foodValue(smallest)) smallest = m;
+        }
+        return best != null ? best : smallest;
+    }
+
+    static double missing(LivingEntity e) {
+        return maxHealth(e) - e.getHealth();
+    }
+
     static boolean eat(Worker w) {
+        java.util.List<Material> carried = new java.util.ArrayList<>();
+        for (ItemStack it : w.pockets.getContents()) if (it != null && foodValue(it.getType()) > 0) carried.add(it.getType());
+        Material pick = fittingFood(carried, missing(w.body));
         for (ItemStack it : w.pockets.getContents()) {
-            if (it == null || foodValue(it.getType()) <= 0) continue;
+            if (it == null || it.getType() != pick) continue;
             Material food = it.getType();
             w.pockets.removeItem(new ItemStack(food, 1));
             w.hold(food);

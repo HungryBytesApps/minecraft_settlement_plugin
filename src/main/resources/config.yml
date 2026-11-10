@@ -9,19 +9,25 @@ max-settlers-per-settlement: 10
 # Can settlers use chests and barrels in the settlement unless you switch them off with the ledger?
 chests-allowed-by-default: true
 
-# Price to recruit a new settler at the bell (item:amount). Empty list = free.
+# Price to recruit a new settler at the bell (item:amount), by how many settlers already live there:
+# from 0 settlers the first list, from 3 the second, and so on. (A plain list also works: then every
+# settler costs recruit-cost-increase % more than the one before.)
 recruit-cost:
-  - emerald:5
-  - bread:10
+  0: [emerald:3, bread:10]
+  3: [emerald:6, cooked_beef:12]
+  6: [emerald:10, golden_carrot:8]
+  10: [emerald:16, cake:2]
+  15: [emerald:24, golden_apple:2]
+recruit-cost-increase: 20
 
 # Particles for the settlement border and work areas (Show border). Any particle without extra
-# data works, e.g. FLAME, SMALL_FLAME, SOUL_FIRE_FLAME, END_ROD, HAPPY_VILLAGER, COMPOSTER, WAX_ON,
+# data works, e.g. SOUL_FIRE_FLAME (blue), HAPPY_VILLAGER (green), FLAME, SMALL_FLAME, END_ROD, HAPPY_VILLAGER, COMPOSTER, WAX_ON,
 # ELECTRIC_SPARK, GLOW, CRIT. Resource packs can change how they look.
-border-particle: FLAME
+border-particle: SOUL_FIRE_FLAME
 work-area-particle: HAPPY_VILLAGER
 
 # ---- Settlers ----
-# Show "Name (Job)" above each settler.
+# Show the job above each settler and what it is doing under it.
 show-names: true
 
 # Walking speed in blocks per tick (20 ticks = 1 second). A player walks 0.21.

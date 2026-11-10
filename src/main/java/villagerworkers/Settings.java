@@ -38,16 +38,50 @@ record Settings(
         java.util.Map<String, String> skinGender,
         boolean talkSounds,
         String voiceSound,
-        String laughSound
+        String laughSound,
+        java.util.TreeMap<Integer, List<ItemStack>> recruitTiers,
+        int recruitIncrease
 ) {
+    /** What the next settler costs, with this many settlers already living there. */
+    List<ItemStack> recruitCostFor(int settlers) {
+        if (!recruitTiers.isEmpty()) {
+            java.util.Map.Entry<Integer, List<ItemStack>> e = recruitTiers.floorEntry(settlers);
+            return e != null ? e.getValue() : recruitTiers.firstEntry().getValue();
+        }
+        List<ItemStack> out = new ArrayList<>();
+        for (ItemStack it : recruitCost) {
+            ItemStack c = it.clone();
+            c.setAmount((int) Math.ceil(it.getAmount() * (1 + recruitIncrease * settlers / 100.0)));
+            out.add(c);
+        }
+        return out;
+    }
+
     static Settings from(FileConfiguration c) {
         List<String> names = c.getStringList("names");
         if (names.isEmpty()) names = List.of("Bob");
         List<String> lines = c.getStringList("chat-lines");
         if (lines.isEmpty()) lines = List.of("Hmm...");
         List<String> skins = c.getStringList("skins");
+        List<ItemStack> cost = parseCost(c.getStringList("recruit-cost"));
+        // recruit-cost can also be a list per number of settlers: "0: [...]", "3: [...]"
+        java.util.TreeMap<Integer, List<ItemStack>> tiers = new java.util.TreeMap<>();
+        org.bukkit.configuration.ConfigurationSection rc = c.getConfigurationSection("recruit-cost");
+        if (rc != null) {
+            for (String k : rc.getKeys(false)) {
+                try {
+                    tiers.put(Integer.parseInt(k.trim()), parseCost(rc.getStringList(k)));
+                } catch (NumberFormatException ignored) {
+                }
+            }
+        }
+        int maxRadius = (int) clamp(c.getInt("max-work-radius", 12), 2, 32);
+        return build(c, cost, tiers, names, lines, skins, maxRadius);
+    }
+
+    private static List<ItemStack> parseCost(List<String> list) {
         List<ItemStack> cost = new ArrayList<>();
-        for (String s : c.getStringList("recruit-cost")) {
+        for (String s : list) {
             String[] p = s.split(":");
             Material m = Material.matchMaterial(p[0].trim().toLowerCase(Locale.ROOT));
             if (m == null || !m.isItem()) continue;
@@ -58,7 +92,11 @@ record Settings(
             }
             if (n > 0) cost.add(new ItemStack(m, n));
         }
-        int maxRadius = (int) clamp(c.getInt("max-work-radius", 12), 2, 32);
+        return cost;
+    }
+
+    private static Settings build(FileConfiguration c, List<ItemStack> cost, java.util.TreeMap<Integer, List<ItemStack>> tiers,
+                                  List<String> names, List<String> lines, List<String> skins, int maxRadius) {
         return new Settings(
                 (int) clamp(c.getInt("max-settlements-per-player", 1), 0, 100),
                 (int) clamp(c.getInt("settlement-radius", 48), 8, 128),
@@ -78,7 +116,7 @@ record Settings(
                 (int) clamp(c.getInt("guard-radius", 16), 4, 48),
                 (int) clamp(c.getInt("regen-seconds", 4), 1, 600),
                 (int) clamp(c.getInt("eat-below-health-percent", 60), 1, 99),
-                Borders.particle(c.getString("border-particle", "FLAME"), org.bukkit.Particle.FLAME),
+                Borders.particle(c.getString("border-particle", "SOUL_FIRE_FLAME"), org.bukkit.Particle.SOUL_FIRE_FLAME),
                 Borders.particle(c.getString("work-area-particle", "HAPPY_VILLAGER"), org.bukkit.Particle.HAPPY_VILLAGER),
                 skins.isEmpty() ? List.of("steve", "alex") : skins,
                 names,
@@ -89,7 +127,9 @@ record Settings(
                 skinGender(c),
                 c.getBoolean("talk-sounds", true),
                 c.getString("voice-sound", "minecraft:entity.villager.ambient"),
-                c.getString("laugh-sound", "minecraft:entity.villager.yes")
+                c.getString("laugh-sound", "minecraft:entity.villager.yes"),
+                tiers,
+                (int) clamp(c.getInt("recruit-cost-increase", 20), 0, 1000)
         );
     }
 

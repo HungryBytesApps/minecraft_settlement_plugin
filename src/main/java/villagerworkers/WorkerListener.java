@@ -276,6 +276,13 @@ final class WorkerListener implements Listener {
         if (victimSettler) {
             Worker w = plugin.workers().get(victim.getUniqueId());
             if (w == null) return;
+            if (Combat.blocks(w, e.getDamager())) { // blocked with the shield
+                e.setCancelled(true);
+                victim.getWorld().playSound(victim.getLocation(), "minecraft:item.shield.block", org.bukkit.SoundCategory.NEUTRAL, 1f, 0.9f + w.random.nextFloat() * 0.2f);
+                if (e.getDamager() instanceof org.bukkit.entity.Projectile pr) pr.remove();
+                if (src instanceof org.bukkit.entity.LivingEntity le && Combat.hostile(le)) w.lastAttacker = le;
+                return;
+            }
             w.lastHurt = Bukkit.getCurrentTick();
             if (src instanceof org.bukkit.entity.LivingEntity le && Combat.hostile(le)) w.lastAttacker = le;
         }
@@ -310,6 +317,7 @@ final class WorkerListener implements Listener {
         Worker w = plugin.workers().get(e.getEntity().getUniqueId());
         if (w == null) return;
         SettlerInventory.close(w); // someone looking in its pockets: finish that first
+        w.showTorch(false);        // drop the shield, not the torch
         // Drop what they carried and wore (the item in hand is only a copy).
         e.getDrops().clear();
         e.setDroppedExp(0);
@@ -318,7 +326,7 @@ final class WorkerListener implements Listener {
         }
         w.pockets.clear();
         org.bukkit.inventory.EntityEquipment eq = w.body.getEquipment();
-        for (EquipmentSlot slot : new EquipmentSlot[]{EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET}) {
+        for (EquipmentSlot slot : new EquipmentSlot[]{EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET, EquipmentSlot.OFF_HAND}) {
             org.bukkit.inventory.ItemStack it = eq.getItem(slot);
             if (it != null && !it.getType().isAir()) e.getDrops().add(it.clone());
         }

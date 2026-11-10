@@ -37,6 +37,9 @@ final class LumberjackJob {
             Activity d = Work.deposit(w, t, keep);
             if (d != null) return d;
         }
+        // Saplings, apples and sticks from the leaves: pick them up.
+        Activity pick = Work.collectDrops(w, t, LumberjackJob::wanted, 20);
+        if (pick != null) return pick;
         // Replant spots where a tree stood.
         int radius = w.plugin.settings().townRadius();
         boolean outside = wp.isOn("OUTSIDE");

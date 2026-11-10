@@ -148,7 +148,7 @@ final class Defense {
         for (Block b : t.containers(w.plugin.settings().townRadius())) {
             if (!t.rule(b)[1] || w.isSkipped(b)) continue;
             Inventory inv = Town.inventory(b);
-            if (inv == null || bestFood(inv) < 0) continue;
+            if (inv == null || bestFood(inv, Combat.missing(w.body)) < 0) continue;
             double d = b.getLocation().distanceSquared(w.body.getLocation());
             if (d < bestD) {
                 bestD = d;
@@ -159,7 +159,7 @@ final class Defense {
         return new GoAndDo(w, best, 2.0, "Getting food", b -> true, b -> {
             Inventory inv = Town.inventory(b);
             if (inv == null) return;
-            int slot = bestFood(inv);
+            int slot = bestFood(inv, Combat.missing(w.body));
             if (slot < 0) return;
             ItemStack it = inv.getItem(slot);
             int n = Math.min(3, it.getAmount());
@@ -172,18 +172,17 @@ final class Defense {
         });
     }
 
-    private static int bestFood(Inventory inv) {
-        int best = -1, bestV = 0;
+    /** The slot with the food that fits the damage best (see Combat.fittingFood), or -1. */
+    private static int bestFood(Inventory inv, double missing) {
+        java.util.List<Material> kinds = new java.util.ArrayList<>();
+        for (ItemStack it : inv.getContents()) if (it != null && Combat.foodValue(it.getType()) > 0) kinds.add(it.getType());
+        Material pick = Combat.fittingFood(kinds, missing);
+        if (pick == null) return -1;
         for (int i = 0; i < inv.getSize(); i++) {
             ItemStack it = inv.getItem(i);
-            if (it == null) continue;
-            int v = Combat.foodValue(it.getType());
-            if (v > bestV) {
-                bestV = v;
-                best = i;
-            }
+            if (it != null && it.getType() == pick) return i;
         }
-        return best;
+        return -1;
     }
 
     // ---- Take cover ----
