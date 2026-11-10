@@ -48,11 +48,88 @@ final class Social {
     }
 
     /** In the evening: get together with the others at the gathering spot. */
+    /**
+     * The evening: their own time, so a bit of everything: a chat or a story, making music, sitting
+     * together at the gathering spot, a quiet evening at home, an evening walk, little jobs. Each for a
+     * while, then something else; just standing around only now and then.
+     */
     static Activity evening(Worker w, Town t) {
         Location spot = Seats.gatheringSpot(t, w.plugin.settings().townRadius());
-        Block seat = Seats.nearestFree(spot, 8, w);
-        if (seat != null) return new Sit(w, seat, Mode.SOCIAL, Integer.MAX_VALUE, spot);
+        int r = w.random.nextInt(100);
+        if (r < 28) {
+            Activity talk = Chat.start(w);
+            if (talk != null) return talk;
+        } else if (r < 42) {
+            Activity band = Music.start(w);
+            if (band != null) return band;
+        } else if (r < 66) {
+            Block seat = Seats.nearestFree(spot, 10, w);
+            if (seat != null) return new Sit(w, seat, Mode.SOCIAL, 600 + w.random.nextInt(900), spot);
+        } else if (r < 80) {
+            // A quiet evening at home: inside, with a book (on a seat if there's one).
+            Location home = Defense.shelter(w, t, new java.util.HashSet<>());
+            if (home != null) {
+                Block seat = Seats.nearestFree(home, 6, w);
+                if (seat != null) return new Sit(w, seat, Mode.READ, 600 + w.random.nextInt(800), null);
+                return new GoThen(w, home, new Read(w, 400 + w.random.nextInt(400)), "Relaxing at home");
+            }
+        } else if (r < 90) {
+            Activity walk = stroll(w);
+            if (walk != null) return walk;
+        } else if (r < 96) {
+            Activity p = Potter.start(w);
+            if (p != null) return p;
+        }
+        Block seat = Seats.nearestFree(spot, 10, w);
+        if (seat != null) return new Sit(w, seat, Mode.SOCIAL, 600 + w.random.nextInt(600), spot);
         return new Hangout(w, spot);
+    }
+
+    /** Walk somewhere first, then do something there. */
+    static final class GoThen implements Activity {
+        private final Worker w;
+        private final Location to;
+        private final Activity then;
+        private final String walkLabel;
+        private boolean arrived, started;
+        private int time;
+
+        GoThen(Worker w, Location to, Activity then, String walkLabel) {
+            this.w = w;
+            this.to = to;
+            this.then = then;
+            this.walkLabel = walkLabel;
+        }
+
+        @Override
+        public boolean tick() {
+            if (!arrived) {
+                if (!started) {
+                    started = true;
+                    if (!w.mover.go(to, 1.0, w.plugin.settings().walkSpeed())) arrived = true;
+                    return false;
+                }
+                if (w.mover.arrived() || w.mover.failed() || ++time > 900) arrived = true;
+                return false;
+            }
+            return then.tick();
+        }
+
+        @Override
+        public void stop() {
+            w.mover.stop();
+            then.stop();
+        }
+
+        @Override
+        public String label() {
+            return arrived ? then.label() : walkLabel;
+        }
+
+        @Override
+        public boolean freeTime() {
+            return true;
+        }
     }
 
     private static Worker partner(Worker w) {
@@ -408,7 +485,7 @@ final class Social {
 
         @Override
         public boolean tick() {
-            if (!w.isNight()) return true;
+            if (!w.isNight() || time > 500 + w.random.nextInt(300)) return true; // a while, then something else
             if (phase == 0) {
                 phase = 1;
                 double a = w.random.nextDouble() * Math.PI * 2;

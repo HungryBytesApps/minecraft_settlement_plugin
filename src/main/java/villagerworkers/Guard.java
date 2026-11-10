@@ -75,7 +75,7 @@ final class Guard implements Activity {
         if (target == null && time % 10 == 0 && time >= calmUntil) target = findTarget();
 
         if (target != null) {
-            if (target.getLocation().distanceSquared(w.body.getLocation()) <= 10 * 10) w.showTorch(false); // shield back when it gets close
+            if (target.getLocation().distanceSquared(w.body.getLocation()) <= 16 * 16 || w.weapon != Weapon.MELEE) w.showTorch(false); // weapon out: within skeleton range, or to shoot
             if (sub != null) {
                 if (arrowRun) return runSub(); // archers fetch arrows as soon as they run out
                 sub.stop();                    // anything else waits until after the fight
@@ -102,7 +102,7 @@ final class Guard implements Activity {
             // From when monsters start spawning at dusk until they burn at sunrise (or anywhere really dark).
             long tod = w.body.getWorld().getTime();
             boolean night = tod >= 13000 && tod < 23460;
-            boolean fighting = target != null && target.getLocation().distanceSquared(w.body.getLocation()) <= 10 * 10;
+            boolean fighting = target != null && target.getLocation().distanceSquared(w.body.getLocation()) <= 16 * 16;
             w.showTorch(!fighting && (night || w.body.getEyeLocation().getBlock().getLightLevel() < 7));
         }
         // After a fight: pick up what the monsters dropped, and bring a good load of it to storage.

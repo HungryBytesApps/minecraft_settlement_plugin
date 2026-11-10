@@ -122,8 +122,8 @@ record Settings(
                 names,
                 lines,
                 jobSkins(c),
-                orDefault(c.getStringList("names-male"), List.of("Bram", "Cor", "Daan", "Finn", "Gijs", "Hugo", "Jens", "Joep", "Kees", "Lars", "Otto", "Rik", "Sem", "Teun", "Thijs", "Wim")),
-                orDefault(c.getStringList("names-female"), List.of("Anna", "Eva", "Femke", "Fleur", "Greet", "Ilse", "Lieke", "Lotte", "Maud", "Noor", "Pien", "Roos", "Saar", "Sanne", "Vera", "Yara")),
+                orDefault(c.getStringList("names-male"), List.of("Arthur", "Benjamin", "Charlie", "Daniel", "David", "Edward", "George", "Harry", "Henry", "Jack", "James", "John", "Leo", "Michael", "Oliver", "Oscar", "Robert", "Samuel", "Thomas", "William")),
+                orDefault(c.getStringList("names-female"), List.of("Alice", "Amelia", "Ava", "Charlotte", "Chloe", "Ellie", "Emily", "Emma", "Grace", "Hannah", "Holly", "Isla", "Lily", "Lucy", "Mary", "Mia", "Olivia", "Rose", "Ruby", "Sophie")),
                 skinGender(c),
                 c.getBoolean("talk-sounds", true),
                 c.getString("voice-sound", "minecraft:entity.villager.ambient"),
@@ -146,7 +146,9 @@ record Settings(
     }
 
     private static List<String> orDefault(List<String> l, List<String> def) {
-        return l == null || l.isEmpty() ? def : l;
+        if (l == null || l.isEmpty()) return def;
+        if (l.contains("Kees") && l.contains("Bram") || l.contains("Greet") && l.contains("Lotte")) return def; // old Dutch defaults
+        return l;
     }
 
     /** skin-gender: steve: male, alex: female… (built-in defaults if missing). */

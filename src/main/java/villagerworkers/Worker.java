@@ -147,7 +147,8 @@ final class Worker {
         PersistentDataContainer pdc = body.getPersistentDataContainer();
         pdc.set(Keys.OWNER, PersistentDataType.STRING, owner.toString());
         pdc.set(Keys.NAME, PersistentDataType.STRING, name);
-        pdc.set(Keys.TOWN, PersistentDataType.STRING, townId);
+        if (townId == null) pdc.remove(Keys.TOWN);
+        else pdc.set(Keys.TOWN, PersistentDataType.STRING, townId);
         if (skin != null) pdc.set(Keys.SKIN, PersistentDataType.STRING, skin);
         String wp = Keys.ser(workplace);
         if (wp == null) pdc.remove(Keys.WORKPLACE);
@@ -193,8 +194,20 @@ final class Worker {
         body.setInvulnerable(false); // mobs can hurt settlers (players can't, see WorkerListener)
         body.setRemoveWhenFarAway(false);
         body.setPersistent(true);
-        // No skin yet, or a man's skin with a woman's name (or the other way around): pick one that fits the name.
         Settings st = plugin.settings();
+        // Settlers from earlier versions with a Dutch default name get an English one (fitting their skin).
+        org.bukkit.NamespacedKey renamed = new org.bukkit.NamespacedKey(plugin, "renamed");
+        if (OLD_NAMES.contains(name) && skin != null && !body.getPersistentDataContainer().has(renamed)) {
+            String fresh = Skins.nameFor(st, skin, random);
+            Town own = town();
+            if (own != null && own.settlers.containsKey(body.getUniqueId())) {
+                own.settlers.put(body.getUniqueId(), fresh);
+                plugin.towns().save();
+            }
+            name = fresh;
+            body.getPersistentDataContainer().set(Keys.NAME, PersistentDataType.STRING, name);
+        }
+        // No skin yet, or a man's skin with a woman's name (or the other way around): pick one that fits the name.
         String g = Skins.gender(st, skin);
         boolean mismatch = ("male".equals(g) && st.femaleNames().contains(name)) || ("female".equals(g) && st.maleNames().contains(name))
                 || (skin != null && "male".equals(g) && skin.endsWith(":slim")) || (skin != null && "female".equals(g) && skin.endsWith(":wide"));
@@ -235,7 +248,7 @@ final class Worker {
     private void updateDescription() {
         int hp = (int) Math.ceil(body.getHealth());
         String doing = doing();
-        String tag = hp + "|" + doing + "|" + title();
+        String tag = hp + "|" + doing + "|" + title() + "|" + name;
         if (tag.equals(shownTag)) return;
         shownTag = tag;
         healthShown = hp;
@@ -246,7 +259,7 @@ final class Worker {
             body.setDescription(null);
             return;
         }
-        Component top = Component.text(title(), NamedTextColor.WHITE);
+        Component top = Component.text(name + " ", NamedTextColor.WHITE).append(Component.text("[" + title() + "]", NamedTextColor.GOLD));
         if (hurt) top = top.append(Component.text("  " + healthText(), bad ? NamedTextColor.RED : NamedTextColor.GOLD));
         body.customName(top);
         body.setCustomNameVisible(true);
@@ -255,8 +268,16 @@ final class Worker {
 
     private String shownTag;
 
+    private static final java.util.Set<String> OLD_NAMES = java.util.Set.of("Anna", "Bram", "Cor", "Daan", "Eva", "Femke", "Finn", "Fleur",
+            "Gijs", "Greet", "Hugo", "Ilse", "Jens", "Joep", "Kees", "Lars", "Lieke", "Lotte", "Maud", "Noor", "Otto", "Pien", "Rik", "Roos",
+            "Saar", "Sanne", "Sem", "Teun", "Thijs", "Vera", "Wim", "Yara");
+
     /** Put the job's tool (or a guard's weapon) in hand (after reading, playing music...). */
     void holdTool() {
+        if (torchShown) {
+            body.getEquipment().setItemInMainHand(new ItemStack(Material.TORCH));
+            return;
+        }
         if (guard || borrowedWeapon != null) {
             ItemStack wpn = guard && weapon == Guard.Weapon.RANGED ? Combat.bow(this) : null;
             if (wpn == null) wpn = Combat.bestMelee(this);
@@ -379,26 +400,13 @@ final class Worker {
     // ---- Torch in the dark (guards) ----
 
     private boolean torchShown;
-    private ItemStack storedShield;
 
-    /** A torch in the off hand (free, just for light); the shield is kept aside meanwhile, also over a restart. */
+    /** A torch in the main hand (free, just for light); the shield stays in the off hand. The weapon comes back for a fight. */
     void showTorch(boolean on) {
         if (on == torchShown) return;
-        org.bukkit.inventory.EntityEquipment eq = body.getEquipment();
-        org.bukkit.NamespacedKey key = new org.bukkit.NamespacedKey(plugin, "stored_shield");
-        if (on) {
-            ItemStack off = eq.getItemInOffHand();
-            storedShield = off.getType().isAir() ? null : off.clone();
-            body.getPersistentDataContainer().set(key, PersistentDataType.BYTE_ARRAY,
-                    storedShield == null ? new byte[0] : storedShield.serializeAsBytes());
-            eq.setItemInOffHand(new ItemStack(Material.TORCH));
-            torchShown = true;
-        } else {
-            eq.setItemInOffHand(storedShield);
-            storedShield = null;
-            body.getPersistentDataContainer().remove(key);
-            torchShown = false;
-        }
+        torchShown = on;
+        if (on) body.getEquipment().setItemInMainHand(new ItemStack(Material.TORCH));
+        else holdTool();
     }
 
     boolean torchShown() {

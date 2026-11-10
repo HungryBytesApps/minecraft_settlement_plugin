@@ -36,6 +36,7 @@ public final class VillagerWorkersPlugin extends JavaPlugin {
         saveDefaultConfig();
         settings = Settings.from(getConfig());
         Keys.init(this);
+        LEAVING = new org.bukkit.NamespacedKey(this, "leaving");
         Chat.load(this);
         towns = new Towns(this);
         workers = new Workers(this);
@@ -59,7 +60,7 @@ public final class VillagerWorkersPlugin extends JavaPlugin {
     }
 
     /** Changes with every version I send, to check the right jar is installed. */
-    static final String BUILD = "2026-11-10 #32";
+    static final String BUILD = "2026-11-10 #37";
 
     @Override
     public boolean onCommand(org.bukkit.command.CommandSender sender, org.bukkit.command.Command cmd, String label, String[] args) {
@@ -84,12 +85,19 @@ public final class VillagerWorkersPlugin extends JavaPlugin {
 
     /** A settler came into the world: start it, or turn it into a villager if its settlement is gone. */
     void load(Mannequin m) {
-        String townId = m.getPersistentDataContainer().get(Keys.TOWN, PersistentDataType.STRING);
-        if (towns.get(townId) == null) {
-            becomeVillager(m);
+        if (m.getPersistentDataContainer().has(LEAVING)) { // was walking away when the server stopped
+            m.remove();
             return;
         }
+        String townId = m.getPersistentDataContainer().get(Keys.TOWN, PersistentDataType.STRING);
         workers.register(m);
+        if (towns.get(townId) == null) {
+            // Its settlement was disbanded while it was far away: it drops its things and leaves too.
+            Worker w = workers.get(m.getUniqueId());
+            if (w != null) getServer().getScheduler().runTask(this, () -> {
+                if (w.body.isValid()) dismiss(w);
+            });
+        }
     }
 
     /** Settlers from the previous version were villagers. */
@@ -282,17 +290,108 @@ public final class VillagerWorkersPlugin extends JavaPlugin {
     }
 
     /** Dismissed: the settler leaves and a normal villager stands in its place. */
+    /** Dismissed: leaves its things behind, says goodbye, walks out of the settlement and is gone. */
     void dismiss(Worker w) {
         SettlerInventory.close(w);
         w.showTorch(false);
         Location at = w.body.getLocation();
         for (ItemStack it : w.pockets.getContents()) if (it != null && !it.getType().isAir()) at.getWorld().dropItemNaturally(at, it);
         w.pockets.clear();
-        for (ItemStack it : w.body.getEquipment().getArmorContents()) if (it != null && !it.getType().isAir()) at.getWorld().dropItemNaturally(at, it);
-        ItemStack off = w.body.getEquipment().getItemInOffHand();
+        w.savePockets();
+        org.bukkit.inventory.EntityEquipment eq = w.body.getEquipment();
+        for (ItemStack it : eq.getArmorContents()) if (it != null && !it.getType().isAir()) at.getWorld().dropItemNaturally(at, it);
+        ItemStack off = eq.getItemInOffHand();
         if (off.getType() == Material.SHIELD) at.getWorld().dropItemNaturally(at, off);
-        forget(w);
-        becomeVillager(w.body);
+        eq.setArmorContents(new ItemStack[4]);
+        eq.setItemInOffHand(null);
+        eq.setItemInMainHand(null);
+        Town t = w.town();
+        Location exit = exitPoint(t, at);
+        // No longer part of the settlement, but still walking (and gone once out).
+        if (t != null) {
+            t.settlers.remove(w.body.getUniqueId());
+            for (Town.Workplace wp : t.workplaces.values()) wp.workers.remove(w.body.getUniqueId());
+            towns.save();
+        }
+        w.leaveWorkplace();
+        w.guard = false;
+        w.townId = null;
+        w.body.getPersistentDataContainer().set(LEAVING, PersistentDataType.BYTE, (byte) 1);
+        w.save();
+        w.applyLook();
+        w.start(new Leave(w, exit));
+    }
+
+    /** A point outside the border, straight away from the bell. */
+    private Location exitPoint(Town t, Location from) {
+        if (t == null || t.bell.getWorld() != from.getWorld()) return from.clone().add(20, 0, 0);
+        double dx = from.getX() - t.bell.getX(), dz = from.getZ() - t.bell.getZ();
+        double len = Math.sqrt(dx * dx + dz * dz);
+        if (len < 1) {
+            double a = random.nextDouble() * Math.PI * 2;
+            dx = Math.cos(a);
+            dz = Math.sin(a);
+            len = 1;
+        }
+        double r = settings.townRadius() + 6;
+        int x = (int) Math.floor(t.bell.getX() + dx / len * r), z = (int) Math.floor(t.bell.getZ() + dz / len * r);
+        int y = from.getWorld().getHighestBlockYAt(x, z, org.bukkit.HeightMap.MOTION_BLOCKING_NO_LEAVES) + 1;
+        return new Location(from.getWorld(), x + 0.5, y, z + 0.5);
+    }
+
+    static org.bukkit.NamespacedKey LEAVING;
+
+    /** Walking out of the settlement; gone once outside (or after a while). */
+    private final class Leave implements Activity {
+        private final Worker w;
+        private final Location exit;
+        private int time;
+
+        Leave(Worker w, Location exit) {
+            this.w = w;
+            this.exit = exit;
+            Bubbles.say(VillagerWorkersPlugin.this, w.body, "Goodbye!", 60);
+            Voice.speak(w, "Goodbye!");
+        }
+
+        @Override
+        public boolean tick() {
+            time++;
+            Location me = w.body.getLocation();
+            double dx = me.getX() - exit.getX(), dz = me.getZ() - exit.getZ();
+            if ((dx * dx + dz * dz) < 4 * 4 || time > 1800) {
+                me.getWorld().spawnParticle(org.bukkit.Particle.POOF, me.clone().add(0, 1, 0), 10, 0.3, 0.5, 0.3, 0.02);
+                workers.unregister(w.body.getUniqueId());
+                w.body.remove();
+                return true;
+            }
+            if (!w.mover.moving() && time % 40 == 1) {
+                // Far away: walk towards it bit by bit (paths are limited in length).
+                Location step = exit;
+                double dist = Math.sqrt(dx * dx + dz * dz);
+                if (dist > 40) {
+                    double f = 40 / dist;
+                    int x = (int) Math.floor(me.getX() - dx * f), z = (int) Math.floor(me.getZ() - dz * f);
+                    step = new Location(me.getWorld(), x + 0.5, me.getWorld().getHighestBlockYAt(x, z, org.bukkit.HeightMap.MOTION_BLOCKING_NO_LEAVES) + 1, z + 0.5);
+                }
+                if (!w.mover.go(step, 3, settings.walkSpeed()) && time > 200) {
+                    workers.unregister(w.body.getUniqueId());
+                    w.body.remove(); // can't find the way out: just go
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        @Override
+        public void stop() {
+            w.mover.stop();
+        }
+
+        @Override
+        public String label() {
+            return "Leaving the settlement";
+        }
     }
 
     /** Remove a settler from its town and workplace (death or dismissal). */

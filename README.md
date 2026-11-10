@@ -5,8 +5,7 @@ Build a settlement with settlers who work and live their own lives. Server-side 
 ## Creating a settlement
 
 Right-click a **bell** → create a settlement. You get the **Settlement Ledger** (one per player).
-- **Bell menu**: recruit, show border, get a ledger, rename, disband.
-- **Bell menu** (the settlement's rules): recruit (gets more expensive per settler, `recruit-cost` tiers), rename, show border, auto assign jobs, use all chests, when attacked, settlers consumption (Off / Food only / Food & Potions), get a ledger, disband.
+- **Bell menu** (the settlement's rules): recruit (gets more expensive per settler, `recruit-cost` tiers), rename, show border, auto assign jobs, use all chests, when attacked, settlers consumption (Off / Food only / Food & Potions), get a ledger, disband (all settlers drop their things and leave).
 - **Ledger menu** (running the settlement): settlers table (click a row for its menu), workstations, storage targets.
 The settlement border is shown with particles, only for you and only near you (`border-particle`, `work-area-particle` in the config).
 Bell menu → **Show border**: When holding ledger / On / Off.
@@ -49,7 +48,7 @@ Settlers are player-like (Mannequins): their own skin (`skins` in the config), w
 and only tools they really carry in hand. Look at a settler and it looks back at you. They turn their heads smoothly, glance around, nod while chatting, crouch to work the fields, really eat, draw their bows and blow their horns. Old villager settlers are converted automatically.
 Skins per job: `job-skins` in the config (url:/value: from mineskin.org, texture: from a resource pack, or player:Name).
 Own skins: put them in the server resource pack and add `texture:namespace:path/to/skin` (or `...:slim`) to `skins` in the config.
-Hiring a wild villager turns it into a settler; dismissing a settler turns it back into a villager.
+Hiring a wild villager turns it into a settler; dismissing a settler makes it drop its things and walk out of the settlement for good.
 
 ## Weather
 
@@ -88,4 +87,6 @@ settlers list. Dead settlers drop what they carried and wore.
 Push to GitHub: the workflow builds it under Actions → Artifacts.
 
 
-Above each settler: its job (and health when hurt), under it what it's doing. Names show in the menus and conversations.
+Above each settler: its name and job, e.g. "Emma [Farmer]" (and health when hurt), under it what it's doing. Rename it in its menu.
+
+At night (and anywhere really dark) guards carry a free torch in the main hand, for dynamic-light mods, and keep their shield. The weapon comes back as soon as a monster comes within 16 blocks (skeleton range).

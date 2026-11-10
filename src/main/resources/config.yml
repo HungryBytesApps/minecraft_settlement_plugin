@@ -85,8 +85,8 @@ job-skins:
 seeds-to-keep: 16
 
 # Names that fit the skin: men's names for men's skins, women's names for women's skins.
-names-male: [Bram, Cor, Daan, Finn, Gijs, Hugo, Jens, Joep, Kees, Lars, Otto, Rik, Sem, Teun, Thijs, Wim]
-names-female: [Anna, Eva, Femke, Fleur, Greet, Ilse, Lieke, Lotte, Maud, Noor, Pien, Roos, Saar, Sanne, Vera, Yara]
+names-male: [Arthur, Benjamin, Charlie, Daniel, David, Edward, George, Harry, Henry, Jack, James, John, Leo, Michael, Oliver, Oscar, Robert, Samuel, Thomas, William]
+names-female: [Alice, Amelia, Ava, Charlotte, Chloe, Ellie, Emily, Emma, Grace, Hannah, Holly, Isla, Lily, Lucy, Mary, Mia, Olivia, Rose, Ruby, Sophie]
 # Which built-in skins are men and which are women (decides the name and slim/wide arms).
 skin-gender:
   steve: male
@@ -100,7 +100,7 @@ skin-gender:
   zuri: male
 
 # Names for skins that are neither (a player's skin, your own skins).
-names: [Anna, Bram, Cor, Daan, Eva, Finn, Greet, Hugo, Ilse, Joep, Kees, Lotte, Maud, Noor, Otto, Pien, Rik, Saar, Teun, Vera, Wim, Yara]
+names: [Alex, Charlie, Jamie, Jordan, Morgan, Riley, Robin, Sam, Taylor]
 
 # Sounds when settlers talk: a mumbling voice (each settler its own pitch), and a laugh.
 talk-sounds: true

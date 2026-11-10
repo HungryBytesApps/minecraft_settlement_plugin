@@ -166,7 +166,7 @@ final class Menus {
             pl.sendActionBar(Component.text("Here's your Settlement Ledger.", NamedTextColor.GREEN));
         }));
         buttons.add(button(plugin, "Tutorial", NamedTextColor.AQUA, "How everything works", w, pl -> tutorial(plugin, pl, t, true)));
-        buttons.add(button(plugin, "Disband settlement", NamedTextColor.RED, "Removes the settlement. Settlers become villagers again.", w, pl -> disband(plugin, pl, t)));
+        buttons.add(button(plugin, "Disband settlement", NamedTextColor.RED, "Removes the settlement. All settlers drop their things and leave.", w, pl -> disband(plugin, pl, t)));
         show(p, t.name, body, List.of(), DialogType.multiAction(buttons).columns(2).exitAction(close(plugin)).build());
     }
 
@@ -590,7 +590,7 @@ final class Menus {
                 settler(plugin, pl, w);
             }));
         }
-        buttons.add(button(plugin, "Dismiss", NamedTextColor.RED, "Turns it back into a villager. It drops its things.", width, pl -> {
+        buttons.add(button(plugin, "Dismiss", NamedTextColor.RED, "It drops its things, says goodbye and walks out of the settlement for good.", width, pl -> {
             plugin.dismiss(w);
             pl.sendActionBar(Component.text(w.name + " is a normal villager again.", NamedTextColor.YELLOW));
         }));
@@ -621,7 +621,17 @@ final class Menus {
                     String n = view.getText("name");
                     if (!(audience instanceof Player pl)) return;
                     Bukkit.getScheduler().runTask(plugin, () -> {
-                        if (n != null && !n.isBlank()) w.name = n.trim();
+                        if (n != null && !n.isBlank()) {
+                            w.name = n.trim();
+                            // Your own choice: never replaced automatically.
+                            w.body.getPersistentDataContainer().set(new org.bukkit.NamespacedKey(plugin, "renamed"),
+                                    org.bukkit.persistence.PersistentDataType.BYTE, (byte) 1);
+                            Town own = w.town();
+                            if (own != null) {
+                                own.settlers.put(w.body.getUniqueId(), w.name);
+                                plugin.towns().save();
+                            }
+                        }
                         w.save();
                         w.applyLook();
                         settler(plugin, pl, w);
