@@ -27,7 +27,7 @@ final class Mover {
     private int idx;
     private Location target;
     private double reach, speed;
-    private int stuckTicks, repaths;
+    private int stuckTicks, repaths, fails, rescueAfter;
     private double fall, stepDist;
     private Location lastPos;
     private boolean arrived, failed;
@@ -55,8 +55,10 @@ final class Mover {
             path = null;
             failed = true;
             halt();
+            if (++fails >= 6) rescue();
             return false;
         }
+        fails = 0;
         path = p;
         idx = 0;
         stuckTicks = 0;
@@ -66,6 +68,55 @@ final class Mover {
             arrived = true;
         }
         return true;
+    }
+
+    /**
+     * Fell into a pit or got cut off: after several failed paths, check whether the bell can be
+     * reached. If not, poof back to a free spot next to the bell.
+     */
+    private void rescue() {
+        int now = Bukkit.getCurrentTick();
+        if (now < rescueAfter) return;
+        rescueAfter = now + 600;
+        Town t = w.town();
+        if (t == null || t.bell.getWorld() != w.body.getWorld()) return;
+        if (PathFinder.find(w.body.getLocation(), t.bell.clone().add(0.5, 0, 0.5), 3) != null) {
+            fails = 0; // home is reachable: it's just this target
+            return;
+        }
+        Location spot = safeSpot(t.bell);
+        if (spot == null) return;
+        fails = 0;
+        Location from = w.body.getLocation();
+        from.getWorld().spawnParticle(org.bukkit.Particle.POOF, from.clone().add(0, 1, 0), 10, 0.3, 0.5, 0.3, 0.02);
+        spot.setYaw(from.getYaw());
+        w.body.teleport(spot, io.papermc.paper.entity.TeleportFlag.EntityState.RETAIN_PASSENGERS);
+        spot.getWorld().spawnParticle(org.bukkit.Particle.POOF, spot.clone().add(0, 1, 0), 10, 0.3, 0.5, 0.3, 0.02);
+        w.body.setFallDistance(0);
+        fall = 0;
+        lastPos = spot;
+        w.plugin.getLogger().info(w.name + " was stuck and got brought back to the bell.");
+    }
+
+    /** A spot near the bell with solid ground and two free blocks above. */
+    private static Location safeSpot(Location bell) {
+        World world = bell.getWorld();
+        for (int r = 1; r <= 4; r++) {
+            for (int dx = -r; dx <= r; dx++) {
+                for (int dz = -r; dz <= r; dz++) {
+                    if (Math.max(Math.abs(dx), Math.abs(dz)) != r) continue;
+                    int x = bell.getBlockX() + dx, z = bell.getBlockZ() + dz;
+                    for (int y = bell.getBlockY() + 3; y >= bell.getBlockY() - 4; y--) {
+                        Block feet = world.getBlockAt(x, y, z);
+                        Block ground = feet.getRelative(0, -1, 0);
+                        if (ground.isSolid() && !ground.isLiquid() && feet.isPassable() && !feet.isLiquid()
+                                && feet.getRelative(0, 1, 0).isPassable() && !feet.getRelative(0, 1, 0).isLiquid())
+                            return new Location(world, x + 0.5, y, z + 0.5);
+                    }
+                }
+            }
+        }
+        return null;
     }
 
     boolean moving() { return path != null; }
