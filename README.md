@@ -53,7 +53,7 @@ Hiring a wild villager turns it into a settler; dismissing a settler turns it ba
 
 ## Weather
 
-When it rains, settlers with nothing to do go inside. In a thunderstorm everyone (except guards) goes inside, even from work.
+When it rains, settlers with nothing to do go inside. In a thunderstorm everyone (except guards) goes under the nearest roof in the settlement, even from work. Rain: buildings with a door first (anywhere in the settlement).
 
 ## Free time
 

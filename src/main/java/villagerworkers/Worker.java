@@ -77,6 +77,11 @@ final class Worker {
     private int regenTimer, healthShown = -1, defenseCheck = 20, foodCheck = 100;
 
     int errorLoggedUntil;
+    /** Farmer: planting round (after a harvest round), and how much it harvested this round. */
+    boolean planting;
+    int harvestRound;
+    /** Don't look for shelter from the weather again before this tick (nothing found, or work called). */
+    int shelterAfter;
     /** What it harvested itself (only that may go into the composter; never things taken from storage). */
     final java.util.Map<Material, Integer> harvested = new java.util.HashMap<>();
     long ticks;               // diagnostics: how often tick() ran
@@ -396,6 +401,10 @@ final class Worker {
         }
     }
 
+    boolean torchShown() {
+        return torchShown;
+    }
+
     /** After a restart while the torch was shown: put the shield back. */
     private void restoreStoredShield() {
         org.bukkit.NamespacedKey key = new org.bukkit.NamespacedKey(plugin, "stored_shield");
@@ -563,7 +572,7 @@ final class Worker {
     }
 
     /** Work that can be done right now (day, or night if allowed), or null. */
-    private Activity workToDo() {
+    Activity workToDo() {
         Town t = town();
         if (t == null || job() == Job.NONE) return null;
         if (isNight() && !plugin.settings().workAtNight()) return null;

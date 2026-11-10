@@ -294,6 +294,20 @@ final class Defense {
      * it, like villagers). No such building: under a roof near the gathering spot. Null: nowhere.
      */
     static Location shelter(Worker w, Town t, java.util.Set<String> skip) {
+        return shelter(w, t, skip, false);
+    }
+
+    /**
+     * Where to go: {@code anyRoof} (thunder): the nearest spot with a block above the head, anywhere in
+     * the settlement. Otherwise: inside the nearest building (with a door) in the whole settlement, else
+     * a roofed spot close by.
+     */
+    static Location shelter(Worker w, Town t, java.util.Set<String> skip, boolean anyRoof) {
+        int townR = w.plugin.settings().townRadius();
+        if (anyRoof) {
+            Location roof = nearbyCover(w, skip, townR, false);
+            if (roof != null) return roof;
+        }
         Location best = null;
         double bestD = Double.MAX_VALUE;
         for (Location in : indoorSpots(w.plugin, t)) {
@@ -305,6 +319,10 @@ final class Defense {
             }
         }
         if (best != null) return spreadInside(w, best);
+
+        // No building with a door: a spot with a roof and walls (a shed), else just a roof.
+        Location near = nearbyCover(w, skip, townR, true);
+        if (near != null) return near;
 
         Location c = Seats.gatheringSpot(t, w.plugin.settings().socialRadius());
         if (c == null || c.getWorld() != w.body.getWorld()) c = t.bell;
@@ -325,6 +343,30 @@ final class Defense {
             }
         }
         return best; // null: nowhere to hide
+    }
+
+    /** Search around the settler (rings, nearest first) for cover: indoors first if asked, else the nearest roof. */
+    private static Location nearbyCover(Worker w, java.util.Set<String> skip, int maxR, boolean indoorFirst) {
+        Location me = w.body.getLocation();
+        World world = me.getWorld();
+        Location roof = null;
+        for (int r = 0; r <= maxR; r++) {
+            if (!indoorFirst && roof != null) return roof; // the nearest roof will do
+            for (int i = 0; i < Math.max(1, 8 * r); i += Math.max(1, r / 8)) {
+                double a = r == 0 ? 0 : Math.PI * 2 * i / (8.0 * r);
+                int x = (int) Math.floor(me.getX() + Math.cos(a) * r), z = (int) Math.floor(me.getZ() + Math.sin(a) * r);
+                if (!world.isChunkLoaded(x >> 4, z >> 4)) continue;
+                for (int y = me.getBlockY() + 3; y >= me.getBlockY() - 3; y--) {
+                    if (!PathFinder.walkable(world, x, y, z)) continue;
+                    Location l = new Location(world, x + 0.5, y, z + 0.5);
+                    if (skip.contains(Keys.ser(l))) break;
+                    if (indoorFirst && indoor(world, x, y, z)) return l;
+                    if (roof == null && roofed(world, x, y, z)) roof = l;
+                    break;
+                }
+            }
+        }
+        return roof;
     }
 
     /** A free spot a little further into the room, so not everyone stands on one block. */
@@ -352,7 +394,7 @@ final class Defense {
                 if (!world.isChunkLoaded(x >> 4, z >> 4)) continue;
                 for (int y = by - 8; y <= by + 8; y++) {
                     Block b = world.getBlockAt(x, y, z);
-                    if (!org.bukkit.Tag.WOODEN_DOORS.isTagged(b.getType())) continue;
+                    if (!Mover.handDoor(b.getType())) continue;
                     if (!(b.getBlockData() instanceof org.bukkit.block.data.type.Door door)
                             || door.getHalf() != org.bukkit.block.data.Bisected.Half.BOTTOM) continue;
                     org.bukkit.block.BlockFace f = door.getFacing();
@@ -390,7 +432,10 @@ final class Defense {
     }
 
     private static boolean roofed(World world, int x, int y, int z) {
-        for (int dy = 2; dy <= 6; dy++) if (world.getBlockAt(x, y + dy, z).getType().isOccluding()) return true;
+        for (int dy = 2; dy <= 8; dy++) {
+            Material m = world.getBlockAt(x, y + dy, z).getType();
+            if (m.isSolid() && !org.bukkit.Tag.LEAVES.isTagged(m)) return true; // a real roof (glass too), not a tree
+        }
         return false;
     }
 

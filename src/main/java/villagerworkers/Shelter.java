@@ -23,11 +23,6 @@ final class Shelter implements Activity {
         this.w = w;
         this.t = t;
         this.storm = storm;
-        if (w.random.nextInt(3) == 0) {
-            String line = storm ? "Thunder! Inside, quick!" : "Rain... let's get inside.";
-            Bubbles.say(w.plugin, w.body, line, 50);
-            Voice.speak(w, line);
-        }
     }
 
     /** Is it raining (or storming) on this settler? */
@@ -41,9 +36,13 @@ final class Shelter implements Activity {
     /** Check now and then: should this settler go inside? */
     static Activity check(Worker w, Town t) {
         if (w.guard || w.activity instanceof Shelter || w.activity instanceof Defense.Reaction || !exposed(w)) return null;
+        if (org.bukkit.Bukkit.getCurrentTick() < w.shelterAfter) return null;
         boolean thunder = w.body.getWorld().isThundering();
-        boolean idle = w.activity == null || w.activity.freeTime();
-        if (!thunder && !idle) return null; // just rain: work goes on
+        if (!thunder) {
+            // Just rain: only settlers with nothing to do at all go inside; work goes on in the rain.
+            boolean idle = w.activity == null || w.activity.freeTime();
+            if (!idle || w.workToDo() != null) return null;
+        }
         return new Shelter(w, t, thunder);
     }
 
@@ -54,9 +53,18 @@ final class Shelter implements Activity {
         if (!world.hasStorm() || (storm && !world.isThundering() && time > 200)) return true; // over
         if (spot == null || (w.mover.failed() && time % 20 == 0)) {
             if (spot != null) unreachable.add(Keys.ser(spot));
-            if (++tries > 4) return true; // nowhere to go: give up
-            spot = Defense.shelter(w, t, unreachable);
-            if (spot == null) return true;
+            Location next = ++tries > 4 ? null : Defense.shelter(w, t, unreachable, storm);
+            if (next == null) {
+                // Nowhere to go: carry on (and don't try again for a minute), no fuss.
+                w.shelterAfter = org.bukkit.Bukkit.getCurrentTick() + 1200;
+                return true;
+            }
+            if (spot == null && w.random.nextInt(3) == 0) {
+                String line = storm ? "Thunder! Inside, quick!" : "Rain... let's get inside.";
+                Bubbles.say(w.plugin, w.body, line, 50);
+                Voice.speak(w, line);
+            }
+            spot = next;
             w.mover.go(spot, 0.8, w.plugin.settings().workSpeed());
             return false;
         }
@@ -74,6 +82,8 @@ final class Shelter implements Activity {
     @Override
     public void stop() {
         w.mover.stop();
+        // Called away (work in the rain): don't go back in for a while.
+        if (w.body.getWorld().hasStorm()) w.shelterAfter = Math.max(w.shelterAfter, org.bukkit.Bukkit.getCurrentTick() + 1200);
     }
 
     @Override

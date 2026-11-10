@@ -119,6 +119,15 @@ final class TargetsMenu {
         String name = m.getKey().getKey();
         if (m == Material.SHIELD) return Component.empty(); // drawn as a 3D model, no flat texture
         if (m == Material.CROSSBOW) name = "crossbow_standby";
+        switch (m) { // blocks whose picture is not called after the block
+            case BAMBOO -> {
+                return Component.object(net.kyori.adventure.text.object.ObjectContents.sprite(
+                        net.kyori.adventure.key.Key.key("minecraft", "items"), net.kyori.adventure.key.Key.key("minecraft", "item/bamboo")));
+            }
+            case CACTUS, MELON, PUMPKIN -> name = name + "_side";
+            default -> {
+            }
+        }
         if (m.isBlock() && m.isSolid()) return Component.object(net.kyori.adventure.text.object.ObjectContents.sprite(
                 net.kyori.adventure.key.Key.key("minecraft", "blocks"), net.kyori.adventure.key.Key.key("minecraft", "block/" + name)));
         return Component.object(net.kyori.adventure.text.object.ObjectContents.sprite(

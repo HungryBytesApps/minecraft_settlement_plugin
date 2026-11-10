@@ -171,7 +171,7 @@ final class PathFinder {
 
     static boolean passable(Block b) {
         Material m = b.getType();
-        if (Tag.WOODEN_DOORS.isTagged(m) || Tag.FENCE_GATES.isTagged(m)) return true; // opened on the way
+        if (Mover.handDoor(m) || Tag.FENCE_GATES.isTagged(m)) return true; // opened on the way
         if (b.isLiquid()) return false;
         if (m == Material.FIRE || m == Material.SOUL_FIRE || m == Material.SWEET_BERRY_BUSH || m == Material.COBWEB
                 || m == Material.POWDER_SNOW || m == Material.WITHER_ROSE || m == Material.LAVA) return false;

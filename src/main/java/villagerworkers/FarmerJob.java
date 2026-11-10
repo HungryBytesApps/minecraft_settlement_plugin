@@ -113,29 +113,36 @@ final class FarmerJob {
             if (d != null) return d;
         }
 
-        // Harvest: what the settlement wants (or anything compostable, when composting is On).
+        // Work in rounds: harvest a batch, then plant the empty farmland, then harvest again. (A big field
+        // always has something ripening; without rounds the planting would never come.)
         boolean harvestForCompost = makeMeal && compost == Compost.ON;
         List<Block> land = Fields.farmland(t, radius);
+        Block empty = Work.nearestOf(w, land, f -> f.getType() == Material.FARMLAND && f.getRelative(BlockFace.UP).getType() == Material.AIR
+                && !w.isSkipped(f.getRelative(BlockFace.UP)));
+        Block spot = empty == null ? null : empty.getRelative(BlockFace.UP);
+        if (w.planting && spot != null) {
+            Activity p = plantOrFetch(w, t, empty, spot);
+            if (p != null) return p;
+        }
+        w.planting = false;
         if (!storageFull || harvestForCompost) {
             List<Block> candidates = new ArrayList<>();
             for (Block f : land) candidates.add(f.getRelative(BlockFace.UP));
             candidates.addAll(Fields.plants(t, radius));
-            Block ripe = Work.nearestOf(w, candidates, b -> harvestable(b) && wantsHarvest(t, b, radius, harvestForCompost));
+            Block ripe = w.harvestRound >= 24 ? null : Work.nearestOf(w, candidates, b -> harvestable(b) && wantsHarvest(t, b, radius, harvestForCompost));
             if (ripe != null) {
+                w.harvestRound++;
                 Work.claim(w, ripe);
                 return harvest(w, ripe);
             }
         }
-
-        // Plant the empty farmland (with what grew there before).
-        Block empty = Work.nearestOf(w, land, f -> f.getType() == Material.FARMLAND && f.getRelative(BlockFace.UP).getType() == Material.AIR
-                && !w.isSkipped(f.getRelative(BlockFace.UP)));
-        Block spot = empty == null ? null : empty.getRelative(BlockFace.UP);
+        // Batch harvested (or nothing ripe): now plant.
+        w.harvestRound = 0;
         if (spot != null) {
-            Work.claim(w, empty);
-            if (hasAnySeed(w)) return plant(w, spot);
-            Activity fetch = fetchSeeds(w, t, lastSeed.get(spot));
-            if (fetch != null) return fetch;
+            w.planting = true;
+            Activity p = plantOrFetch(w, t, empty, spot);
+            if (p != null) return p;
+            w.planting = false;
         }
 
         // Use bone meal (if switched on): only on crops the settlement still wants.
@@ -342,6 +349,12 @@ final class FarmerJob {
     }
 
     // ---- Planting ----
+
+    private static Activity plantOrFetch(Worker w, Town t, Block farmland, Block spot) {
+        Work.claim(w, farmland);
+        if (hasAnySeed(w)) return plant(w, spot);
+        return fetchSeeds(w, t, lastSeed.get(spot));
+    }
 
     private static boolean hasAnySeed(Worker w) {
         for (Material seed : CROP.keySet()) if (w.count(seed) > 0) return true;

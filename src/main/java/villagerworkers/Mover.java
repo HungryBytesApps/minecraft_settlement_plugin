@@ -2,6 +2,7 @@ package villagerworkers;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.SoundCategory;
 import org.bukkit.Tag;
 import org.bukkit.World;
@@ -113,19 +114,20 @@ final class Mover {
         // Step by step (Mannequins don't walk by themselves); the client smooths it into a walk.
         double nx = loc.getX(), nz = loc.getZ(), ny = loc.getY();
         float yaw = loc.getYaw();
-        boolean climbing = n[1] > ny + 0.01 && dist < 1.3;
+        double ty = floorY(v.getWorld(), n); // the real surface: half a block lower on a slab
+        boolean climbing = ty > ny + 0.01 && dist < 1.3;
         if (dist > 0.01 && !(climbing && dist < 0.95)) { // up a step: first up, then on (no walking into the block)
             double sp = Math.min(speed, dist);
             nx += dx / dist * sp;
             nz += dz / dist * sp;
             yaw = (float) Math.toDegrees(Math.atan2(-dx, dz));
         }
-        if (n[1] > ny + 0.01) {
-            if (dist < 1.3) ny = Math.min(n[1], ny + 0.25); // up a step, close to it
+        if (ty > ny + 0.01) {
+            if (dist < 1.3) ny = Math.min(ty, ny + 0.25); // up a step, close to it
             fall = 0;
         } else {
             // Down: stay on the edge until the body is past it, then drop (faster and faster, like falling).
-            double support = Math.max(n[1], supportY(v.getWorld(), nx, ny, nz));
+            double support = Math.max(ty, supportY(v.getWorld(), nx, ny, nz));
             if (ny > support + 0.001) {
                 fall = Math.min(0.6, fall + 0.08);
                 ny = Math.max(support, ny - fall);
@@ -156,6 +158,14 @@ final class Mover {
             stuckTicks = 0;
             lastPos = v.getLocation();
         }
+    }
+
+    /** Where the feet go on a path spot: on top of the block below it (a slab: half a block lower). */
+    private static double floorY(World w, int[] n) {
+        Block below = w.getBlockAt(n[0], n[1] - 1, n[2]);
+        if (below.isPassable()) return n[1];
+        double top = below.getBoundingBox().getMaxY();
+        return top < n[1] && top > n[1] - 1 ? top : n[1];
     }
 
     /** Top of whatever is under the body (its four corners), up to 3 blocks down. */
@@ -189,9 +199,14 @@ final class Mover {
         v.setRotation(yaw, Math.max(-60, Math.min(60, pitch)));
     }
 
+    /** A door you open by hand (wooden or copper, not iron). */
+    static boolean handDoor(Material m) {
+        return Tag.DOORS.isTagged(m) && m != Material.IRON_DOOR;
+    }
+
     private void openDoor(World world, int[] n) {
         Block b = world.getBlockAt(n[0], n[1], n[2]);
-        boolean door = Tag.WOODEN_DOORS.isTagged(b.getType());
+        boolean door = Mover.handDoor(b.getType());
         if (!door && !Tag.FENCE_GATES.isTagged(b.getType())) return;
         if (!(b.getBlockData() instanceof Openable o) || o.isOpen()) return;
         o.setOpen(true);
@@ -231,7 +246,7 @@ final class Mover {
             passingGate.remove(b);
             o.setOpen(false);
             b.setBlockData(o, true);
-            boolean door = Tag.WOODEN_DOORS.isTagged(b.getType());
+            boolean door = Mover.handDoor(b.getType());
             b.getWorld().playSound(b.getLocation().add(0.5, 0.5, 0.5),
                     door ? "minecraft:block.wooden_door.close" : "minecraft:block.fence_gate.close", SoundCategory.BLOCKS, 0.8f, 1f);
             it.remove();

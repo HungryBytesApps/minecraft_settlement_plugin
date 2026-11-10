@@ -649,17 +649,8 @@ final class Menus {
     // ---- Hire a wild villager ----
 
     static void hire(VillagerWorkersPlugin plugin, Player p, Villager v, Town t) {
-        Random rnd = new Random();
-        List<String> names = rnd.nextBoolean() ? plugin.settings().maleNames() : plugin.settings().femaleNames();
-        String suggestion = names.get(rnd.nextInt(names.size()));
-        DialogInput name = DialogInput.text("name", Component.text("Name")).initial(suggestion).maxLength(20).width(200).build();
-        ActionButton yes = ActionButton.create(Component.text("Hire", NamedTextColor.GREEN), null, 100,
-                click(plugin, (view, audience) -> {
-                    String chosen = view.getText("name");
-                    if (audience instanceof Player pl) Bukkit.getScheduler().runTask(plugin, () -> plugin.hire(pl, v, t, chosen));
-                }, ONCE));
+        ActionButton yes = button(plugin, "Hire", NamedTextColor.GREEN, "It becomes a settler of " + t.name, 100, pl -> plugin.hire(pl, v, t, null));
         ActionButton no = button(plugin, "Cancel", null, null, 100, pl -> {});
-        show(p, "Hire villager?", List.of(),
-                List.of(name), DialogType.confirmation(yes, no));
+        show(p, "Hire villager?", List.of(), List.of(), DialogType.confirmation(yes, no));
     }
 }
