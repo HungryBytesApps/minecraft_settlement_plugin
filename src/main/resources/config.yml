@@ -1,10 +1,15 @@
-# VillagerWorkers settings
+# Settlement plugin settings
 
 # ---- Settlements ----
 # Right-click a bell to create a settlement there. The settlement is a square around the bell,
-# this many blocks to every side (48 = a 97 x 97 square).
+# this many blocks to every side (48 = a 97 x 97 square). Change it per settlement with the
+# Radius slider at the bell (min/max below). Expansion bells add smaller squares.
 max-settlements-per-player: 1
 settlement-radius: 48
+settlement-radius-min: 16
+settlement-radius-max: 64
+expansion-radius-min: 4
+expansion-radius-max: 24
 max-settlers-per-settlement: 10
 
 # Keep settlements working while nobody is near: their chunks stay loaded, so settlers keep working,

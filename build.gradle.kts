@@ -2,7 +2,7 @@ plugins {
     java
 }
 
-group = "villagerworkers"
+group = "settlement"
 version = "1.0.0"
 
 repositories {

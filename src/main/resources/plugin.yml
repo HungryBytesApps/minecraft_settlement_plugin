@@ -1,14 +1,13 @@
-name: VillagerWorkers
+name: Settlement
 version: 1.0.0
-main: villagerworkers.VillagerWorkersPlugin
+main: settlement.SettlementPlugin
 api-version: '1.21'
-description: Create a settlement at a bell, recruit settlers who work (farming) and live their own lives.
+description: A settlement at a bell with settlers who work and live their own lives.
 permissions:
-  villagerworkers.admin:
+  settlement.admin:
     description: Manage anyone's workers and ignore the worker limit.
     default: op
 commands:
   settlers:
     description: Settler diagnostics. Look at a settler and type /settlers info
     usage: /settlers info
-    aliases: [vw]

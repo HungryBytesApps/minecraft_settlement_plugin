@@ -1,98 +1,152 @@
-# VillagerWorkers
+# Settlement plugin
 
-Build a settlement with settlers who work and live their own lives. Server-side only, no client mods.
+A settlement at a bell with settlers who work and live their own lives. Paper, server-side only.
+Private plugin: everything you need to know is in this file.
 
-## Creating a settlement
+## Permissions
 
-Right-click a **bell** → create a settlement. You get the **Settlement Ledger** (one per player).
-- **Bell menu** (the settlement's rules): recruit (gets more expensive per settler, `recruit-cost` tiers), rename, show border, auto assign jobs, use all chests, when attacked, settlers consumption (Off / Food only / Food & Potions), get a ledger, disband (all settlers drop their things and leave).
-- **Ledger menu** (running the settlement): settlers table (click a row for its menu), workstations, storage targets.
-The settlement border is shown with particles, only for you and only near you (`border-particle`, `work-area-particle` in the config).
-Bell menu → **Show border**: When holding ledger / On / Off.
+Everyone can use it, no permissions needed.
+- **Founder** (who created the settlement): everything.
+- **Members** (bell → Members): use the ledger (settlers, workstations, storage targets, chests, hiring
+  villagers) and settler menus, and get a ledger / notifications at the bell. Not: the other bell settings,
+  dismissing settlers, expansions. Members also get the settlement's notifications.
+- **Other players**: nothing; settlers just say hi.
+- `settlement.admin` (ops by default): everything everywhere, and ignores `max-settlements-per-player` and
+  `max-settlers-per-settlement`.
+
+## Starting a settlement
+
+Right-click a **bell** → create a settlement. The settlement is the square around the bell
+(`settlement-radius` blocks in every direction). You get the **Settlement Ledger** (one per player).
+
+### Size and shape
+- **Radius** (bell, founder): slider `settlement-radius-min` to `-max` (16–64), applied when you go back.
+- **Expansions**: place a bell inside the settlement and right-click it → Create expansion. It adds a square of
+  its own (radius `expansion-radius-min` to `-max`, 4–24) to make any shape. Right-click it again for its radius
+  or Remove expansion; breaking the bell removes it too.
+- Settlements never overlap: growing stops at a neighbour, and a new settlement near another one gets a smaller
+  radius (refused if not even the minimum fits).
+- Shrinking or removing is refused when a workstation with workers or an expansion bell would fall outside.
+- Everything follows the shape: border particles (outer edge only), patrols, fields, chests, loaded chunks, alarms.
+
+### Bell menu (the settlement's rules)
+- **Recruit settler**: costs items, more for every settler (`recruit-cost` tiers, `recruit-cost-increase`).
+  A new settler walks into the settlement.
+- **Rename**, **Radius**.
+- **Auto assign jobs** (off by default): settlers without a job take a free workstation by themselves.
+- **Use all chests**: On = settlers use every chest and barrel; Off = only the ones you allow with the ledger.
+- **When attacked**: Take cover or Call to arms (see Defense).
+- **Settlers consumption**: Off / Food only / Food & Potions (guards also drink healing potions in a fight).
+- **Get a ledger**.
+- **Notifications** (per player): which messages you get in the chat (under attack / all clear, missing
+  tools & weapons, storage full, settler died), whether the alarm bell rings, and **Show border**
+  (particles along the border: when holding the ledger / on / off).
+- **Members** and **Disband settlement** (founder only): all settlers drop their things and walk away.
+
+### The ledger
+Right-click with it:
+- a **chest or barrel**: may settlers put things in / take things out? **Private**: only you can open, change or
+  break it; settlers never use it (bell and ledger settings don't change that), hoppers can't take from it,
+  explosions don't break it. Stored on the chest itself, so it stays private even after disbanding.
+  Only its owner can place a chest next to it to make one big private chest; anyone else's chest stays separate.
+- a **workstation**: its menu (workers, in use, settings).
+- a **wild villager**: hire it. It walks to the settlement, or follows you when it's far away.
+- anything else: the ledger menu: **Settlers** (click a row for its menu), **Workstations**, **Storage targets**.
+
+Right-click one of your settlers (no ledger needed): its menu: rename, inventory (a chest window: take
+things out or put things in), worker / guard, guard settings, leave workplace, dismiss (drops its things
+and walks out of the settlement for good). While the menu is open it stops and looks at you.
+Other players' settlers just say hi.
+
+## Workstations
+
+Place one in the settlement. Ledger on it → **Workers (n)**: add as many settlers as you like (free settlers
+first, then ones with another job), ✖ takes one off. All workers work in the whole settlement and share
+the work. **In use** (checkbox) switches the workstation off without removing the workers.
+
+- **Composter – farmer**: first harvests everything ripe, then replants. Wheat, carrots, potatoes, beetroot,
+  melons and pumpkins (from stems), sugar cane, cactus and bamboo (bottom piece stays), sweet berries, cocoa.
+  Replants with the same seed as before (or a neighbour's). Fetches seeds from storage.
+  Melon blocks from slices when you set a melon block target.
+  - **Make compost**: Off / On / Overflow only (only its own harvest, never things from storage) → bone meal.
+  - **Use bone meal**: on crops that are still needed.
+- **Smoker – cook**: cooks raw food. **Blast furnace – smelter**: ores and raw metal.
+- **Furnace – furnace worker**: only what smokers and blast furnaces can't do (stone types, glass, bricks,
+  dyes, charcoal…) and **only what you set a storage target for**.
+- Furnace jobs fetch fuel from storage (coal, charcoal, wood).
+- **Loom – herder**: per kind of animal a checkbox and **Adults** (2–20): breeds up to that number with food
+  from storage and slaughters the extra adults. Unchecked kinds are left alone (no breeding, no killing).
+  Shears sheep (shears from storage), collects drops and eggs, closes gates behind it, climbs over a fence
+  with a carpet on top. **Throw eggs**: throws spare eggs into the chicken pen for chicks, only when there are
+  fewer chickens than wanted and the eggs' storage target is reached (no egg target = no throwing).
+- **Fletching table – lumberjack**: fells real trees (logs on dirt with natural leaves) with an axe from
+  storage, inside or outside the settlement (toggle). **Replant saplings** On/Off.
+- **Smithing table – smith**: weapons, armor, bows and arrows, **only what you set a storage target for**.
+
+Tools wear out (axes per log, shears per sheep, weapons per hit, bows per shot, shields per blocked hit;
+Unbreaking helps). Missing tool → a chat message (at most every 5 minutes per settler).
+
+## Storage and targets
+
+- Harvests go to an allowed chest that already holds that item, otherwise the nearest one with room.
+- No room: settlers keep things in their pockets (9 slots), stop, and you get a message.
+- Ledger → **Storage targets**: per workstation its products with −64/−16/+16/+64 and ∞.
+  - No target = ∞ (keep making it), 0 = don't keep any.
+  - Smith and furnace worker: no target or 0 = don't make it.
+  - Settlers stop making a product when storage holds the target. Farmers keep replanting.
 
 ## Settlers
 
-- **Recruit** at the bell (price in `recruit-cost`): a new settler walks into the settlement.
-- Or **hire** a wild villager: right-click it with the ledger. If it's far away, it follows you when you're near.
-- Right-click your settler: its menu (others just say hi) (rename, skin, inventory as a chest window, role worker/guard, guard settings, leave workplace, dismiss).
+- Player-like (Mannequins). Above them "Name [Job]" (health when hurt), under it what they're doing.
+- Names from `names-male` / `names-female`; rename in the settler menu.
+- **Skins**: 8 people (4 men, 4 women), each with an outfit per job (`settler-skins: true`).
+  A settler is always the same person; the outfit follows the job. The images are in the server resource
+  pack: `assets/settlers/textures/skins/<person>_<outfit>.png` (outfits: settler, farmer, cook, smelter,
+  furnace_worker, herder, lumberjack, smith, guard). Women use slim arms. Players without the pack see a
+  missing texture. `job-skins` in the config overrides a job; `settler-skins: false` uses `skins`.
+- They heal slowly (`regen-seconds`) and eat from storage below `eat-below-health-percent` (if consumption allows).
+- Players can't hurt them. Monsters can; when they die they drop everything.
+- A settler that falls somewhere it can't get out of is brought back to the bell (poof).
 
-## Workplaces
+### Free time
+Conversations of 2–3 settlers (128 stories built in, add your own in `my-conversations.yml`) with a
+mumbling voice (`talk-sounds`, `voice-sound`), music bands of 2–5 playing real old songs, putting on a record
+from storage at a jukebox, reading, walks, pottering around the workplace, visiting someone at work.
+Evening: together at the spot with the most seats close together (stairs, slabs, carpets; a campfire counts
+extra), or at the bell. `sit-height` if they sit too high or low.
 
-Place a workplace block in the settlement and add as many settlers as you like (they all work in the whole settlement and share the work) (ledger on it → Choose settler), or turn on "Free settlers take jobs" at the bell. Ledger on it: its settings (sliders apply when you close the window).
-- **Composter** – farmer: harvests (all ripe crops first), then replants all farmland in the settlement with the same crop. Also melons and pumpkins from stems, sugar cane, cactus and bamboo (keeps the bottom piece), sweet berries and cocoa. Makes melon blocks from slices when you set a melon target. Make compost: Off / On / Overflow only (only its own harvest, never things from storage). Use bone meal: On/Off (only on crops still needed).
-- **Smoker** – cook, **Blast furnace** – smelter, **Furnace** – furnace worker (choose: food, ores, stone & building, other):
-  fetch things to cook/smelt and fuel (coal, charcoal, wood) from storage, collect the results.
-- **Loom** – herder (shuts gates right behind it; can climb over a fence with a carpet on top): keeps each kind of animal in its area at its own herd size (set per kind; 0 = leave alone): breeds with food from storage, slaughters the extra adults,
-  shears sheep (shears from storage), throws eggs into the chickens' pen for chicks, brings meat, wool, leather, eggs and feathers to storage.
-- **Fletching table** – lumberjack: fells real trees (logs on dirt with natural leaves) inside the settlement or just outside it (toggle), with an axe from storage, replants saplings.
-- **Smithing table** – smith: makes weapons, armor, bows and arrows from storage materials, only what you ask for
-  (What to make: how many to keep in stock, 0 = don't make).
-
-## Storage
-
-Settlers use the chests and barrels in the settlement (on by default, `chests-allowed-by-default`).
-- Ledger on a chest: allow/deny putting things in and taking things out.
-- Ledger menu: **Use all chests: On/Off**.
-- Harvests go to an allowed chest that already holds that item, otherwise the nearest one with space.
-- Farmers fetch seeds from storage when they run out.
-- No room left: settlers keep the goods in their pockets (9 slots), stop harvesting and you get a message (at most every 5 minutes).
-
-## Storage targets
-
-Ledger menu → **Storage targets**: per workstation, its products in alphabetical order (icon, in storage / target). Click one to change its target with −/+ buttons.
-No limit by default (keep producing). Settlers stop making a product once storage holds the target (farmers keep replanting).
-
-## Settlers
-
-Settlers are player-like (Mannequins): their own skin (`skins` in the config), with a name that fits it (`names-male`, `names-female`, `skin-gender`), their job under their name,
-and only tools they really carry in hand. Look at a settler and it looks back at you. They turn their heads smoothly, glance around, nod while chatting, crouch to work the fields, really eat, draw their bows and blow their horns. Old villager settlers are converted automatically.
-Skins per job: `job-skins` in the config (url:/value: from mineskin.org, texture: from a resource pack, or player:Name).
-Own skins: put them in the server resource pack and add `texture:namespace:path/to/skin` (or `...:slim`) to `skins` in the config.
-Hiring a wild villager turns it into a settler; dismissing a settler makes it drop its things and walk out of the settlement for good.
-
-## Weather
-
-When it rains, settlers with nothing to do go inside. In a thunderstorm everyone (except guards) goes under the nearest roof in the settlement, even from work. Rain: buildings with a door first (anywhere in the settlement).
-
-## Free time
-
-During the day: conversations of 2 or 3 settlers telling little stories (128 built in, add your own in `my-conversations.yml`), with a mumbling voice per settler (`talk-sounds`, `voice-sound`), pottering around their workplace, walks, reading (on a bench or standing), making music together,
-visiting someone at work, sitting down, looking around.
-
-In the evening everyone gets together at the gathering spot: the place in the settlement with the most seats
-close together (stairs, bottom slabs, cushions; a campfire nearby counts extra), or the bell. They sit, talk,
-play music and read until morning. Tune `sit-height` if they sit too high or low.
+### Weather
+Rain: settlers with nothing to do go inside (buildings with a door first). Thunder: everyone except guards
+goes under a real roof. They close the doors behind them.
 
 ## Guards and defense
 
-Settler menu → **Role: Guard**. Guards take the best weapon, armor, a bow and arrows (`arrows-to-carry`) only from chests
-settlers may take from. No weapon there → a warning, and "no weapon!" in the settlers list.
-- **Stance**: Defensive (stays at its post, fights mobs within its radius, default `guard-radius` 16; set with
-  **Set post here** and **Guard radius**), Patrol (walks mostly along the inside of the border, sometimes through the middle),
-  Escort (follows you inside the settlement).
-- **Weapon**: Auto, Melee or Archer. Archers get arrows as soon as they run out; others refill only after a fight.
-- A guard that gets hit goes after its attacker. Guards keep guarding at night.
+Settler menu → **Role: Guard**. Guards take the best weapon, armor, shield, bow and arrows (`arrows-to-carry`)
+from chests settlers may take from, and pick up loot after a fight.
+- **Stance**: Defensive (stays at its post: **Set post here**, **Guard radius**, default `guard-radius`) or
+  Patrol (walks along the border).
+- **Weapon**: Auto (bow at range, melee up close), Melee or Archer.
+- Creepers: knocked back, and guards run 9+ blocks away when one hisses.
+- A monster that can't be reached for a while is ignored (it doesn't keep the alarm going forever).
 
-Hostile mobs in the settlement ring the bell and you get a message. Other settlers react as set in the ledger:
-**Take cover** (run into the nearest building with a door and close it behind them; otherwise under a roof near the gathering spot; nowhere to hide: they run around the settlement, away from the monsters) or **Call to arms** (borrow a weapon from storage, fight, bring it back;
-no weapon → take cover).
+Monsters in the settlement ring the bell. Other settlers **Take cover** (into a building with a door, doors
+closed) or with **Call to arms** borrow a weapon from storage, fight, and bring it back.
 
-All settlers can be hurt and die, but never by players. They heal slowly (`regen-seconds`) and eat food from storage
-below `eat-below-health-percent` if **Settlers may eat** is on; guards eat first. **Guards use potions** (off by default):
-guards carry and drink healing potions in a fight. Health shows under the name when hurt (red when below half) and in the
-settlers list. Dead settlers drop what they carried and wore.
+## Other config
+
+`keep-settlements-loaded` (true): the settlement's chunks stay loaded so it keeps working while you're away.
+`border-particle`, `show-names`, `work-speed`, `walk-speed`, `work-at-night`, `seeds-to-keep`, `chat-lines`.
+
+## Command and logs
+
+`/settlers info`: build number and diagnostics of the settler you look at.
+The console shows the build at startup. Errors are logged with their stack trace, at most once a minute per
+settler or task, so one broken settler never stops the others.
+
+## Data
+
+`plugins/Settlement/`: `config.yml`, `towns.yml` (settlements), `my-conversations.yml`.
 
 ## Build the jar
 
-Push to GitHub: the workflow builds it under Actions → Artifacts.
-
-
-Above each settler: its name and job, e.g. "Emma [Farmer]" (and health when hurt), under it what it's doing. Rename it in its menu.
-
-Tools wear out: axes per log, shears per sheep, swords per hit, bows per shot, shields per blocked hit (Unbreaking helps).
-Right-click a settler: it stops and turns to you while its menu is open, then carries on.
-Workstations: Workers (n) lists who works there (✖ takes one off), with Add worker on top. Lumberjack: Replant saplings On/Off.
-Music: bands of 2 to 5 play real old songs (melody, bass, drums, octaves). Jukebox: settlers put on a record from storage, listen, and put it away after.
-Taking cover or sheltering from the weather: they shut the doors behind them.
-
-Settlements keep working while you're away (`keep-settlements-loaded: true` in the config): their chunks stay loaded, so settlers work, crops grow and furnaces burn. Set it to false to let them pause when nobody is near.
+Upload `src` to GitHub: the workflow builds it under Actions → Artifacts.
