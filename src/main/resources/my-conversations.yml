@@ -1,0 +1,16 @@
+# Your own conversations for settlers (on top of the built-in ones). Each is for 2 or 3 settlers.
+# A line starts with who says it (0, 1 or 2), then a colon. Restart the server after editing.
+# Placeholders: {0} {1} {2} = the names of the settlers talking, {job0} {job1} {job2} = their jobs,
+# {other} = another settler of the settlement, {town} = the settlement, {owner} = its owner,
+# {item} and {count} = something in storage and how much of it there is.
+#
+# Example (remove the # in front of the lines to use it):
+#
+# conversations:
+#   - people: 2
+#     lines:
+#       - "0: Hey {1}, have you seen my hat?"
+#       - "1: It's on your head, {0}."
+#       - "0: My OTHER hat."
+
+conversations: []

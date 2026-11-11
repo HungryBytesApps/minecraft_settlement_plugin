@@ -31,7 +31,8 @@ Right-click a **bell** → create a settlement. The settlement is the square aro
 
 ### Bell menu (the settlement's rules)
 - **Recruit settler**: costs items, more for every settler (`recruit-cost` tiers, `recruit-cost-increase`).
-  A new settler walks into the settlement.
+  A new settler (or a hired villager) walks to the bell and waits there for instructions (`newcomer-wait-seconds`, default 180),
+  or until you give it a job or make it a guard; then it goes about its free time.
 - **Rename**, **Radius**.
 - **Auto assign jobs** (off by default): settlers without a job take a free workstation by themselves.
 - **Use all chests**: On = settlers use every chest and barrel; Off = only the ones you allow with the ledger.
@@ -39,14 +40,18 @@ Right-click a **bell** → create a settlement. The settlement is the square aro
 - **Settlers consumption**: Off / Food only / Food & Potions (guards also drink healing potions in a fight).
 - **Get a ledger**.
 - **Notifications** (per player): which messages you get in the chat (under attack / all clear, missing
-  tools & weapons, storage full, settler died), whether the alarm bell rings, and **Show border**
-  (particles along the border: when holding the ledger / on / off).
+  tools & weapons, storage full, settler died) and whether the alarm bell rings.
+- **Show border** (per player): particles along the border: when holding the ledger / on / off.
 - **Members** and **Disband settlement** (founder only): all settlers drop their things and walk away.
 
 ### The ledger
 Right-click with it:
-- a **chest or barrel**: may settlers put things in / take things out? **Private**: only you can open, change or
-  break it; settlers never use it (bell and ledger settings don't change that), hoppers can't take from it,
+- a **chest or barrel**: may settlers put things in / take things out? **Filter**: Off / Prefer (the chosen
+  items go here first, others may too) / Only (nothing else goes in); **Filter items**: pick a group and click
+  item icons. Settlers store an item in a chest whose filter lists it first, then where it already is, then
+  anywhere. Taking: from every allowed chest.
+   **Private**: only you can open, change or
+  break it (ops with `settlement.admin` can open it too); settlers never use it (bell and ledger settings don't change that), hoppers can't take from it,
   explosions don't break it. Stored on the chest itself, so it stays private even after disbanding.
   Only its owner can place a chest next to it to make one big private chest; anyone else's chest stays separate.
 - a **workstation**: its menu (workers, in use, settings).
@@ -67,17 +72,23 @@ the work. **In use** (checkbox) switches the workstation off without removing th
 - **Composter – farmer**: first harvests everything ripe, then replants. Wheat, carrots, potatoes, beetroot,
   melons and pumpkins (from stems), sugar cane, cactus and bamboo (bottom piece stays), sweet berries, cocoa.
   Replants with the same seed as before (or a neighbour's). Fetches seeds from storage.
-  Melon blocks from slices when you set a melon block target.
+  Melon blocks from slices when you set a melon block target. Nether wart on soul sand.
   - **Make compost**: Off / On / Overflow only (only its own harvest, never things from storage) → bone meal.
   - **Use bone meal**: on crops that are still needed.
-- **Smoker – cook**: cooks raw food. **Blast furnace – smelter**: ores and raw metal.
+- **Smoker – cook**: cooks raw food, and makes crafting-table food by storage target (no target = don't make):
+  bread, cookies, cake (the buckets go back), pumpkin pie, mushroom stew, beetroot soup, rabbit stew. Sugar and
+  bowls it makes itself (bowls only when there are none in storage); milk it asks the herder for.
+- **Blast furnace – smelter**: ores and raw metal.
 - **Furnace – furnace worker**: only what smokers and blast furnaces can't do (stone types, glass, bricks,
   dyes, charcoal…) and **only what you set a storage target for**.
 - Furnace jobs fetch fuel from storage (coal, charcoal, wood).
 - **Loom – herder**: per kind of animal a checkbox and **Adults** (2–20): breeds up to that number with food
   from storage and slaughters the extra adults. Unchecked kinds are left alone (no breeding, no killing).
   Shears sheep (shears from storage), collects drops and eggs, closes gates behind it, climbs over a fence
-  with a carpet on top. **Throw eggs**: throws spare eggs into the chicken pen for chicks, only when there are
+  with a carpet on top. **Bees** (On): harvests full beehives and bee nests, honey with a glass
+  bottle (made from glass) and honeycomb with shears, by storage target; it lights a campfire under the hive for a
+  moment first (free, players can't use or break it). A hive without room for one is left alone (notification
+  "Beehive needs room for a campfire"). Milks a cow when someone asks for milk. **Throw eggs**: throws spare eggs into the chicken pen for chicks, only when there are
   fewer chickens than wanted and the eggs' storage target is reached (no egg target = no throwing).
 - **Fletching table – lumberjack**: fells real trees (logs on dirt with natural leaves) with an axe from
   storage, inside or outside the settlement (toggle). **Replant saplings** On/Off.
@@ -85,6 +96,15 @@ the work. **In use** (checkbox) switches the workstation off without removing th
 
 Tools wear out (axes per log, shears per sheep, weapons per hit, bows per shot, shields per blocked hit;
 Unbreaking helps). Missing tool → a chat message (at most every 5 minutes per settler).
+
+## Asking each other
+
+A settler that needs an ingredient another job makes (glass from the furnace worker, gold ingots from the
+smelter, milk from the herder...) walks over and asks for it, then waits. The other makes just enough, whatever
+the storage targets say, walks over and hands it over (the item goes from hand to hand), "Here you go",
+"Thanks". If it can't (nothing to make it from), it says sorry and they don't ask again for 2 minutes.
+Ingredients never need storage targets: sugar, glass bottles, bowls, planks, blaze powder, gold nuggets and the
+like are made by whoever needs them.
 
 ## Storage and targets
 
