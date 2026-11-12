@@ -183,6 +183,21 @@ final class WorkerListener implements Listener {
         if (Worker.isWorker(e.getRightClicked())) onClickVillager(e);
     }
 
+    /** A player right-clicks a settler (or the fake fisher in its place): its menu, or a greeting. */
+    static void clickSettler(SettlementPlugin plugin, Player p, Worker w) {
+        if (w.leaving) return; // dismissed and on its way out
+        if (w.canManage(p)) { // your own settler: its menu (no ledger needed)
+            w.pauseFor(p, 1200); // waits while you're in its menu
+            Menus.settler(plugin, p, w);
+        } else {
+            w.pauseFor(p, 60);
+            String hi = GREETINGS.get(w.random.nextInt(GREETINGS.size()));
+            Bubbles.say(plugin, w.body, hi, 40);
+            Voice.speak(w, hi);
+            w.anim.look(p.getEyeLocation());
+        }
+    }
+
     @EventHandler(priority = EventPriority.HIGH)
     public void onClickVillager(PlayerInteractEntityEvent e) {
         if (e.getHand() != EquipmentSlot.HAND) return;
@@ -204,17 +219,7 @@ final class WorkerListener implements Listener {
         }
         if (w != null) {
             e.setCancelled(true);
-            if (w.leaving) return; // dismissed and on its way out
-            if (w.canManage(p)) { // your own settler: its menu (no ledger needed)
-                w.pauseFor(p, 1200); // waits while you're in its menu
-                Menus.settler(plugin, p, w);
-            } else {
-                w.pauseFor(p, 60);
-                String hi = GREETINGS.get(w.random.nextInt(GREETINGS.size()));
-                Bubbles.say(plugin, w.body, hi, 40);
-                Voice.speak(w, hi);
-                w.anim.look(p.getEyeLocation());
-            }
+            clickSettler(plugin, p, w);
             return;
         }
         if (!(e.getRightClicked() instanceof Villager v)) return;

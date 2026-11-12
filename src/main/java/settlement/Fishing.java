@@ -79,8 +79,7 @@ final class Fishing implements Listener {
         for (int dx = -2; dx <= 2; dx++) {
             for (int dz = -2; dz <= 2; dz++) {
                 for (int dy = -1; dy <= 0; dy++) {
-                    Block b = water.getRelative(dx, dy, dz);
-                    if (b.getType() != Material.WATER || !(b.getBlockData() instanceof Levelled l) || l.getLevel() != 0) return false;
+                    if (!stillWater(water.getRelative(dx, dy, dz))) return false;
                 }
                 Material above = water.getRelative(dx, 1, dz).getType();
                 if (!above.isAir() && above != Material.LILY_PAD) return false;
@@ -89,9 +88,42 @@ final class Fishing implements Listener {
         return true;
     }
 
+    /** Still water like vanilla counts it: a water source, also with seagrass or kelp in it, or a bubble column. */
+    private static boolean stillWater(Block b) {
+        switch (b.getType()) {
+            case SEAGRASS, TALL_SEAGRASS, KELP, KELP_PLANT, BUBBLE_COLUMN -> {
+                return true;
+            }
+            case WATER -> {
+                return b.getBlockData() instanceof Levelled l && l.getLevel() == 0;
+            }
+            default -> {
+                return b.getBlockData() instanceof org.bukkit.block.data.Waterlogged wl && wl.isWaterlogged() && b.isPassable();
+            }
+        }
+    }
+
+    /** Open water anywhere the fishers of this barrel can cast (within 7 blocks of it, from the shore out). */
     static boolean anyOpen(Block barrel) {
-        for (Block w : waterNear(barrel)) if (open(w)) return true;
+        for (Block w : waterAround(barrel)) if (open(w)) return true;
         return false;
+    }
+
+    /** The water surface (water with air above) within 7 blocks of the barrel. */
+    private static List<Block> waterAround(Block barrel) {
+        List<Block> out = new ArrayList<>();
+        for (int dx = -7; dx <= 7; dx++) {
+            for (int dz = -7; dz <= 7; dz++) {
+                for (int dy = 1; dy >= -3; dy--) {
+                    Block b = barrel.getRelative(dx, dy, dz);
+                    if (b.getType() == Material.WATER && b.getRelative(BlockFace.UP).getType().isAir()) {
+                        out.add(b);
+                        break;
+                    }
+                }
+            }
+        }
+        return out;
     }
 
     // ---- What it keeps ----
@@ -421,6 +453,9 @@ final class Fishing implements Listener {
                     List<Block> targets = castTargets(w.body.getLocation());
                     if (targets.isEmpty()) targets = waterNear(barrel);
                     if (targets.isEmpty()) return true;
+                    List<Block> open = new ArrayList<>();
+                    for (Block b : targets) if (open(b)) open.add(b);
+                    if (!open.isEmpty()) targets = open; // casts into open water when it can reach it (treasure)
                     water = targets.get(w.random.nextInt(targets.size()));
                     phase = 1;
                     time = 0;
@@ -758,15 +793,70 @@ final class Fishing implements Listener {
         if (!(e.getPlayer() instanceof Player p) || !(e.getInventory().getHolder(false) instanceof Barrel b)) return;
         Town t = plugin.towns().at(b.getLocation());
         if (t == null || !t.fishersBarrel(b.getBlock())) return; // no fisher works here: a normal barrel
+        if (b.getBlock().equals(viewing.get(p.getUniqueId()))) return; // opened from the workstation menu: take only
         e.setCancelled(true);
-        p.sendActionBar(Component.text("This is the fisher's barrel.", NamedTextColor.YELLOW));
+        p.sendActionBar(Component.text("This is the fisher's barrel. Open it from its workstation menu.", NamedTextColor.YELLOW));
+    }
+
+    /** Players looking into a fisher's barrel from its workstation menu: they may only take things out. */
+    private static final Map<UUID, Block> viewing = new HashMap<>();
+
+    /** "Barrel contents" in the workstation menu (founder and members): take the catch out, put nothing in. */
+    static void openBarrel(SettlementPlugin plugin, Player p, Town t, Town.Workplace wp) {
+        Block b = wp.loc.getBlock();
+        if (!(b.getState(false) instanceof Barrel br) || !t.canManage(p)) return;
+        viewing.put(p.getUniqueId(), b);
+        p.openInventory(br.getInventory());
+        if (!(p.getOpenInventory().getTopInventory().getHolder(false) instanceof Barrel)) viewing.remove(p.getUniqueId());
+    }
+
+    private static boolean takeOnly(org.bukkit.inventory.InventoryView view, org.bukkit.entity.HumanEntity who) {
+        Block b = viewing.get(who.getUniqueId());
+        return b != null && view.getTopInventory().getHolder(false) instanceof Barrel br && br.getBlock().equals(b);
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
+    public void onBarrelClick(org.bukkit.event.inventory.InventoryClickEvent e) {
+        if (!takeOnly(e.getView(), e.getWhoClicked())) return;
+        boolean top = e.getRawSlot() >= 0 && e.getRawSlot() < e.getView().getTopInventory().getSize();
+        switch (e.getAction()) {
+            case PICKUP_ALL, PICKUP_HALF, PICKUP_ONE, PICKUP_SOME, DROP_ALL_SLOT, DROP_ONE_SLOT, DROP_ALL_CURSOR, DROP_ONE_CURSOR,
+                 COLLECT_TO_CURSOR, NOTHING, CLONE_STACK -> {
+                return; // taking out, or nothing goes in
+            }
+            case MOVE_TO_OTHER_INVENTORY -> {
+                if (top) return; // shift-click out of the barrel
+            }
+            case PLACE_ALL, PLACE_ONE, PLACE_SOME, SWAP_WITH_CURSOR -> {
+                if (!top) return; // in their own inventory
+            }
+            default -> {
+                if (!top) return; // number keys and such in their own inventory
+            }
+        }
+        e.setCancelled(true);
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
+    public void onBarrelDrag(org.bukkit.event.inventory.InventoryDragEvent e) {
+        if (!takeOnly(e.getView(), e.getWhoClicked())) return;
+        int size = e.getView().getTopInventory().getSize();
+        for (int slot : e.getRawSlots()) {
+            if (slot < size) {
+                e.setCancelled(true);
+                return;
+            }
+        }
     }
 
     /** A barrel with a pile on its lid that a player looked into: the pile follows what's in it (gone without a fisher). */
     @EventHandler
     public void onClose(org.bukkit.event.inventory.InventoryCloseEvent e) {
-        if (!(e.getInventory().getHolder(false) instanceof Barrel b) || !shown.containsKey(b.getBlock())) return;
+        if (!(e.getInventory().getHolder(false) instanceof Barrel b)) return;
+        if (b.getBlock().equals(viewing.get(e.getPlayer().getUniqueId()))) viewing.remove(e.getPlayer().getUniqueId());
         Town t = plugin.towns().at(b.getLocation());
+        if (t != null) t.countsChanged(); // a player may have taken things out
+        if (!shown.containsKey(b.getBlock())) return;
         if (t != null && t.fishersBarrel(b.getBlock())) pile(b.getBlock());
         else clearPile(b.getBlock());
     }

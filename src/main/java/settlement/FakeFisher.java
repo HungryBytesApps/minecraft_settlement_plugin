@@ -69,6 +69,34 @@ final class FakeFisher {
         return f;
     }
 
+    /** Fake player entity id → its fake (read on the network thread). */
+    private static final Map<Integer, FakeFisher> byId = new java.util.concurrent.ConcurrentHashMap<>();
+    private static com.github.retrooper.packetevents.event.PacketListenerCommon listener;
+
+    /** Right-clicking the fake works like right-clicking the settler. */
+    static void listen(SettlementPlugin plugin) {
+        listener = PacketEvents.getAPI().getEventManager().registerListener(new com.github.retrooper.packetevents.event.PacketListener() {
+            @Override
+            public void onPacketReceive(com.github.retrooper.packetevents.event.PacketReceiveEvent e) {
+                if (e.getPacketType() != com.github.retrooper.packetevents.protocol.packettype.PacketType.Play.Client.INTERACT_ENTITY) return;
+                com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientInteractEntity pk =
+                        new com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientInteractEntity(e);
+                FakeFisher f = byId.get(pk.getEntityId());
+                if (f == null || pk.getHand() != com.github.retrooper.packetevents.protocol.player.InteractionHand.MAIN_HAND) return;
+                Object who = e.getPlayer();
+                if (!(who instanceof Player p)) return;
+                Bukkit.getScheduler().runTask(plugin, () -> {
+                    if (p.isOnline() && f.w.body.isValid()) WorkerListener.clickSettler(plugin, p, f.w);
+                });
+            }
+        }, com.github.retrooper.packetevents.event.PacketListenerPriority.NORMAL);
+    }
+
+    static void unlisten() {
+        if (listener != null) PacketEvents.getAPI().getEventManager().unregisterListener(listener);
+        listener = null;
+    }
+
     /** Server stopping / plugin reload: every settler back for everyone. */
     static void removeAll() {
         for (FakeFisher f : new ArrayList<>(active.values())) f.remove();
@@ -92,6 +120,7 @@ final class FakeFisher {
         this.at = w.body.getLocation();
         this.yaw = at.getYaw();
         this.pitch = at.getPitch();
+        byId.put(id, this);
         update();
     }
 
@@ -290,6 +319,7 @@ final class FakeFisher {
     void remove() {
         if (removed) return;
         removed = true;
+        byId.remove(id);
         for (UUID v : viewers) {
             Player p = Bukkit.getPlayer(v);
             if (p != null) hideFrom(p);

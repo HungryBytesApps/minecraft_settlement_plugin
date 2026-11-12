@@ -557,7 +557,7 @@ final class Menus {
         if (job.usesArea) body.add(line("Works in the whole settlement.", NamedTextColor.DARK_GRAY));
         if (job == Worker.Job.HERDER) body.add(line("Adults to keep per animal: breeds up to it, slaughters the rest. Unchecked: left alone.", NamedTextColor.GRAY));
         if (job == Worker.Job.FISHER) body.add(line(Fishing.anyOpen(wp.loc.getBlock())
-                ? "Open water: fish, junk and treasure." : "Not open water (needs 5x5, 2 deep, nothing on top): fish and junk, no treasure.", NamedTextColor.GRAY));
+                ? "Open water: fish, junk and treasure." : "No open water within 7 blocks (needs 5x5, 2 deep, nothing on top): fish and junk, no treasure.", NamedTextColor.GRAY));
         if (job == Worker.Job.BREWER) body.add(line("Brews the potions you set targets for (Storage targets). Needs water nearby.", NamedTextColor.GRAY));
 
         // Sliders: applied when you click any button or close the window (no Save button).
@@ -657,6 +657,8 @@ final class Menus {
             for (Material m : Fishing.JUNK) if (Fishing.keepJunk(wp, m)) kept++;
             buttons.add(wbutton(plugin, apply, "Junk filter (" + kept + " kept)", NamedTextColor.WHITE, "Which junk the fisher keeps; the rest goes back into the water", w,
                     pl -> Fishing.junkMenu(plugin, pl, t, wp)));
+            if (!wp.workers.isEmpty()) buttons.add(wbutton(plugin, apply, "Barrel contents", NamedTextColor.WHITE,
+                    "See the catch and take things out (only the fisher puts things in)", w, pl -> Fishing.openBarrel(plugin, pl, t, wp)));
             // Without a fisher it's a normal barrel, with the settings of a chest.
             if (wp.workers.isEmpty()) buttons.add(wbutton(plugin, apply, "Chest settings", NamedTextColor.WHITE,
                     "Nobody fishes here, so this is a normal barrel: its storage settings", w, pl -> openChest(plugin, pl, t, wp.loc.getBlock(), x -> showWorkplace(plugin, x, t, wp))));

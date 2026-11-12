@@ -51,6 +51,7 @@ public final class SettlementPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new Campfires(), this);
         getServer().getPluginManager().registerEvents(new Fishing(this), this);
         FisherSkins.load(this); // the fisher skins from MineSkin (once, then from the cache)
+        if (Fishing.realLook()) FakeFisher.listen(this); // clicks on the fake fisher reach the settler
 
         for (World w : getServer().getWorlds()) {
             for (Mannequin m : w.getEntitiesByClass(Mannequin.class)) {
@@ -94,7 +95,7 @@ public final class SettlementPlugin extends JavaPlugin {
     }
 
     /** Changes with every version I send, to check the right jar is installed. */
-    static final String BUILD = "2026-11-12 #77";
+    static final String BUILD = "2026-11-12 #80";
 
     @Override
     public boolean onCommand(org.bukkit.command.CommandSender sender, org.bukkit.command.Command cmd, String label, String[] args) {
@@ -123,7 +124,10 @@ public final class SettlementPlugin extends JavaPlugin {
 
     @Override
     public void onDisable() {
-        if (Fishing.realLook()) FakeFisher.removeAll(); // fishers back for everyone
+        if (Fishing.realLook()) {
+            FakeFisher.removeAll(); // fishers back for everyone
+            FakeFisher.unlisten();
+        }
         if (workers != null) for (Worker w : workers.all()) w.stop();
         if (towns != null) towns.save();
         if (borders != null) borders.clearAll();

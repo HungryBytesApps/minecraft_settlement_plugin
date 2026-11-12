@@ -109,7 +109,8 @@ the work. **In use** (checkbox) switches the workstation off without removing th
   real rod, line and bobber; the fisher skins for it are the MineSkin links in `fisher-skins` in the config (fetched once at
   startup, matched by the skin's name, kept in `fisher-skins-cache.yml`; none = a default skin). Without PacketEvents: a simple bobber and a lead as line. Every 4 catches it keeps
   the catch in the barrel (3 slots; a pile of fish on the lid shows it) and takes it to the chests when it fills up. While
-  a fisher works there the barrel is only for the fisher (players can't open it; settlers may take the fish out;
+  a fisher works there the barrel is only for the fisher (players can't open it directly: the workstation menu's
+  **Barrel contents** lets the founder and members take things out, not put things in; settlers may take the fish out;
   broken: it drops its contents). Without a fisher it's a normal barrel (the workstation menu has its
   **Chest settings**). Catches like vanilla: fish 85%, junk 10%, treasure 5% only in open water (5x5, 2 deep, nothing on
   top; the workstation menu says if it is). Fish whose storage target is reached go back into the water; junk
