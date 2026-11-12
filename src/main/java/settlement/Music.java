@@ -11,56 +11,20 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Random;
 
 /**
  * Settlers making music together: a band of 2 to 5 plays along with a music disc (heard only near the band),
- * now and then (config: music-every-minutes). Alone in the evening, a settler plays a few quiet notes.
+ * now and then (config: music-every-minutes).
  */
 final class Music {
     private Music() {}
 
-    /** Instrument: what they hold, and which note block sound it makes. */
-    record Instrument(Material item, String sound) {}
+    /** What a band player holds: Minecraft's only real instruments (a goat horn, a bell) and a note block. */
+    record Instrument(Material item) {}
 
-    static final List<Instrument> INSTRUMENTS = List.of(
-            new Instrument(Material.GOAT_HORN, "flute"),
-            new Instrument(Material.BELL, "bell"),
-            new Instrument(Material.STRING, "guitar"),
-            new Instrument(Material.STICK, "basedrum"),
-            new Instrument(Material.AMETHYST_SHARD, "chime"),
-            new Instrument(Material.BAMBOO, "didgeridoo"));
-
-    private static final Instrument[] MELODY = {INSTRUMENTS.get(0), INSTRUMENTS.get(1), INSTRUMENTS.get(2), INSTRUMENTS.get(4)};
-    private static final Instrument BASS = new Instrument(Material.BAMBOO, "bass");
-    private static final Instrument DRUM = new Instrument(Material.STICK, "basedrum");
-
-    static Instrument random(Random r) {
-        return INSTRUMENTS.get(r.nextInt(INSTRUMENTS.size()));
-    }
-
-    private static int fit(int p) {
-        while (p < 0) p += 12;
-        while (p > 24) p -= 12;
-        return p;
-    }
-
-    /** Play one note: the sound, a note particle above the head, and a little movement. */
-    static void play(Worker w, Instrument inst, int pitchIndex, float volume) {
-        int n = fit(pitchIndex);
-        float pitch = (float) Math.pow(2, (n - 12) / 12.0);
-        Location head = w.body.getLocation().add(0, 2.3, 0);
-        w.body.getWorld().playSound(w.body.getLocation(), "minecraft:block.note_block." + inst.sound(), SoundCategory.RECORDS, volume, pitch);
-        w.body.getWorld().spawnParticle(Particle.NOTE, head, 0, n / 24.0, 0, 0, 1);
-        if (w.body.getEquipment().getItemInMainHand().getType() == Material.GOAT_HORN) w.anim.use(10); // horn to the mouth
-        else if (w.random.nextInt(3) == 0) w.body.swingMainHand();
-    }
-
-    /** For sitting alone with an instrument (evening): a random note from a nice scale. */
-    static void note(Worker w, Instrument inst) {
-        int[] scale = {6, 8, 10, 13, 15, 18, 20, 22};
-        play(w, inst, scale[w.random.nextInt(scale.length)], 0.7f);
-    }
+    private static final Instrument[] MELODY = {new Instrument(Material.GOAT_HORN), new Instrument(Material.BELL)};
+    private static final Instrument BASS = new Instrument(Material.NOTE_BLOCK);
+    private static final Instrument DRUM = new Instrument(Material.NOTE_BLOCK);
 
     // ---- A band ----
 

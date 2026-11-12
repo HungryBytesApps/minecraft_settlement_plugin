@@ -806,6 +806,7 @@ final class Fishing implements Listener {
         Block b = wp.loc.getBlock();
         if (!(b.getState(false) instanceof Barrel br) || !t.canManage(p)) return;
         viewing.put(p.getUniqueId(), b);
+        Menus.markShown(p); // the barrel replaces the menu: don't close it after the click
         p.openInventory(br.getInventory());
         if (!(p.getOpenInventory().getTopInventory().getHolder(false) instanceof Barrel)) viewing.remove(p.getUniqueId());
     }

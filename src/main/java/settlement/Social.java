@@ -416,8 +416,7 @@ final class Social {
         private final Location lookAt;
         private int left, phase, time, next;
         private ArmorStand stand;
-        private Music.Instrument playing;
-        private int playUntil, readUntil;
+        private int readUntil;
 
         Sit(Worker w, Block seat, Mode mode, int ticks, Location lookAt) {
             this.w = w;
@@ -467,17 +466,8 @@ final class Social {
             return --left <= 0;
         }
 
-        /** Evening: talk, play some music, read a bit, look around. */
+        /** Evening: talk, read a bit, look around. */
         private void socialTick() {
-            if (playing != null) {
-                if (time >= playUntil) {
-                    playing = null;
-                    w.holdTool();
-                } else if (time % (6 + w.random.nextInt(4)) == 0) {
-                    Music.note(w, playing);
-                }
-                return;
-            }
             if (readUntil > 0) {
                 if (time >= readUntil) {
                     readUntil = 0;
@@ -490,13 +480,9 @@ final class Social {
             if (time < next) return;
             next = time + 80 + w.random.nextInt(140);
             int r = w.random.nextInt(100);
-            if (r < 55) {
+            if (r < 65) {
                 say(w, nearestOther(w));
-            } else if (r < 72) {
-                playing = Music.random(w.random);
-                w.hold(playing.item());
-                playUntil = time + 100 + w.random.nextInt(80);
-            } else if (r < 85) {
+            } else if (r < 82) {
                 w.hold(Material.BOOK);
                 readUntil = time + 200;
             } else {
@@ -519,7 +505,7 @@ final class Social {
             return switch (mode) {
                 case READ -> "Reading on a bench";
                 case IDLE -> "Sitting down";
-                case SOCIAL -> playing != null ? "Playing music with the others" : "Hanging out with the others";
+                case SOCIAL -> "Hanging out with the others";
             };
         }
 

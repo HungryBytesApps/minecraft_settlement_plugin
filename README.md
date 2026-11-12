@@ -58,7 +58,7 @@ Right-click with it:
 - a **wild villager**: hire it. It walks to the settlement, or follows you when it's far away.
 - anything else: the ledger menu: **Settlers** (click a row for its menu), **Workstations**, **Storage targets**,
   **Problems**: what went wrong lately (missing tools or materials, full storage, chests or workstations they
-  can't reach, settlers that got stuck, attacks, deaths), newest first with how long ago, 100 lines, pages of 15.
+  can't reach, settlers that got stuck), newest first with how long ago, 100 lines, pages of 15.
   The same problem shows again only after 10 minutes; the log is empty again after a restart. **Clear** empties it.
 
 Right-click one of your settlers (no ledger needed): its menu: rename, inventory (a chest window: take

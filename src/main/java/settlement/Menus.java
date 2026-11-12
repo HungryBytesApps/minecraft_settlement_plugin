@@ -658,7 +658,7 @@ final class Menus {
             buttons.add(wbutton(plugin, apply, "Junk filter (" + kept + " kept)", NamedTextColor.WHITE, "Which junk the fisher keeps; the rest goes back into the water", w,
                     pl -> Fishing.junkMenu(plugin, pl, t, wp)));
             if (!wp.workers.isEmpty()) buttons.add(wbutton(plugin, apply, "Barrel contents", NamedTextColor.WHITE,
-                    "See the catch and take things out (only the fisher puts things in)", w, pl -> Fishing.openBarrel(plugin, pl, t, wp)));
+                    "See the catch and take things out", w, pl -> Fishing.openBarrel(plugin, pl, t, wp)));
             // Without a fisher it's a normal barrel, with the settings of a chest.
             if (wp.workers.isEmpty()) buttons.add(wbutton(plugin, apply, "Chest settings", NamedTextColor.WHITE,
                     "Nobody fishes here, so this is a normal barrel: its storage settings", w, pl -> openChest(plugin, pl, t, wp.loc.getBlock(), x -> showWorkplace(plugin, x, t, wp))));

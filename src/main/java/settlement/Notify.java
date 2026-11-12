@@ -45,7 +45,7 @@ final class Notify {
 
     /** Send to the settlement's owner and members (or just the given player without a settlement). */
     static void send(Town t, UUID fallback, Kind k, String text, NamedTextColor color) {
-        TownLog.town(t, text, color); // also in the ledger's problem log
+        if (k == Kind.TOOLS || k == Kind.STORAGE || k == Kind.BEES) TownLog.town(t, text, color); // management problems: also in the ledger's log
         if (t == null) send(fallback, k, text, color);
         else for (UUID id : t.people()) send(id, k, text, color);
     }
