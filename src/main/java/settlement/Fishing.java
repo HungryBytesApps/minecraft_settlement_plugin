@@ -444,8 +444,8 @@ final class Fishing implements Listener {
                 time = 0;
                 return false;
             }
-            if (phase == 5) {
-                if (time >= 3) {
+            if (phase == 5) { // the fake appears once the skin had time to load, then casts
+                if ((fake.ready() && time >= 3) || time >= 60) {
                     fake.look(bobberAt());
                     fake.cast(floatAt());
                     w.body.getWorld().playSound(w.body.getLocation(), "minecraft:entity.fishing_bobber.throw", SoundCategory.NEUTRAL, 0.6f, 0.8f);

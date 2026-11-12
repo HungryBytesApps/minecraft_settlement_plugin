@@ -94,7 +94,7 @@ public final class SettlementPlugin extends JavaPlugin {
     }
 
     /** Changes with every version I send, to check the right jar is installed. */
-    static final String BUILD = "2026-11-12 #75";
+    static final String BUILD = "2026-11-12 #77";
 
     @Override
     public boolean onCommand(org.bukkit.command.CommandSender sender, org.bukkit.command.Command cmd, String label, String[] args) {

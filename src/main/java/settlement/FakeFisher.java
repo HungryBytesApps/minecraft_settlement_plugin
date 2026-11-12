@@ -12,7 +12,6 @@ import com.github.retrooper.packetevents.protocol.player.UserProfile;
 import com.github.retrooper.packetevents.util.Vector3d;
 import com.github.retrooper.packetevents.wrapper.PacketWrapper;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerDestroyEntities;
-import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityAnimation;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityEquipment;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityHeadLook;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityMetadata;
@@ -98,9 +97,30 @@ final class FakeFisher {
 
     // ---- Who sees it ----
 
+    /** Ticks between telling a player about the fake (so its game downloads the skin) and showing it. */
+    private static final int PRELOAD = 30;
+    /** Players told about it, not shown yet: since when. */
+    private final Map<UUID, Integer> pending = new HashMap<>();
+
     /** Call every tick while fishing: players coming close see it, players leaving get the settler back. */
     void tick() {
         if (++sinceUpdate >= 10) update();
+        if (pending.isEmpty() || removed) return;
+        int now = Bukkit.getCurrentTick();
+        for (java.util.Iterator<Map.Entry<UUID, Integer>> it = pending.entrySet().iterator(); it.hasNext(); ) {
+            Map.Entry<UUID, Integer> e = it.next();
+            if (now - e.getValue() < PRELOAD && now >= e.getValue()) continue;
+            it.remove();
+            Player p = Bukkit.getPlayer(e.getKey());
+            if (p == null) continue;
+            viewers.add(e.getKey());
+            showTo(p);
+        }
+    }
+
+    /** Everyone close by sees the fake now (the skin had time to load): it can cast. */
+    boolean ready() {
+        return pending.isEmpty();
     }
 
     private void update() {
@@ -116,23 +136,34 @@ final class FakeFisher {
             Player p = Bukkit.getPlayer(v);
             if (p != null) hideFrom(p);
         }
+        for (UUID v : new ArrayList<>(pending.keySet())) {
+            if (now.contains(v)) continue;
+            pending.remove(v);
+            Player p = Bukkit.getPlayer(v);
+            if (p != null) forget(p);
+        }
         for (UUID v : now) {
-            if (viewers.contains(v)) continue;
+            if (viewers.contains(v) || pending.containsKey(v)) continue;
             Player p = Bukkit.getPlayer(v);
             if (p == null) continue;
-            viewers.add(v);
-            showTo(p);
+            pending.put(v, Bukkit.getCurrentTick());
+            preload(p); // the settler stays visible until the skin is there
         }
     }
 
-    private void showTo(Player p) {
-        p.hideEntity(w.plugin, w.body);
+    /** Tell the player's game about the fake (name hidden, skin): it starts downloading the skin. Not shown yet. */
+    private void preload(Player p) {
         send(p, new WrapperPlayServerTeams(team, WrapperPlayServerTeams.TeamMode.CREATE,
                 new WrapperPlayServerTeams.ScoreBoardTeamInfo(net.kyori.adventure.text.Component.empty(), null, null,
                         WrapperPlayServerTeams.NameTagVisibility.NEVER, WrapperPlayServerTeams.CollisionRule.NEVER,
                         net.kyori.adventure.text.format.NamedTextColor.WHITE, WrapperPlayServerTeams.OptionData.NONE), name));
         send(p, new WrapperPlayServerPlayerInfoUpdate(EnumSet.of(WrapperPlayServerPlayerInfoUpdate.Action.ADD_PLAYER),
                 new WrapperPlayServerPlayerInfoUpdate.PlayerInfo(profile(), false, 0, GameMode.SURVIVAL, null, null)));
+    }
+
+    /** Swap: the settler hidden, the fake shown in its place. */
+    private void showTo(Player p) {
+        p.hideEntity(w.plugin, w.body);
         send(p, new WrapperPlayServerSpawnEntity(id, Optional.of(uuid), EntityTypes.PLAYER, new Vector3d(at.getX(), at.getY(), at.getZ()),
                 pitch, yaw, yaw, 0, Optional.empty()));
         List<EntityData<?>> data = new ArrayList<>();
@@ -150,9 +181,14 @@ final class FakeFisher {
 
     private void hideFrom(Player p) {
         send(p, new WrapperPlayServerDestroyEntities(hookId, id));
+        forget(p);
+        p.showEntity(w.plugin, w.body);
+    }
+
+    /** The player's game forgets the fake (name and skin entry). */
+    private void forget(Player p) {
         send(p, new WrapperPlayServerPlayerInfoRemove(uuid));
         send(p, new WrapperPlayServerTeams(team, WrapperPlayServerTeams.TeamMode.REMOVE, (WrapperPlayServerTeams.ScoreBoardTeamInfo) null));
-        p.showEntity(w.plugin, w.body);
     }
 
     /** The fisher skin (fisher-skins: <person>: value / signature); none set: a default skin. */
@@ -176,7 +212,11 @@ final class FakeFisher {
     }
 
     void swing() {
-        all(() -> new WrapperPlayServerEntityAnimation(id, WrapperPlayServerEntityAnimation.EntityAnimationType.SWING_MAIN_ARM));
+        // 26.3 has its own swing packet (the old animation packet no longer swings arms).
+        all(() -> new com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerSwingAnimation(id,
+                com.github.retrooper.packetevents.protocol.player.InteractionHand.MAIN_HAND,
+                new com.github.retrooper.packetevents.protocol.component.builtin.item.ItemSwingAnimation(
+                        com.github.retrooper.packetevents.protocol.component.builtin.item.ItemSwingAnimation.Type.WHACK, 6)));
     }
 
     /** Throw: the bobber flies from the hand towards {@code target} (the game moves it, like a player's). */
@@ -254,7 +294,12 @@ final class FakeFisher {
             Player p = Bukkit.getPlayer(v);
             if (p != null) hideFrom(p);
         }
+        for (UUID v : pending.keySet()) {
+            Player p = Bukkit.getPlayer(v);
+            if (p != null) forget(p);
+        }
         viewers.clear();
+        pending.clear();
         if (active.get(w.body.getUniqueId()) == this) active.remove(w.body.getUniqueId());
     }
 
@@ -279,8 +324,19 @@ final class FakeFisher {
         }
     }
 
+    private static int errorUntil;
+
+    /** Send one packet; a packet that fails is skipped (logged at most once a minute), the rest goes on. */
     private static void send(Player p, PacketWrapper<?> packet) {
-        PacketEvents.getAPI().getPlayerManager().sendPacket(p, packet);
+        try {
+            PacketEvents.getAPI().getPlayerManager().sendPacket(p, packet);
+        } catch (RuntimeException ex) {
+            int now = Bukkit.getCurrentTick();
+            if (now >= errorUntil) {
+                errorUntil = now + 1200;
+                Bukkit.getLogger().warning("[Settlement] Fishing look: " + packet.getClass().getSimpleName() + " failed: " + ex.getMessage());
+            }
+        }
     }
 
     /** A throw that lands about at {@code to} (the bobber's flight: drag 0.92 a tick, gravity 0.03). */
