@@ -1,0 +1,176 @@
+# Settlement plugin settings
+
+# ---- Settlements ----
+# Right-click a bell to create a settlement there. The settlement is a square around the bell,
+# this many blocks to every side (48 = a 97 x 97 square). Change it per settlement with the
+# Radius slider at the bell (min/max below). Expansion bells add smaller squares.
+max-settlements-per-player: 1
+settlement-radius: 48
+settlement-radius-min: 16
+settlement-radius-max: 64
+expansion-radius-min: 4
+expansion-radius-max: 24
+max-settlers-per-settlement: 10
+
+# Keep settlements working while nobody is near: their chunks stay loaded, so settlers keep working,
+# crops keep growing and furnaces keep burning while you're away. (About 49 chunks per settlement
+# at radius 48; no monsters spawn there without players nearby.)
+keep-settlements-loaded: true
+
+# Can settlers use chests and barrels in the settlement unless you switch them off with the ledger?
+chests-allowed-by-default: true
+
+# Price to recruit a new settler at the bell (item:amount), by how many settlers already live there:
+# from 0 settlers the first list, from 3 the second, and so on. (A plain list also works: then every
+# settler costs recruit-cost-increase % more than the one before.)
+recruit-cost:
+  0: [emerald:3, bread:10]
+  3: [emerald:6, cooked_beef:12]
+  6: [emerald:10, golden_carrot:8]
+  10: [emerald:16, cake:2]
+  15: [emerald:24, golden_apple:2]
+recruit-cost-increase: 20
+
+# A new (recruited or hired) settler waits at the bell for instructions this long, or until it gets
+# a job or becomes a guard. Then it goes about its free time. 0 = no waiting.
+newcomer-wait-seconds: 180
+
+# Particle for the settlement border (Show border). Any particle without extra
+# data works, e.g. SOUL_FIRE_FLAME (blue), HAPPY_VILLAGER (green), FLAME, SMALL_FLAME, END_ROD, HAPPY_VILLAGER, COMPOSTER, WAX_ON,
+# ELECTRIC_SPARK, GLOW, CRIT. Resource packs can change how they look.
+border-particle: SOUL_FIRE_FLAME
+
+# ---- Settlers ----
+# Show the job above each settler and what it is doing under it.
+show-names: true
+
+# Walking speed in blocks per tick (20 ticks = 1 second). A player walks 0.21.
+work-speed: 0.15
+walk-speed: 0.11
+
+# Work area radius around a workplace (composter): default for new workplaces, and the maximum.
+default-work-radius: 6
+max-work-radius: 12
+# How far from the bell settlers wander in their free time.
+social-radius: 16
+
+# Settlers stop working at night and get together at a gathering spot (the place with the
+# most seats close together: stairs, slabs, cushions). Without seats they meet at the bell.
+work-at-night: false
+
+# ---- Defense ----
+# Guards (and settlers called to arms) take weapons, armor, arrows and potions only from chests
+# settlers may take from. Arrows a guard carries (refilled after a fight; archers when they run out).
+arrows-to-carry: 32
+# Default radius a defensive guard protects around its post.
+guard-radius: 16
+# Settlers heal 1 health point every this many seconds when not fighting.
+regen-seconds: 4
+# Below this health (in %) settlers eat food from storage (if allowed in the ledger). Guards eat first.
+eat-below-health-percent: 60
+
+# Height of sitting settlers relative to the top of the seat (raise if they sink in).
+sit-height: 0.0
+
+# The plugin's own settler skins (8 people, an outfit for every job). The images must be in the
+# server resource pack: assets/settlers/textures/skins/<person>_<outfit>.png. Off: use skins and job-skins below.
+settler-skins: true
+
+# Settler skins, picked at random (when settler-skins is off or not uploaded yet). Built-in skins: steve, alex, ari, efe, kai, makena, noor,
+# sunny, zuri. Use "player:Name" for a real player's skin, or "texture:namespace:path/to/skin" (add ":slim"
+# for slim arms) for your own skin image in the server resource pack (assets/namespace/textures/path/to/skin.png).
+skins: [steve, alex, ari, efe, kai, makena, noor, sunny, zuri]
+
+# Skins per job (a settler gets one of these while it has that job; empty or missing = its own skin).
+# Jobs: farmer, cook, smelter, furnace-worker, herder, lumberjack, smith, brewer, fisher, guard, settler (no job).
+# A skin can be:
+#   url:http://textures.minecraft.net/texture/<id>        (add :slim for slim arms)
+#   value:<texture value>                                  (the long "value" from mineskin.org)
+#   texture:namespace:path/to/skin                         (a skin image in your server resource pack)
+#   player:Name                                            (a player's current skin)
+# To use a skin image from a skin website: upload it at mineskin.org and copy the texture URL or value.
+job-skins:
+  farmer: []
+  cook: []
+  smelter: []
+  furnace-worker: []
+  herder: []
+  lumberjack: []
+  smith: []
+  guard: []
+
+# Farmers keep this many of each seed (seeds, carrots, potatoes, beetroot seeds) for replanting.
+seeds-to-keep: 16
+
+# Names that fit the skin: men's names for men's skins, women's names for women's skins.
+names-male: [Arthur, Benjamin, Charlie, Daniel, David, Edward, George, Harry, Henry, Jack, James, John, Leo, Michael, Oliver, Oscar, Robert, Samuel, Thomas, William]
+names-female: [Alice, Amelia, Ava, Charlotte, Chloe, Ellie, Emily, Emma, Grace, Hannah, Holly, Isla, Lily, Lucy, Mary, Mia, Olivia, Rose, Ruby, Sophie]
+# Which built-in skins are men and which are women (decides the name and slim/wide arms).
+skin-gender:
+  steve: male
+  alex: female
+  ari: female
+  efe: female
+  kai: male
+  makena: female
+  noor: female
+  sunny: male
+  zuri: male
+
+# Names for skins that are neither (a player's skin, your own skins).
+names: [Alex, Charlie, Jamie, Jordan, Morgan, Riley, Robin, Sam, Taylor]
+
+# Sounds when settlers talk: a mumbling voice (each settler its own pitch), and a laugh.
+talk-sounds: true
+voice-sound: minecraft:entity.villager.ambient
+laugh-sound: minecraft:entity.villager.yes
+
+# Things settlers say when sitting together in the evening. Their conversations (little stories
+# for 2 or 3 settlers) are built in; add your own in my-conversations.yml.
+chat-lines:
+  - "Nice weather today!"
+  - "Did you see the crops?"
+  - "Hmm..."
+  - "I heard a zombie last night."
+  - "Busy day, busy day."
+  - "Haha!"
+  - "Really?"
+  - "My back hurts from all that farming."
+  - "Have you met the new guy?"
+  - "I could use a nap."
+  - "The emeralds aren't what they used to be."
+  - "Look at that!"
+  - "Mhm, mhm."
+  - "I love carrots."
+  - "Where's my hoe?"
+  - "Rain soon, I can feel it."
+  - "Hrrm."
+  - "No way!"
+  - "That's what I said!"
+  - "Let's grab some bread later."
+
+# Settlers' bands play along with a music disc, heard only near the band.
+# How often a settlement may have a band (minutes between songs).
+music-every-minutes: 20
+# Loudness: 1.0 = heard up to 16 blocks away, 2.0 = 32 blocks.
+music-volume: 1.0
+# Which discs (an empty list [] = no bands). All: 13, cat, blocks, chirp, far, mall, mellohi, stal, strad,
+# ward, 11, wait, otherside, 5, pigstep, relic, creator, creator_music_box, precipice, tears, lava_chicken.
+music-discs: [cat, chirp, far, mall, mellohi, stal, strad, wait, blocks, otherside, relic, creator_music_box, precipice]
+
+
+# The fisher's real fishing look (rod, line, bobber) needs the PacketEvents plugin. While fishing, players
+# see a fake player in the fisher's place, which can only wear a Mojang-signed skin: the fisher skins uploaded
+# to mineskin.org. List their links here: they're fetched once at startup and matched to the people by the
+# skin's name (aldric, maren...). (Or per person: aldric: {value: "...", signature: "..."}.)
+fisher-skins:
+  - https://minesk.in/e62804a03bfe42b79d40cf3db56e9d78
+  - https://minesk.in/fc4d643b93c34cb2afe098b287f95899
+  - https://minesk.in/3b2d4889db4941bd9db860a9e95bcb9e
+  - https://minesk.in/236cc0daf1534128a86b516ef23d3515
+  - https://minesk.in/9f182020d1b04fd5a3ffc53f056c44c0
+  - https://minesk.in/c6bf0f81dc064a4bac60e93891ce0111
+  - https://minesk.in/eadee605f7aa4ea2ba0a989b0d30dd33
+  - https://minesk.in/f78d23e129db4a93b99e7006b417d69e
+# Your MineSkin API key, only if fetching the skins fails without one. Keep it here, never in the source.
+mineskin-api-key: ""

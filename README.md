@@ -56,7 +56,10 @@ Right-click with it:
   Only its owner can place a chest next to it to make one big private chest; anyone else's chest stays separate.
 - a **workstation**: its menu (workers, in use, settings).
 - a **wild villager**: hire it. It walks to the settlement, or follows you when it's far away.
-- anything else: the ledger menu: **Settlers** (click a row for its menu), **Workstations**, **Storage targets**.
+- anything else: the ledger menu: **Settlers** (click a row for its menu), **Workstations**, **Storage targets**,
+  **Problems**: what went wrong lately (missing tools or materials, full storage, chests or workstations they
+  can't reach, settlers that got stuck, attacks, deaths), newest first with how long ago, 100 lines, pages of 15.
+  The same problem shows again only after 10 minutes; the log is empty again after a restart. **Clear** empties it.
 
 Right-click one of your settlers (no ledger needed): its menu: rename, inventory (a chest window: take
 things out or put things in), worker / guard, guard settings, leave workplace, dismiss (drops its things
@@ -66,7 +69,8 @@ Other players' settlers just say hi.
 ## Workstations
 
 Place one in the settlement. Ledger on it → **Workers (n)**: add as many settlers as you like (free settlers
-first, then ones with another job), ✖ takes one off. All workers work in the whole settlement and share
+first, then ones with another job). Click a worker for its menu (Back returns to the list); **Remove** next to
+it takes it off. All workers work in the whole settlement and share
 the work. **In use** (checkbox) switches the workstation off without removing the workers.
 
 - **Composter – farmer**: first harvests everything ripe, then replants. Wheat, carrots, potatoes, beetroot,
@@ -92,6 +96,24 @@ the work. **In use** (checkbox) switches the workstation off without removing th
   fewer chickens than wanted and the eggs' storage target is reached (no egg target = no throwing).
 - **Fletching table – lumberjack**: fells real trees (logs on dirt with natural leaves) with an axe from
   storage, inside or outside the settlement (toggle). **Replant saplings** On/Off.
+- **Brewing stand – brewer**: brews every potion (also long, strong, splash and lingering) by storage target
+  (Storage targets → pick an effect; no target = don't brew), with the real brewing stand: fills glass bottles at
+  water near the stand, nether wart, then the ingredients one by one, blaze powder as fuel. Makes blaze powder,
+  glistering melon, golden carrots, fermented spider eyes, magma cream, sugar and bottles itself; asks for glass
+  and gold. Things only mobs or the world give (ghast tears, rabbit feet, phantom membranes, dragon's breath,
+  turtle helmets, breeze rods...) must be in storage.
+- **Barrel by water – fisher**: a barrel with water within 2 blocks is a fishing spot (other barrels stay storage).
+  Each fisher picks its own spot on the shore within 7 blocks of the barrel (at least 3 blocks from other fishers)
+  and fishes there with a rod from storage, faster in the rain. With the **PacketEvents** plugin on the server it
+  looks like real fishing: players nearby see a fake player in the fisher's place (no name, not in the tab list) with a
+  real rod, line and bobber; the fisher skins for it are the MineSkin links in `fisher-skins` in the config (fetched once at
+  startup, matched by the skin's name, kept in `fisher-skins-cache.yml`; none = a default skin). Without PacketEvents: a simple bobber and a lead as line. Every 4 catches it keeps
+  the catch in the barrel (3 slots; a pile of fish on the lid shows it) and takes it to the chests when it fills up. While
+  a fisher works there the barrel is only for the fisher (players can't open it; settlers may take the fish out;
+  broken: it drops its contents). Without a fisher it's a normal barrel (the workstation menu has its
+  **Chest settings**). Catches like vanilla: fish 85%, junk 10%, treasure 5% only in open water (5x5, 2 deep, nothing on
+  top; the workstation menu says if it is). Fish whose storage target is reached go back into the water; junk
+  only when chosen in the **Junk filter**; treasure always kept.
 - **Smithing table – smith**: weapons, armor, bows and arrows, **only what you set a storage target for**.
 
 Tools wear out (axes per log, shears per sheep, weapons per hit, bows per shot, shields per blocked hit;
@@ -130,7 +152,8 @@ like are made by whoever needs them.
 
 ### Free time
 Conversations of 2–3 settlers (128 stories built in, add your own in `my-conversations.yml`) with a
-mumbling voice (`talk-sounds`, `voice-sound`), music bands of 2–5 playing real old songs, putting on a record
+mumbling voice (`talk-sounds`, `voice-sound`), music bands of 2–5 playing along with a music disc (heard only near the band; `music-every-minutes`, default
+20, per settlement; `music-volume`; `music-discs`), putting on a record
 from storage at a jukebox, reading, walks, pottering around the workplace, visiting someone at work.
 Evening: together at the spot with the most seats close together (stairs, slabs, carpets; a campfire counts
 extra), or at the bell. `sit-height` if they sit too high or low.
