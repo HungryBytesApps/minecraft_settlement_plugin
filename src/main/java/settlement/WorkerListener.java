@@ -186,6 +186,10 @@ final class WorkerListener implements Listener {
     /** A player right-clicks a settler (or the fake fisher in its place): its menu, or a greeting. */
     static void clickSettler(SettlementPlugin plugin, Player p, Worker w) {
         if (w.leaving) return; // dismissed and on its way out
+        if (Downed.is(w)) {
+            Downed.helpClick(p, w);
+            return;
+        }
         if (w.canManage(p)) { // your own settler: its menu (no ledger needed)
             w.pauseFor(p, 1200); // waits while you're in its menu
             Menus.settler(plugin, p, w);
@@ -202,10 +206,22 @@ final class WorkerListener implements Listener {
     public void onClickVillager(PlayerInteractEntityEvent e) {
         if (e.getHand() != EquipmentSlot.HAND) return;
         Player p = e.getPlayer();
+        java.util.UUID downed = Downed.clicked(e.getRightClicked()); // the click area over a downed settler
+        if (downed != null) {
+            e.setCancelled(true);
+            Worker dw = plugin.workers().get(downed);
+            if (dw != null && Downed.is(dw)) Downed.helpClick(p, dw);
+            else e.getRightClicked().remove();
+            return;
+        }
         if (Worker.isWorker(e.getRightClicked())) {
             e.setCancelled(true);
             Worker seen = plugin.workers().get(e.getRightClicked().getUniqueId());
             if (seen != null) seen.lastClickSeen = Bukkit.getCurrentTick();
+            if (seen != null && Downed.is(seen)) { // lying there: hold right-click to help it up
+                Downed.helpClick(p, seen);
+                return;
+            }
             // Both click events can come for one click: handle it once.
             int now = Bukkit.getCurrentTick();
             Integer last = lastClick.put(p.getUniqueId(), now);
@@ -342,6 +358,30 @@ final class WorkerListener implements Listener {
         }
     }
 
+    /** Health running out: downed instead of dead. Downed: nothing hurts it any more. */
+    @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGHEST)
+    public void onDeadlyDamage(org.bukkit.event.entity.EntityDamageEvent e) {
+        if (!Worker.isWorker(e.getEntity())) return;
+        Worker w = plugin.workers().get(e.getEntity().getUniqueId());
+        if (w == null) return;
+        if (Downed.is(w)) {
+            if (e.getCause() != org.bukkit.event.entity.EntityDamageEvent.DamageCause.VOID
+                    && e.getCause() != org.bukkit.event.entity.EntityDamageEvent.DamageCause.KILL) e.setCancelled(true);
+            return;
+        }
+        if (e.getFinalDamage() < w.body.getHealth()) return;
+        switch (e.getCause()) {
+            case VOID, KILL -> {
+                return; // really gone
+            }
+            default -> {
+            }
+        }
+        e.setCancelled(true);
+        w.body.playHurtAnimation(0);
+        Downed.down(w);
+    }
+
     @EventHandler(ignoreCancelled = true, priority = EventPriority.MONITOR)
     public void onAnyDamage(org.bukkit.event.entity.EntityDamageEvent e) {
         if (!Worker.isWorker(e.getEntity())) return;
@@ -353,22 +393,16 @@ final class WorkerListener implements Listener {
     public void onDeath(EntityDeathEvent e) {
         Worker w = plugin.workers().get(e.getEntity().getUniqueId());
         if (w == null) return;
-        SettlerInventory.close(w); // someone looking in its pockets: finish that first
-        // Drop what they carried and wore (the item in hand is only a copy).
+        // Killed outright (the void, /kill): its things go into a grave, nothing drops.
         e.getDrops().clear();
         e.setDroppedExp(0);
-        for (org.bukkit.inventory.ItemStack it : w.pockets.getContents()) {
-            if (it != null && !it.getType().isAir()) e.getDrops().add(it.clone());
-        }
-        w.pockets.clear();
-        org.bukkit.inventory.EntityEquipment eq = w.body.getEquipment();
-        for (EquipmentSlot slot : new EquipmentSlot[]{EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET, EquipmentSlot.OFF_HAND}) {
-            org.bukkit.inventory.ItemStack it = eq.getItem(slot);
-            if (it != null && !it.getType().isAir()) e.getDrops().add(it.clone());
-        }
+        org.bukkit.Location at = w.body.getLocation();
         String name = w.name;
+        Town t = w.town();
+        boolean grave = at.getY() > at.getWorld().getMinHeight() && Graves.bury(plugin, w, at);
         plugin.forget(w);
-        Notify.send(w.town(), w.owner, Notify.Kind.DEATH, "✝ " + (w.guard ? "Guard " : "Settler ") + name + " has died. Their things lie where they fell.", NamedTextColor.RED);
+        Notify.send(t, w.owner, Notify.Kind.DEATH, "✝ " + (w.guard ? "Guard " : "Settler ") + name + " has died."
+                + (grave ? " Their things are at the skull (" + at.getBlockX() + ", " + at.getBlockY() + ", " + at.getBlockZ() + ")." : ""), NamedTextColor.RED);
     }
 
     @EventHandler

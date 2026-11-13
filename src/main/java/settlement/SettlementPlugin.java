@@ -50,6 +50,7 @@ public final class SettlementPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new PrivateChests(this), this);
         getServer().getPluginManager().registerEvents(new Campfires(), this);
         getServer().getPluginManager().registerEvents(new Fishing(this), this);
+        getServer().getPluginManager().registerEvents(new Graves(this), this); // where settlers died: their things
         FisherSkins.load(this); // the fisher skins from MineSkin (once, then from the cache)
         if (Fishing.realLook()) FakeFisher.listen(this); // clicks on the fake fisher reach the settler
 
@@ -96,7 +97,7 @@ public final class SettlementPlugin extends JavaPlugin {
     }
 
     /** Changes with every version I send, to check the right jar is installed. */
-    static final String BUILD = "2026-11-13 #88";
+    static final String BUILD = "2026-11-13 #93";
 
     @Override
     public boolean onCommand(org.bukkit.command.CommandSender sender, org.bukkit.command.Command cmd, String label, String[] args) {
@@ -125,6 +126,7 @@ public final class SettlementPlugin extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        Graves.hideAll();
         if (Fishing.realLook()) {
             FakeFisher.removeAll(); // fishers back for everyone
             FakeFisher.unlisten();

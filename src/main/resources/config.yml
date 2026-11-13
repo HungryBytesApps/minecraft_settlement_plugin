@@ -174,3 +174,11 @@ fisher-skins:
   - https://minesk.in/f78d23e129db4a93b99e7006b417d69e
 # Your MineSkin API key, only if fetching the skins fails without one. Keep it here, never in the source.
 mineskin-api-key: ""
+
+# A settler whose health runs out is downed: it lies there, glowing and on the locator bar. Hold right-click
+# on it for revive-seconds to help it up. Nobody comes within downed-minutes: it dies, and its things lie in
+# a grave (a skull and bones; right-click to take them).
+downed-minutes: 5
+revive-seconds: 3
+# Find (settler menu): how long a settler glows and shows on the locator bar.
+find-minutes: 2

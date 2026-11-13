@@ -399,8 +399,17 @@ final class Worker {
     }
 
     /** A player talks to it: stop, turn to them, wait (at most this long, or until the menu closes), then carry on. */
+    /** A monster close by (a guard: a bit further): stop chatting and react. */
+    private boolean danger() {
+        double r = guard ? 12 : 6;
+        for (org.bukkit.entity.Entity e : body.getNearbyEntities(r, 4, r)) {
+            if (e instanceof org.bukkit.entity.Enemy && !e.isDead()) return true;
+        }
+        return false;
+    }
+
     void pauseFor(org.bukkit.entity.Player p, int ticks) {
-        if (leaving) return; // on its way out
+        if (leaving || downedUntil > 0) return; // on its way out, or lying on the ground
         if (activity instanceof Defense.Reaction || (activity instanceof Guard g && !g.idle())) return; // not in a fight
         pausedFor = p;
         pauseUntil = Bukkit.getCurrentTick() + ticks;
@@ -447,11 +456,21 @@ final class Worker {
 
     void tick() {
         ticks++;
+        if (!downedChecked) { // after a restart: still downed?
+            downedChecked = true;
+            Downed.restore(this);
+        }
+        if (ticks % 20 == 0) Downed.markTick(this);
+        if (downedUntil > 0) { // lying on the ground, waiting for help
+            Downed.tick(this, ticks);
+            anim.tick();
+            return;
+        }
         // Someone is talking to it (its menu is open): stand still and look at them.
         if (pausedFor != null) {
             int nowT = Bukkit.getCurrentTick();
             if (pausedFor.isOnline() && pausedFor.getWorld() == body.getWorld() && nowT < pauseUntil
-                    && pausedFor.getLocation().distanceSquared(body.getLocation()) < 10 * 10) {
+                    && pausedFor.getLocation().distanceSquared(body.getLocation()) < 10 * 10 && !(ticks % 10 == 0 && danger())) {
                 mover.stop();
                 if (ticks % 10 == 0) anim.look(pausedFor.getEyeLocation());
                 anim.tick();
@@ -549,6 +568,12 @@ final class Worker {
     /** Dismissed: walking out of the settlement, gone once outside. */
     boolean leaving;
 
+    /** Downed (health ran out): lies there until this tick, waiting for help (0: not downed). See Downed. */
+    int downedUntil;
+    /** Find: glows and shows on the locator bar until this tick (0: not). */
+    int markUntil;
+    private boolean downedChecked;
+
     private void decide() {
         Town t = town();
         if (t == null) {
@@ -624,7 +649,7 @@ final class Worker {
     }
 
     void start(Activity a) {
-        if (a == null) return;
+        if (a == null || downedUntil > 0) return;
         if (activity != null) {
             Activity old = activity;
             activity = null;
@@ -659,7 +684,19 @@ final class Worker {
 
     /** Free for a chat, music, etc. */
     boolean available() {
+        if (downedUntil > 0) return false;
         return activity == null || activity.interruptible();
+    }
+
+    /** Stop everything it's doing (downed). */
+    void stopAll() {
+        pausedFor = null;
+        if (activity != null) {
+            Activity a = activity;
+            activity = null;
+            a.stop();
+        }
+        mover.stop();
     }
 
     // ---- Helpers ----

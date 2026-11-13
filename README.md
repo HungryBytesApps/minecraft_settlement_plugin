@@ -166,6 +166,16 @@ extra), or at the bell. `sit-height` if they sit too high or low.
 Rain: settlers with nothing to do go inside (buildings with a door first). Thunder: everyone except guards
 goes under a real roof. They close the doors behind them.
 
+## Downed, graves and Find
+
+- A settler whose health runs out is **downed**, not dead: it lies on the ground, wounded, calling for help,
+  with a glowing outline and a dot on the locator bar. **Hold right-click** on it for `revive-seconds` (a bar
+  shows the progress) to help it up (40% health). Anyone can help.
+- Nobody comes within `downed-minutes` (default 5): it dies. Its things lie in a **grave**: a skull and bones on
+  the ground, glowing and on the locator bar. Right-click it (founder, members) to take them; empty, it's gone.
+  Nothing on it: no grave. Graves are kept in `graves.yml`.
+- **Find** (settler menu): the settler glows and shows on your locator bar for `find-minutes`.
+
 ## Guards and defense
 
 Settler menu → **Role: Guard**. Guards take the best weapon (a sword; an axe only without a sword, and swapped

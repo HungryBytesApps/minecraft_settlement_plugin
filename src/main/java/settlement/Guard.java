@@ -72,6 +72,18 @@ final class Guard implements Activity {
         time++;
         if (w.town() != t) return true;
         int now = Bukkit.getCurrentTick();
+        // A creeper about to blow up close by: get away first, whatever it was doing (a fight, fetching arrows...).
+        org.bukkit.entity.Creeper blowing = hissingCreeper();
+        if (blowing != null) {
+            if (sub != null) {
+                sub.stop();
+                sub = null;
+                arrowRun = false;
+            }
+            Combat.raiseShield(w, false);
+            retreatFrom(blowing, 9);
+            return false;
+        }
         if (target != null && (!target.isValid() || target.isDead() || !inRange(target))) {
             target = null;
             gearCheckAt = time + 40; // restock after the fight
@@ -263,18 +275,58 @@ final class Guard implements Activity {
         return null;
     }
 
-    /** Step back from something, a few blocks straight away from it. */
+    /** A hissing creeper within 7 blocks (looked for every other tick). */
+    private org.bukkit.entity.Creeper hissingCreeper() {
+        if (time % 2 != 0) return lastHissing != null && lastHissing.isValid() && lastHissing.getFuseTicks() > 0 ? lastHissing : null;
+        lastHissing = null;
+        double best = 7 * 7;
+        for (org.bukkit.entity.Entity e : w.body.getNearbyEntities(7, 4, 7)) {
+            if (!(e instanceof org.bukkit.entity.Creeper c) || c.getFuseTicks() <= 0 || c.isDead()) continue;
+            double d = c.getLocation().distanceSquared(w.body.getLocation());
+            if (d < best) {
+                best = d;
+                lastHissing = c;
+            }
+        }
+        return lastHissing;
+    }
+
+    private org.bukkit.entity.Creeper lastHissing;
+
+    /**
+     * Step back from something: straight away from it, else at an angle, else sideways (a wall or water behind
+     * it). Nothing to walk to at all: small steps straight back.
+     */
     private void retreatFrom(LivingEntity e, double dist) {
         Location me = w.body.getLocation();
         org.bukkit.util.Vector away = me.toVector().subtract(e.getLocation().toVector()).setY(0);
         if (away.lengthSquared() < 0.01) away = new org.bukkit.util.Vector(1, 0, 0);
-        away.normalize().multiply(dist);
-        Location to = me.clone().add(away);
-        int top = to.getWorld().getHighestBlockYAt(to.getBlockX(), to.getBlockZ(), org.bukkit.HeightMap.MOTION_BLOCKING_NO_LEAVES) + 1;
-        if (Math.abs(top - me.getY()) <= 3) to.setY(top);
-        else to.setY(me.getY());
+        away.normalize();
         double fast = w.plugin.settings().workSpeed() * (e instanceof org.bukkit.entity.Creeper c && c.getFuseTicks() > 0 ? 2.0 : 1.4);
-        if (!w.mover.moving() || time % 10 == 0) w.mover.go(to, 1.0, fast);
+        if (!w.mover.moving() || time % 10 == 0) {
+            boolean going = false;
+            outer:
+            for (double len : new double[]{dist, dist * 0.6}) {
+                for (double turn : new double[]{0, 45, -45, 90, -90, 135, -135}) {
+                    Location to = me.clone().add(away.clone().rotateAroundY(Math.toRadians(turn)).multiply(len));
+                    int top = to.getWorld().getHighestBlockYAt(to.getBlockX(), to.getBlockZ(), org.bukkit.HeightMap.MOTION_BLOCKING_NO_LEAVES) + 1;
+                    to.setY(Math.abs(top - me.getY()) <= 3 ? top : me.getY());
+                    if (to.distanceSquared(e.getLocation()) <= me.distanceSquared(e.getLocation())) continue; // not further away
+                    if (w.mover.go(to, 1.0, fast)) {
+                        going = true;
+                        break outer;
+                    }
+                }
+            }
+            if (!going) { // boxed in: shuffle straight back where there's room
+                Location step = me.clone().add(away.clone().multiply(0.35));
+                if (PathFinder.walkable(me.getWorld(), step.getBlockX(), step.getBlockY(), step.getBlockZ())) {
+                    step.setYaw(me.getYaw());
+                    step.setPitch(me.getPitch());
+                    w.body.teleport(step);
+                }
+            }
+        }
         w.anim.look(e.getEyeLocation());
         label = "Keeping away from a creeper";
         progressAt = time; // backing off on purpose is not being stuck

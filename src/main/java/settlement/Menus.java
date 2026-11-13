@@ -804,6 +804,10 @@ final class Menus {
             }
         }
         buttons.add(button(plugin, "Inventory", NamedTextColor.WHITE, "What it wears and carries. Take things out or put things in.", width, pl -> SettlerInventory.open(pl, w)));
+        buttons.add(button(plugin, "Find", NamedTextColor.WHITE, "It glows and shows on your locator bar for a few minutes", width, pl -> {
+            Downed.find(w);
+            pl.sendActionBar(Component.text(w.name + " is marked: look for the glow, or on your locator bar.", NamedTextColor.GREEN));
+        }));
         if (wp != null) {
             buttons.add(button(plugin, "Leave workplace", NamedTextColor.WHITE, "Stops working here and looks for another workplace", width, pl -> {
                 w.leaveWorkplace();
