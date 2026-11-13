@@ -59,7 +59,9 @@ Right-click with it:
 - anything else: the ledger menu: **Settlers** (click a row for its menu), **Workstations**, **Storage targets**,
   **Problems**: what went wrong lately (missing tools or materials, full storage, chests or workstations they
   can't reach, settlers that got stuck), newest first with how long ago, 100 lines, pages of 15.
-  The same problem shows again only after 10 minutes; the log is empty again after a restart. **Clear** empties it.
+  The same problem again is one line with a counter (×3), back on top (at most every 10 minutes per settler);
+  "nothing to do" is not a problem. New problems: the ledger glows and its name shows how many (⚠ 3) until
+  someone opens Problems. The log is empty again after a restart. **Clear** empties it.
 
 Right-click one of your settlers (no ledger needed): its menu: rename, inventory (a chest window: take
 things out or put things in), worker / guard, guard settings, leave workplace, dismiss (drops its things
@@ -76,7 +78,7 @@ the work. **In use** (checkbox) switches the workstation off without removing th
 - **Composter – farmer**: first harvests everything ripe, then replants. Wheat, carrots, potatoes, beetroot,
   melons and pumpkins (from stems), sugar cane, cactus and bamboo (bottom piece stays), sweet berries, cocoa.
   Replants with the same seed as before (or a neighbour's). Fetches seeds from storage.
-  Melon blocks from slices when you set a melon block target. Nether wart on soul sand.
+  Melon blocks (9 slices) and hay bales (9 wheat): made to order, only with a storage target. Nether wart on soul sand.
   - **Make compost**: Off / On / Overflow only (only its own harvest, never things from storage) → bone meal.
   - **Use bone meal**: on crops that are still needed.
 - **Smoker – cook**: cooks raw food, and makes crafting-table food by storage target (no target = don't make):
@@ -114,7 +116,8 @@ the work. **In use** (checkbox) switches the workstation off without removing th
   broken: it drops its contents). Without a fisher it's a normal barrel (the workstation menu has its
   **Chest settings**). Catches like vanilla: fish 85%, junk 10%, treasure 5% only in open water (5x5, 2 deep, nothing on
   top; the workstation menu says if it is). Fish whose storage target is reached go back into the water; junk
-  only when chosen in the **Junk filter**; treasure always kept.
+  only when chosen in the **Junk filter**, and then up to its storage target (kept junk shows in the fisher's
+  storage targets); treasure always kept.
 - **Smithing table – smith**: weapons, armor, bows and arrows, **only what you set a storage target for**.
 
 Tools wear out (axes per log, shears per sheep, weapons per hit, bows per shot, shields per blocked hit;
@@ -165,7 +168,8 @@ goes under a real roof. They close the doors behind them.
 
 ## Guards and defense
 
-Settler menu → **Role: Guard**. Guards take the best weapon, armor, shield, bow and arrows (`arrows-to-carry`)
+Settler menu → **Role: Guard**. Guards take the best weapon (a sword; an axe only without a sword, and swapped
+for a sword once there is one), armor, shield, bow and arrows (`arrows-to-carry`)
 from chests settlers may take from, and pick up loot after a fight.
 - **Stance**: Defensive (stays at its post: **Set post here**, **Guard radius**, default `guard-radius`) or
   Patrol (walks along the border).
