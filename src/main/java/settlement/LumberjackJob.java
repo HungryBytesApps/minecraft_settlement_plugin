@@ -81,7 +81,9 @@ final class LumberjackJob {
             Activity d = Work.deposit(w, t, keep);
             if (d != null) return d;
         }
-        w.workStatus = base == null ? (outside ? "No trees just outside the settlement" : "No trees in the settlement") : "The settlement has enough wood";
+        if (base != null) w.workStatus = "The settlement has enough wood";
+        else if (!Fields.saplings(t, radius, outside).isEmpty()) w.workStatus = "Waiting for the saplings to grow";
+        else w.workStatus = outside ? "No trees just outside the settlement" : "No trees in the settlement";
         return null;
     }
 

@@ -16,7 +16,7 @@ import java.util.*;
 final class Fields {
     private Fields() {}
 
-    private record Scan(List<Block> farmland, List<Block> trees, List<Block> plants, List<Block> jukeboxes, List<Block> hives, int at) {}
+    private record Scan(List<Block> farmland, List<Block> trees, List<Block> plants, List<Block> jukeboxes, List<Block> hives, List<Block> saplings, int at) {}
 
     private static final Map<String, Scan> inside = new HashMap<>(), outside = new HashMap<>();
     private static final int OUTSIDE_WIDTH = 24; // how far past the border lumberjacks look
@@ -47,6 +47,11 @@ final class Fields {
         return get(t, radius, outsideRing).trees();
     }
 
+    /** Saplings growing inside the settlement, or in the ring just outside it. */
+    static List<Block> saplings(Town t, int radius, boolean outsideRing) {
+        return get(t, radius, outsideRing).saplings();
+    }
+
     /** Forget a settlement's scan (e.g. after a big change). */
     static void invalidate(Town t) {
         inside.remove(t.id);
@@ -65,8 +70,8 @@ final class Fields {
 
     private static Scan scan(Town t, int radius, boolean ring, int now) {
         World w = t.world();
-        List<Block> farmland = new ArrayList<>(), trees = new ArrayList<>(), plants = new ArrayList<>(), jukeboxes = new ArrayList<>(), hives = new ArrayList<>();
-        if (w == null) return new Scan(farmland, trees, plants, jukeboxes, hives, now);
+        List<Block> farmland = new ArrayList<>(), trees = new ArrayList<>(), plants = new ArrayList<>(), jukeboxes = new ArrayList<>(), hives = new ArrayList<>(), saplings = new ArrayList<>();
+        if (w == null) return new Scan(farmland, trees, plants, jukeboxes, hives, saplings, now);
         int cy = t.bell.getBlockY();
         int margin = radius - Town.BASE, outerMargin = ring ? margin + OUTSIDE_WIDTH : margin;
         int[] box = t.box(outerMargin);
@@ -90,6 +95,8 @@ final class Fields {
                             else if (!ring && (m == Material.BEEHIVE || m == Material.BEE_NEST)) hives.add(w.getBlockAt(x, y, z));
                             else if (!ring && (m == Material.MELON || m == Material.PUMPKIN || m == Material.SWEET_BERRY_BUSH || m == Material.COCOA
                                     || ((m == Material.SUGAR_CANE || m == Material.CACTUS || m == Material.BAMBOO) && below != m))) plants.add(w.getBlockAt(x, y, z));
+                            else if ((Tag.SAPLINGS.isTagged(m) || m == Material.MANGROVE_PROPAGULE) && (Tag.DIRT.isTagged(below) || below == Material.GRASS_BLOCK))
+                                saplings.add(w.getBlockAt(x, y, z));
                             else if (Tag.LOGS.isTagged(m) && !m.name().startsWith("STRIPPED_")
                                     && (Tag.DIRT.isTagged(below) || below == Material.GRASS_BLOCK)) trees.add(w.getBlockAt(x, y, z));
                             below = m;
@@ -98,6 +105,6 @@ final class Fields {
                 }
             }
         }
-        return new Scan(farmland, trees, plants, jukeboxes, hives, now);
+        return new Scan(farmland, trees, plants, jukeboxes, hives, saplings, now);
     }
 }
