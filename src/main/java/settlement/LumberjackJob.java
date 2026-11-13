@@ -125,6 +125,19 @@ final class LumberjackJob {
         return logs;
     }
 
+    /** Natural leaves around the trunk at feet and head height: in the way of getting to it. Nearest first. */
+    static List<Block> leavesAround(Block base) {
+        List<Block> out = new ArrayList<>();
+        for (int dy = 0; dy <= 1; dy++)
+            for (int dx = -2; dx <= 2; dx++)
+                for (int dz = -2; dz <= 2; dz++) {
+                    Block b = base.getRelative(dx, dy, dz);
+                    if (b.getBlockData() instanceof Leaves l && !l.isPersistent()) out.add(b);
+                }
+        out.sort(Comparator.comparingInt(b -> Math.abs(b.getX() - base.getX()) + Math.abs(b.getZ() - base.getZ()) + b.getY()));
+        return out;
+    }
+
     static Material saplingFor(Material log) {
         if (log == Material.MANGROVE_LOG) return Material.MANGROVE_PROPAGULE;
         return Material.matchMaterial(log.name().replace("_LOG", "_SAPLING"));
@@ -159,6 +172,8 @@ final class LumberjackJob {
         private final Material kind;
         private int phase, time, wait, hits;
         private Block current;
+        private boolean cleared; // leaves in the way around the trunk: cut first
+        private final List<Block> leaves = new ArrayList<>();
         private final boolean replant;
         private static final int HITS = 5; // swings per log
 
@@ -173,6 +188,53 @@ final class LumberjackJob {
         @Override
         public boolean tick() {
             time++;
+            if (phase == 0 && !cleared) {
+                cleared = true;
+                leaves.addAll(leavesAround(base));
+                if (!leaves.isEmpty()) {
+                    if (!w.mover.go(base.getLocation().add(0.5, 0, 0.5), 4.5, w.plugin.settings().workSpeed())) {
+                        w.skip(base, 2400);
+                        return true;
+                    }
+                    phase = 3;
+                    time = 0;
+                    return false;
+                }
+            }
+            if (phase == 3) { // walking up to the leaves
+                Location me = w.body.getLocation();
+                double dx = base.getX() + 0.5 - me.getX(), dz = base.getZ() + 0.5 - me.getZ();
+                if (dx * dx + dz * dz <= 4.8 * 4.8 || w.mover.arrived()) {
+                    w.mover.stop();
+                    phase = 4;
+                    Location eye = w.body.getEyeLocation();
+                    leaves.sort(Comparator.comparingDouble(b -> b.getLocation().add(0.5, 0.5, 0.5).distanceSquared(eye)));
+                } else if (w.mover.failed() || time > 600) {
+                    w.skip(base, 2400);
+                    return true;
+                }
+                return false;
+            }
+            if (phase == 4) { // cutting the leaves away, a few swings each (they drop saplings and sticks as usual)
+                if (--wait > 0) return false;
+                wait = 4;
+                while (!leaves.isEmpty() && (!(leaves.get(0).getBlockData() instanceof Leaves)
+                        || leaves.get(0).getLocation().add(0.5, 0.5, 0.5).distanceSquared(w.body.getEyeLocation()) > 5.5 * 5.5)) leaves.remove(0);
+                if (leaves.isEmpty()) {
+                    phase = 0;
+                    time = 0;
+                    return false;
+                }
+                Block leaf = leaves.get(0);
+                w.anim.look(leaf.getLocation().add(0.5, 0.5, 0.5));
+                w.body.swingMainHand();
+                if (++hits < 2) return false;
+                hits = 0;
+                leaves.remove(0);
+                leaf.getWorld().playEffect(leaf.getLocation(), Effect.DESTROY_BLOCK, leaf.getBlockData());
+                leaf.breakNaturally();
+                return false;
+            }
             if (phase == 0) {
                 if (!w.mover.go(base.getLocation().add(0.5, 0, 0.5), 2.0, w.plugin.settings().workSpeed())) {
                     w.skip(base, 2400);

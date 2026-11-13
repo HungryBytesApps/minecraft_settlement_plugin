@@ -178,7 +178,7 @@ final class HerderJob {
             Activity d = Work.deposit(w, t, keep);
             if (d != null) return d;
         }
-        if (herd.isEmpty()) w.workStatus = "No animals in the settlement";
+        if (herd.isEmpty()) w.workStatus = "No animals in pens (fences, walls, gates)";
         else if (missingFood != null) w.workStatus = "Needs " + missingFood + " to breed (none in storage)";
         else w.workStatus = "Looking after the animals";
         return null;
@@ -228,6 +228,7 @@ final class HerderJob {
         for (Animals a : c.getWorld().getNearbyEntitiesByType(Animals.class, c, (box[1] - box[0]) / 2.0 + 1, 16, (box[3] - box[2]) / 2.0 + 1)) {
             if (!FOOD.containsKey(a.getType()) || !t.contains(a.getLocation(), radius) || a.isDead()) continue;
             if (a.getPersistentDataContainer().has(Keys.TOWN)) continue; // never someone's settler
+            if (!penned(a)) continue; // only animals in a pen: wild ones are left alone
             out.computeIfAbsent(a.getType(), k -> new ArrayList<>()).add(a);
         }
         return out;
@@ -321,6 +322,54 @@ final class HerderJob {
             return near.isEmpty() ? List.of(animal.getLocation()) : near;
         }
         return cells;
+    }
+
+    private record Penned(boolean in, int at) {}
+
+    private static final Map<UUID, Penned> pennedCache = new HashMap<>();
+
+    /**
+     * In a pen: it can't walk far (fenced in) and fences, walls or gates are part of what holds it in
+     * (not just a hole or a cave). Checked every 10 seconds per animal.
+     */
+    static boolean penned(Entity animal) {
+        int now = org.bukkit.Bukkit.getCurrentTick();
+        Penned c = pennedCache.get(animal.getUniqueId());
+        if (c != null && now - c.at() < 200) return c.in();
+        if (pennedCache.size() > 2000) pennedCache.values().removeIf(p -> now - p.at() >= 200);
+        org.bukkit.World world = animal.getWorld();
+        org.bukkit.block.Block start = animal.getLocation().getBlock();
+        Set<Long> seen = new HashSet<>();
+        Deque<int[]> todo = new ArrayDeque<>();
+        todo.add(new int[]{start.getX(), start.getY(), start.getZ()});
+        seen.add(key(start.getX(), start.getY(), start.getZ()));
+        int cells = 0;
+        boolean fenced = false;
+        while (!todo.isEmpty() && cells < 400) {
+            int[] p = todo.poll();
+            cells++;
+            for (int[] d : new int[][]{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) {
+                int x = p[0] + d[0], z = p[2] + d[1];
+                boolean moved = false;
+                for (int dy = -1; dy <= 1 && !moved; dy++) {
+                    int y = p[1] + dy;
+                    if (!PathFinder.walkable(world, x, y, z)) continue;
+                    org.bukkit.Material m = world.getBlockAt(x, y, z).getType();
+                    if (isPenSide(m) || isPenSide(world.getBlockAt(x, y - 1, z).getType())) continue; // can't go over a fence either
+                    moved = true;
+                    if (seen.add(key(x, y, z))) todo.add(new int[]{x, y, z});
+                }
+                if (!moved && !fenced)
+                    for (int dy = -1; dy <= 1; dy++) if (isPenSide(world.getBlockAt(x, p[1] + dy, z).getType())) fenced = true;
+            }
+        }
+        boolean in = cells < 400 && fenced;
+        pennedCache.put(animal.getUniqueId(), new Penned(in, now));
+        return in;
+    }
+
+    private static boolean isPenSide(org.bukkit.Material m) {
+        return org.bukkit.Tag.FENCES.isTagged(m) || org.bukkit.Tag.WALLS.isTagged(m) || org.bukkit.Tag.FENCE_GATES.isTagged(m) || m.name().endsWith("_CARPET");
     }
 
     private static long key(int x, int y, int z) {

@@ -88,7 +88,7 @@ the work. **In use** (checkbox) switches the workstation off without removing th
 - **Furnace – furnace worker**: only what smokers and blast furnaces can't do (stone types, glass, bricks,
   dyes, charcoal…) and **only what you set a storage target for**.
 - Furnace jobs fetch fuel from storage (coal, charcoal, wood). A cold furnace is only lit for a full batch (8 items, one coal), unless fewer are wanted.
-- **Loom – herder**: per kind of animal a checkbox and **Adults** (2–20): breeds up to that number with food
+- **Loom – herder**: only looks after animals in a pen (fenced in with fences, walls or gates; wild ones are left alone). per kind of animal a checkbox and **Adults** (2–20): breeds up to that number with food
   from storage and slaughters the extra adults. Unchecked kinds are left alone (no breeding, no killing).
   Shears sheep (shears from storage), collects drops and eggs, closes gates behind it, climbs over a fence
   with a carpet on top. **Bees** (On): harvests full beehives and bee nests, honey with a glass
@@ -97,7 +97,7 @@ the work. **In use** (checkbox) switches the workstation off without removing th
   "Beehive needs room for a campfire"). Milks a cow when someone asks for milk. **Throw eggs**: throws spare eggs into the chicken pen for chicks, only when there are
   fewer chickens than wanted and the eggs' storage target is reached (no egg target = no throwing).
 - **Fletching table – lumberjack**: fells real trees (logs on dirt with natural leaves) with an axe from
-  storage, inside or outside the settlement (toggle). **Replant saplings** On/Off.
+  storage, inside or outside the settlement (toggle). **Replant saplings** On/Off. Low leaves around the trunk are cut away first.
 - **Brewing stand – brewer**: brews every potion (also long, strong, splash and lingering) by storage target
   (Storage targets → pick an effect; no target = don't brew), with the real brewing stand: fills glass bottles at
   water near the stand, nether wart, then the ingredients one by one, blaze powder as fuel. Makes blaze powder,
