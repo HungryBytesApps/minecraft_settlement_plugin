@@ -36,7 +36,7 @@ final class FilterMenu {
         fish.addAll(Fishing.JUNK);
         put(g, "Fish & catch", fish);
         put(g, "Brewing", Brewer.stock());
-        put(g, "Wood", LumberjackJob.PRODUCTS);
+        put(g, "Wood", wood());
         Set<Material> ores = new HashSet<>(FurnaceJob.inputs(Worker.Job.SMELTER));
         ores.addAll(FurnaceJob.products(Worker.Job.SMELTER));
         put(g, "Ores & metals", ores);
@@ -45,7 +45,25 @@ final class FilterMenu {
         put(g, "Stone, glass & other", stone);
         put(g, "Weapons, tools & armor", SmithJob.PRODUCTS);
         put(g, "Fuel", List.of(Material.COAL, Material.CHARCOAL, Material.COAL_BLOCK, Material.DRIED_KELP_BLOCK, Material.BLAZE_ROD));
+        // Wood only in Wood (logs are also furnace input and fuel).
+        Set<Material> wood = new HashSet<>(wood());
+        wood.remove(Material.APPLE); // also food
+        for (Map.Entry<String, List<Material>> e : g.entrySet())
+            if (!e.getKey().equals("Wood") && !e.getKey().equals("In this chest now")) e.getValue().removeIf(wood::contains);
         return g;
+    }
+
+    /** Everything wooden: logs, wood, stripped, planks, slabs, stairs, saplings, leaves, sticks, bamboo. */
+    private static Set<Material> wood() {
+        Set<Material> s = new HashSet<>(LumberjackJob.PRODUCTS);
+        for (Material m : Material.values()) {
+            if (m.isLegacy() || !m.isItem()) continue;
+            if (org.bukkit.Tag.LOGS.isTagged(m) || org.bukkit.Tag.PLANKS.isTagged(m) || org.bukkit.Tag.WOODEN_SLABS.isTagged(m)
+                    || org.bukkit.Tag.WOODEN_STAIRS.isTagged(m) || org.bukkit.Tag.SAPLINGS.isTagged(m) || org.bukkit.Tag.LEAVES.isTagged(m)) s.add(m);
+        }
+        s.addAll(List.of(Material.STICK, Material.BAMBOO, Material.BAMBOO_BLOCK, Material.STRIPPED_BAMBOO_BLOCK, Material.MANGROVE_ROOTS,
+                Material.MUDDY_MANGROVE_ROOTS, Material.MANGROVE_PROPAGULE));
+        return s;
     }
 
     private static void put(Map<String, List<Material>> g, String name, Collection<Material> items) {

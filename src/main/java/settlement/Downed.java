@@ -49,6 +49,8 @@ final class Downed {
         w.body.setHealth(1);
         w.body.setInvulnerable(true);
         w.body.setPose(Pose.SLEEPING, true); // flat on the ground
+        w.downedAt = w.body.getLocation();
+        w.body.setCollidable(false); // can't be pushed around
         clickArea(w, true);
         mark(w.body, true);
         w.body.getPersistentDataContainer().set(KEY, PersistentDataType.BYTE, (byte) 1);
@@ -66,10 +68,14 @@ final class Downed {
             die(w);
             return;
         }
-        if (ticks % 50 == 0 && w.random.nextInt(2) == 0) { // turning the head, as if in pain
-            Location look = w.body.getEyeLocation().add(w.random.nextDouble() * 4 - 2, w.random.nextDouble() * 1.5 - 0.5, w.random.nextDouble() * 4 - 2);
-            w.anim.look(look);
+        // Lies still, exactly where and how it fell.
+        Location here = w.body.getLocation();
+        if (w.downedAt != null && (here.getWorld() != w.downedAt.getWorld() || here.distanceSquared(w.downedAt) > 0.0004
+                || Math.abs(here.getYaw() - w.downedAt.getYaw()) > 0.5f || Math.abs(here.getPitch() - w.downedAt.getPitch()) > 0.5f)) {
+            w.body.teleport(w.downedAt);
+            w.body.setVelocity(new org.bukkit.util.Vector());
         }
+        if (ticks % 20 == 0 && !w.body.isGlowing()) mark(w.body, true); // the outline never goes missing
         if (ticks % 30 == 0) w.body.getWorld().spawnParticle(Particle.DAMAGE_INDICATOR, w.body.getLocation().add(0, 0.4, 0), 1, 0.3, 0.1, 0.3, 0);
         if (ticks % 400 == 0) {
             Bubbles.say(w.plugin, w.body, HELP.get(w.random.nextInt(HELP.size())), 60);
@@ -83,6 +89,8 @@ final class Downed {
         w.downedUntil = 0;
         w.body.getPersistentDataContainer().remove(KEY);
         w.body.setInvulnerable(false);
+        w.body.setCollidable(true);
+        w.downedAt = null;
         w.body.setPose(Pose.STANDING, false);
         clickArea(w, false);
         w.body.setHealth(Math.max(1, Combat.maxHealth(w.body) * 0.4));
@@ -118,20 +126,31 @@ final class Downed {
 
     /** Lying down it's hard to click (tiny), so a click area lies over it. */
     static final NamespacedKey CLICK = new NamespacedKey(Keys.NS, "downed_click");
-    private static final Map<UUID, org.bukkit.entity.Interaction> areas = new HashMap<>();
+    private static final Map<UUID, List<org.bukkit.entity.Interaction>> areas = new HashMap<>();
 
+    /** Click boxes over the whole body: lying down it reaches out from the feet (which way depends on how it fell). */
     private static void clickArea(Worker w, boolean on) {
-        org.bukkit.entity.Interaction old = areas.remove(w.body.getUniqueId());
-        if (old != null) old.remove();
+        List<org.bukkit.entity.Interaction> old = areas.remove(w.body.getUniqueId());
+        if (old != null) old.forEach(org.bukkit.entity.Entity::remove);
         if (!on) return;
         Location at = w.body.getLocation();
-        areas.put(w.body.getUniqueId(), at.getWorld().spawn(at, org.bukkit.entity.Interaction.class, i -> {
-            i.setInteractionWidth(1.6f);
-            i.setInteractionHeight(0.6f);
-            i.setResponsive(true);
-            i.setPersistent(false);
-            i.getPersistentDataContainer().set(CLICK, PersistentDataType.STRING, w.body.getUniqueId().toString());
-        }));
+        double yaw = Math.toRadians(at.getYaw());
+        double fx = -Math.sin(yaw), fz = Math.cos(yaw); // forward
+        List<org.bukkit.entity.Interaction> boxes = new java.util.ArrayList<>();
+        double[][] offsets = {{0, 0}, {fx, fz}, {-fx, -fz}, {-fz, fx}, {fz, -fx}};
+        for (double[] o : offsets) {
+            Location l = at.clone().add(o[0], 0, o[1]);
+            l.setYaw(0);
+            l.setPitch(0);
+            boxes.add(at.getWorld().spawn(l, org.bukkit.entity.Interaction.class, i -> {
+                i.setInteractionWidth(1.2f);
+                i.setInteractionHeight(0.6f);
+                i.setResponsive(true);
+                i.setPersistent(false);
+                i.getPersistentDataContainer().set(CLICK, PersistentDataType.STRING, w.body.getUniqueId().toString());
+            }));
+        }
+        areas.put(w.body.getUniqueId(), boxes);
     }
 
     /** The click area of a downed settler: whose it is (null: not one). */

@@ -462,8 +462,7 @@ final class Worker {
         }
         if (ticks % 20 == 0) Downed.markTick(this);
         if (downedUntil > 0) { // lying on the ground, waiting for help
-            Downed.tick(this, ticks);
-            anim.tick();
+            Downed.tick(this, ticks); // no head turning: lying down, that turns the whole body
             return;
         }
         // Someone is talking to it (its menu is open): stand still and look at them.
@@ -574,6 +573,8 @@ final class Worker {
 
     /** Downed (health ran out): lies there until this tick, waiting for help (0: not downed). See Downed. */
     int downedUntil;
+    /** Where (and which way) it lies while downed: it stays exactly there. */
+    org.bukkit.Location downedAt;
     /** Find: glows and shows on the locator bar until this tick (0: not). */
     int markUntil;
     private boolean downedChecked;
