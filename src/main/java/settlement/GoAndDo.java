@@ -56,7 +56,7 @@ final class GoAndDo implements Activity {
                 ok = w.mover.go(center, reach, w.plugin.settings().workSpeed());
             }
             if (!ok) {
-                unreachable(); // can't get there: leave it for a minute
+                unreachable(true); // no way there at all: leave it for a minute
                 return true;
             }
             phase = 1;
@@ -82,7 +82,7 @@ final class GoAndDo implements Activity {
                 wait = 8;
             } else if (w.mover.failed() || ++time > 600) {
                 w.mover.stop();
-                unreachable();
+                unreachable(false); // got stuck on the way (other settlers, a door...): just try again later
                 return true;
             }
         }
@@ -104,23 +104,27 @@ final class GoAndDo implements Activity {
 
     /** Walk to an open spot right next to the chest (a side you can stand at). Null if none can be reached. */
     private Location goNextTo(Block chest) {
+        // Any spot within 2 blocks it can stand on (like a player's reach): right in front first, then further.
         java.util.List<Location> spots = new java.util.ArrayList<>();
-        int[][] sides = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
-        for (int[] d : sides) {
-            int x = chest.getX() + d[0], z = chest.getZ() + d[1];
-            for (int dy : new int[]{0, -1, 1}) {
-                int y = chest.getY() + dy;
-                if (PathFinder.walkable(chest.getWorld(), x, y, z)) {
-                    spots.add(new Location(chest.getWorld(), x + 0.5, y, z + 0.5));
-                    break;
+        for (int dx = -2; dx <= 2; dx++) {
+            for (int dz = -2; dz <= 2; dz++) {
+                if (dx == 0 && dz == 0) continue;
+                for (int dy : new int[]{0, -1, 1, -2}) {
+                    int x = chest.getX() + dx, y = chest.getY() + dy, z = chest.getZ() + dz;
+                    if (PathFinder.walkable(chest.getWorld(), x, y, z)) {
+                        spots.add(new Location(chest.getWorld(), x + 0.5, y, z + 0.5));
+                        break;
+                    }
                 }
             }
         }
         Location me = w.body.getLocation();
-        // Standing at the chest's own level first, then the nearest.
-        spots.sort(java.util.Comparator.comparingDouble(l -> Math.abs(l.getY() - chest.getY()) * 100 + l.distanceSquared(me)));
+        Location c = chest.getLocation().add(0.5, 0, 0.5);
+        spots.sort(java.util.Comparator.comparingDouble(l -> Math.abs(l.getY() - chest.getY()) * 3 + l.distanceSquared(c) * 2 + l.distanceSquared(me) * 0.01));
+        int tries = 0;
         for (Location l : spots) {
             if (w.mover.go(l, 0.3, w.plugin.settings().workSpeed())) return l;
+            if (++tries >= 6) break; // the nearest few: if none of those can be reached, the rest won't either
         }
         return null;
     }
@@ -165,9 +169,24 @@ final class GoAndDo implements Activity {
         return label;
     }
 
-    /** Can't get there: leave it for a minute; a chest or workstation goes in the problem log. */
-    private void unreachable() {
+    /** Block → how often in a row no way was found to it, and since when. */
+    private static final java.util.Map<Block, int[]> noWay = new java.util.HashMap<>();
+
+    /**
+     * Can't get there: leave it for a minute. A chest or workstation with no way to it three times within 10
+     * minutes goes in the problem log (once could be a settler in the way, a door...).
+     */
+    private void unreachable(boolean noPath) {
         w.skip(target, 1200);
+        if (!noPath) return;
+        int now = org.bukkit.Bukkit.getCurrentTick();
+        int[] f = noWay.get(target);
+        if (f == null || now - f[1] > 12000 || now < f[1]) f = new int[]{0, now};
+        f[0]++;
+        noWay.put(target, f);
+        if (noWay.size() > 500) noWay.values().removeIf(v -> now - v[1] > 12000 || now < v[1]);
+        if (f[0] < 3) return;
+        noWay.remove(target);
         Town t = w.town();
         if (t != null && (Town.isStorage(target) || t.workplace(target.getLocation()) != null)) {
             TownLog.settler(w, "can't reach the " + Work.nice(target.getType()) + " at " + target.getX() + ", " + target.getY() + ", " + target.getZ(),

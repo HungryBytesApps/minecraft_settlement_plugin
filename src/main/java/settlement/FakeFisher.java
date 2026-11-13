@@ -114,6 +114,8 @@ final class FakeFisher {
     private Vector3d hook;
     private boolean biting, removed, inUse = true;
     private int sinceUpdate;
+    /** The settler is marked (glow + locator bar): the fake shows that too. */
+    private boolean marked;
 
     private FakeFisher(Worker w) {
         this.w = w;
@@ -134,6 +136,13 @@ final class FakeFisher {
     /** Call every tick while fishing: players coming close see it, players leaving get the settler back. */
     void tick() {
         if (++sinceUpdate >= 10) update();
+        boolean m = w.body.isGlowing();
+        if (m != marked) { // Find / downed marker switched on or off: the fake follows
+            marked = m;
+            all(this::flags);
+            if (!m) all(() -> waypoint(false));
+            else all(() -> waypoint(true));
+        }
         if (pending.isEmpty() || removed) return;
         int now = Bukkit.getCurrentTick();
         for (java.util.Iterator<Map.Entry<UUID, Integer>> it = pending.entrySet().iterator(); it.hasNext(); ) {
@@ -198,6 +207,11 @@ final class FakeFisher {
         List<EntityData<?>> data = new ArrayList<>();
         data.add(new EntityData<>(SKIN_PARTS, EntityDataTypes.BYTE, (byte) 0x7F)); // all skin layers (jacket, sleeves, hat...)
         send(p, new WrapperPlayServerEntityMetadata(id, data));
+        marked = w.body.isGlowing();
+        if (marked) {
+            send(p, flags());
+            send(p, waypoint(true));
+        }
         List<Equipment> eq = new ArrayList<>();
         eq.add(new Equipment(EquipmentSlot.MAIN_HAND, SpigotConversionUtil.fromBukkitItemStack(new ItemStack(Material.FISHING_ROD))));
         send(p, new WrapperPlayServerEntityEquipment(id, eq));
@@ -209,6 +223,7 @@ final class FakeFisher {
     }
 
     private void hideFrom(Player p) {
+        if (marked) send(p, waypoint(false));
         send(p, new WrapperPlayServerDestroyEntities(hookId, id));
         forget(p);
         p.showEntity(w.plugin, w.body);
@@ -338,6 +353,26 @@ final class FakeFisher {
     private WrapperPlayServerSpawnEntity spawnHook(Vector3d pos, Vector3d velocity) {
         return new WrapperPlayServerSpawnEntity(hookId, Optional.of(UUID.randomUUID()), EntityTypes.FISHING_BOBBER, pos, 0f, 0f, 0f,
                 id, Optional.ofNullable(velocity)); // data = the owner: the line runs to its hand
+    }
+
+    /** Entity flags: glowing outline (0x40) while marked. */
+    private WrapperPlayServerEntityMetadata flags() {
+        List<EntityData<?>> data = new ArrayList<>();
+        data.add(new EntityData<>(0, EntityDataTypes.BYTE, (byte) (marked ? 0x40 : 0)));
+        return new WrapperPlayServerEntityMetadata(id, data);
+    }
+
+    /** A dot on the locator bar where it fishes (the hidden settler can't show one). */
+    private com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerWaypoint waypoint(boolean on) {
+        com.github.retrooper.packetevents.protocol.world.waypoint.TrackedWaypoint wp = new com.github.retrooper.packetevents.protocol.world.waypoint.TrackedWaypoint(
+                com.github.retrooper.packetevents.util.Either.createLeft(uuid),
+                new com.github.retrooper.packetevents.protocol.world.waypoint.WaypointIcon(
+                        com.github.retrooper.packetevents.protocol.world.waypoint.WaypointIcon.ICON_STYLE_DEFAULT, null),
+                new com.github.retrooper.packetevents.protocol.world.waypoint.Vec3iWaypointInfo(
+                        new com.github.retrooper.packetevents.util.Vector3i(at.getBlockX(), at.getBlockY() + 1, at.getBlockZ())));
+        return new com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerWaypoint(
+                on ? com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerWaypoint.Operation.TRACK
+                        : com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerWaypoint.Operation.UNTRACK, wp);
     }
 
     private WrapperPlayServerEntityMetadata bitingData(boolean on) {

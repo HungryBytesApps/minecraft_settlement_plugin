@@ -190,6 +190,7 @@ final class WorkerListener implements Listener {
             Downed.helpClick(p, w);
             return;
         }
+        Downed.found(w); // found it: the Find marker ends
         if (w.canManage(p)) { // your own settler: its menu (no ledger needed)
             w.pauseFor(p, 1200); // waits while you're in its menu
             Menus.settler(plugin, p, w);

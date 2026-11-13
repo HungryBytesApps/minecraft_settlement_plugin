@@ -181,4 +181,4 @@ mineskin-api-key: ""
 downed-minutes: 5
 revive-seconds: 3
 # Find (settler menu): how long a settler glows and shows on the locator bar.
-find-minutes: 2
+find-minutes: 1

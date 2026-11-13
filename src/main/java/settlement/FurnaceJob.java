@@ -154,6 +154,11 @@ final class FurnaceJob {
                 && (out.getAmount() >= 8 || (asked.containsKey(out.getType()) && out.getAmount() + w.count(out.getType()) >= asked.get(out.getType())));
         boolean carryInput = carries(w, wantedInput);
         boolean carryFuel = carries(w, FurnaceJob::isFuel);
+        // Only worth a walk when what it carries can actually go in (the same item as already in there, or an empty slot).
+        ItemStack curIn = in, curFuel = fuel;
+        boolean inputFits = carries(w, m -> wantedInput.test(m) && fits(curIn, m));
+        boolean fuelFits = carries(w, m -> isFuel(m) && fits(curFuel, m));
+        boolean resultFits = out == null || out.getType().isAir() || w.pockets.firstEmpty() >= 0 || w.pockets.containsAtLeast(new ItemStack(out.getType()), 1);
 
         if (Work.needsDeposit(w, keep, false)) {
             Activity d = Work.deposit(w, t, keep);
@@ -161,7 +166,17 @@ final class FurnaceJob {
         }
         // Go to the furnace: take out the results, put in what it carries.
         boolean roomForInput = !hasInputHere || in.getAmount() < in.getMaxStackSize();
-        if (resultReady || (carryInput && roomForInput) || (carryFuel && (!fuelHere || fuel.getAmount() < 8) && (hasInputHere || carryInput))) {
+        // Fuel burns on whether there's anything left to smelt or not: a cold furnace only starts with a full
+        // batch (8, what one coal does), unless fewer are wanted (a request, or a target that's almost there).
+        boolean burning = furnace.getBurnTime() > 0;
+        int batch = (hasInputHere ? in.getAmount() : 0) + countCarried(w, wantedInput);
+        boolean batchOk = burning || batch >= 8 || fewerWanted(w, t, recipes, asked, hasInputHere ? in.getType() : null, batch, radius);
+        if (w.isSkipped(fb)) { // just tended it and nothing could be done: not again right away
+            w.workStatus = hasInputHere ? capital(verb(wp)) + "ing" : "Waiting";
+            return null;
+        }
+        if ((resultReady && resultFits) || (inputFits && roomForInput && batchOk)
+                || (fuelFits && (!fuelHere || fuel.getAmount() < 8) && (hasInputHere || inputFits) && batchOk)) {
             w.workStatus = "Tending the " + Work.nice(fb.getType());
             return new GoAndDo(w, fb, 2.0, "Tending the " + Work.nice(fb.getType()), b -> b.getState(false) instanceof Furnace, b -> tend(w, b, wantedInput));
         }
@@ -174,9 +189,13 @@ final class FurnaceJob {
             if (!w.workStatus.isEmpty()) foodNote = w.workStatus;
         }
         // Get things to cook/smelt (while the furnace runs low), and fuel.
-        if (!carryInput && (!hasInputHere || in.getAmount() < 16)) {
+        if ((!carryInput && (!hasInputHere || in.getAmount() < 16)) || !batchOk) {
             Activity a = Work.fetch(w, t, wantedInput, 64, "Getting things to " + verb(wp));
             if (a != null) return a;
+        }
+        if (!batchOk) {
+            w.workStatus = "Waiting for enough to " + verb(wp) + " (8 for a coal)";
+            return null;
         }
         if (!carryFuel && (!fuelHere || fuel.getAmount() < 4) && (hasInputHere || carryInput)) {
             Activity a = Work.fetch(w, t, m -> GOOD_FUEL.contains(m), 16, "Getting fuel");
@@ -185,8 +204,8 @@ final class FurnaceJob {
             w.workStatus = "Needs fuel (coal, charcoal, wood) in storage";
             return null;
         }
-        if (out != null && !out.getType().isAir()) {
-            // A few results waiting and nothing else to do: collect them anyway.
+        if (out != null && !out.getType().isAir() && !hasInputHere && resultFits) {
+            // Done smelting, a few results left: collect them.
             w.workStatus = "Tending the " + Work.nice(fb.getType());
             return new GoAndDo(w, fb, 2.0, "Tending the " + Work.nice(fb.getType()), b -> b.getState(false) instanceof Furnace, b -> tend(w, b, wantedInput));
         }
@@ -206,6 +225,7 @@ final class FurnaceJob {
     private static void tend(Worker w, Block b, Predicate<Material> wantedInput) {
         if (!(b.getState(false) instanceof Furnace f)) return;
         FurnaceInventory fi = f.getInventory();
+        String before = String.valueOf(fi.getResult()) + fi.getSmelting() + fi.getFuel();
         ItemStack out = fi.getResult();
         if (out != null && !out.getType().isAir()) {
             Map<Integer, ItemStack> left = w.pockets.addItem(out.clone());
@@ -214,7 +234,34 @@ final class FurnaceJob {
         fill(w, fi, true, wantedInput);
         fill(w, fi, false, FurnaceJob::isFuel);
         w.savePockets();
-        b.getWorld().playSound(b.getLocation().add(0.5, 0.5, 0.5), "minecraft:block.fire.ambient", SoundCategory.BLOCKS, 0.6f, 1.2f);
+        boolean changed = !before.equals(String.valueOf(fi.getResult()) + fi.getSmelting() + fi.getFuel());
+        if (!changed) w.skip(b, 600); // nothing it could do here: leave it for half a minute
+    }
+
+    private static int countCarried(Worker w, Predicate<Material> test) {
+        int n = 0;
+        for (ItemStack it : w.pockets.getContents()) if (it != null && test.test(it.getType())) n += it.getAmount();
+        return n;
+    }
+
+    /** Fewer than a batch is all that's wanted of what this makes (asked for, or a target that's nearly reached). */
+    private static boolean fewerWanted(Worker w, Town t, Map<Material, Material> recipes, Map<Material, Integer> asked, Material inFurnace,
+                                       int batch, int radius) {
+        Set<Material> outs = new HashSet<>();
+        if (inFurnace != null && recipes.containsKey(inFurnace)) outs.add(recipes.get(inFurnace));
+        for (ItemStack it : w.pockets.getContents()) if (it != null && recipes.containsKey(it.getType())) outs.add(recipes.get(it.getType()));
+        if (outs.isEmpty()) return false;
+        for (Material o : outs) {
+            if (asked.containsKey(o)) continue;
+            Integer target = t.targets.get(o);
+            if (target == null || target - t.count(o, radius) > batch) return false; // more wanted than it has: wait for more
+        }
+        return true;
+    }
+
+    /** Can this go into a furnace slot holding {@code cur}? */
+    private static boolean fits(ItemStack cur, Material m) {
+        return cur == null || cur.getType().isAir() || (cur.getType() == m && cur.getAmount() < cur.getMaxStackSize());
     }
 
     private static void fill(Worker w, FurnaceInventory fi, boolean input, Predicate<Material> test) {

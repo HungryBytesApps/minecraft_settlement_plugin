@@ -190,9 +190,16 @@ final class Downed {
 
     /** Find: the settler glows and shows on the locator bar for find-minutes. */
     static void find(Worker w) {
-        int minutes = Math.max(1, w.plugin.getConfig().getInt("find-minutes", 2));
+        int minutes = Math.max(1, w.plugin.getConfig().getInt("find-minutes", 1));
         w.markUntil = Bukkit.getCurrentTick() + minutes * 1200;
         mark(w.body, true);
+    }
+
+    /** Found (clicked): the Find marker ends now. */
+    static void found(Worker w) {
+        if (w.markUntil == 0) return;
+        w.markUntil = 0;
+        if (!is(w)) mark(w.body, false);
     }
 
     /** Called now and then: the Find marker ends (a downed settler keeps its marker). */

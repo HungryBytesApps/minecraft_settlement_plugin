@@ -87,7 +87,7 @@ the work. **In use** (checkbox) switches the workstation off without removing th
 - **Blast furnace – smelter**: ores and raw metal.
 - **Furnace – furnace worker**: only what smokers and blast furnaces can't do (stone types, glass, bricks,
   dyes, charcoal…) and **only what you set a storage target for**.
-- Furnace jobs fetch fuel from storage (coal, charcoal, wood).
+- Furnace jobs fetch fuel from storage (coal, charcoal, wood). A cold furnace is only lit for a full batch (8 items, one coal), unless fewer are wanted.
 - **Loom – herder**: per kind of animal a checkbox and **Adults** (2–20): breeds up to that number with food
   from storage and slaughters the extra adults. Unchecked kinds are left alone (no breeding, no killing).
   Shears sheep (shears from storage), collects drops and eggs, closes gates behind it, climbs over a fence
@@ -174,7 +174,7 @@ goes under a real roof. They close the doors behind them.
 - Nobody comes within `downed-minutes` (default 5): it dies. Its things lie in a **grave**: a skull and bones on
   the ground, glowing and on the locator bar. Right-click it (founder, members) to take them; empty, it's gone.
   Nothing on it: no grave. Graves are kept in `graves.yml`.
-- **Find** (settler menu): the settler glows and shows on your locator bar for `find-minutes`.
+- **Find** (settler menu): the settler glows and shows on your locator bar for `find-minutes` (default 1), or until you click it.
 
 ## Guards and defense
 
