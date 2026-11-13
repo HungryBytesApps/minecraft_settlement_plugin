@@ -143,35 +143,12 @@ final class TargetsMenu {
 
     /** The item's own (small) icon inside the text. */
     static Component icon(Material m) {
-        String name = m.getKey().getKey();
         if (m == Material.SHIELD) return Component.empty(); // drawn as a 3D model, no flat texture
-        if (m == Material.CROSSBOW) name = "crossbow_standby";
-        if (name.endsWith("_wood")) name = name.substring(0, name.length() - 5) + "_log";         // bark all round: the log's picture
-        else if (name.endsWith("_hyphae")) name = name.substring(0, name.length() - 7) + "_stem";
-        switch (m) { // blocks whose picture is not called after the block
-            case BAMBOO -> {
-                return Component.object(net.kyori.adventure.text.object.ObjectContents.sprite(
-                        net.kyori.adventure.key.Key.key("minecraft", "items"), net.kyori.adventure.key.Key.key("minecraft", "item/bamboo")));
-            }
-            case LILY_PAD, TRIPWIRE_HOOK -> { // flat items that use the block's picture
-                return Component.object(net.kyori.adventure.text.object.ObjectContents.sprite(
-                        net.kyori.adventure.key.Key.key("minecraft", "blocks"), net.kyori.adventure.key.Key.key("minecraft", "block/" + name)));
-            }
-            case CACTUS, MELON, PUMPKIN, BASALT, ANCIENT_DEBRIS, QUARTZ_BLOCK -> name = name + "_side";
-            case DRIED_KELP_BLOCK -> name = "dried_kelp_side";
-            case SMOOTH_QUARTZ -> name = "quartz_block_bottom";
-            case SMOOTH_SANDSTONE -> name = "sandstone_top";
-            case SMOOTH_RED_SANDSTONE -> name = "red_sandstone_top";
-            default -> {
-            }
-        }
-        if (m.isBlock() && m.isSolid() && m != Material.CAKE) {
-            String pack = PackIcons.BLOCKS.get(m.getKey().getKey()); // the resource pack's own picture
-            return Component.object(net.kyori.adventure.text.object.ObjectContents.sprite(
-                    net.kyori.adventure.key.Key.key("minecraft", "blocks"), net.kyori.adventure.key.Key.key("minecraft", "block/" + (pack != null ? pack : name))));
-        }
+        String id = m.getKey().getKey();
+        String sprite = PackIcons.ICONS.getOrDefault(id, "item/" + id); // the picture the resource pack shows for it
+        String atlas = sprite.startsWith("block/") ? "blocks" : "items";
         return Component.object(net.kyori.adventure.text.object.ObjectContents.sprite(
-                net.kyori.adventure.key.Key.key("minecraft", "items"), net.kyori.adventure.key.Key.key("minecraft", "item/" + name)));
+                net.kyori.adventure.key.Key.key("minecraft", atlas), net.kyori.adventure.key.Key.key("minecraft", sprite)));
     }
 
     static String nice(Material m) {
