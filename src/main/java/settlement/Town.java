@@ -157,6 +157,8 @@ final class Town {
 
     /** All settlers of this town (also the ones in unloaded chunks): id → name. */
     final Map<UUID, String> settlers = new LinkedHashMap<>();
+    /** Where each settler was last seen (for settlers that are far away, in unloaded land). */
+    final Map<UUID, Location> lastSeen = new HashMap<>();
 
     private List<Block> containers = List.of();
     private int containersAt = -10000;

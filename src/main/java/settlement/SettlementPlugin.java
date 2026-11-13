@@ -97,7 +97,7 @@ public final class SettlementPlugin extends JavaPlugin {
     }
 
     /** Changes with every version I send, to check the right jar is installed. */
-    static final String BUILD = "2026-11-13 #102";
+    static final String BUILD = "2026-11-13 #103";
 
     @Override
     public boolean onCommand(org.bukkit.command.CommandSender sender, org.bukkit.command.Command cmd, String label, String[] args) {
@@ -341,6 +341,7 @@ public final class SettlementPlugin extends JavaPlugin {
         w.townId = null;
         if (t != null) {
             t.settlers.remove(w.body.getUniqueId());
+            t.lastSeen.remove(w.body.getUniqueId());
             for (Town.Workplace wp : t.workplaces.values()) wp.workers.remove(w.body.getUniqueId());
             towns.save();
         }
@@ -436,6 +437,7 @@ public final class SettlementPlugin extends JavaPlugin {
         Town t = w.town();
         if (t != null) {
             t.settlers.remove(w.body.getUniqueId());
+            t.lastSeen.remove(w.body.getUniqueId());
             for (Town.Workplace wp : t.workplaces.values()) {
                 wp.workers.remove(w.body.getUniqueId());
             }

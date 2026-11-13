@@ -509,6 +509,10 @@ final class Worker {
         mover.tick();
         anim.tick();
         healthTick();
+        if (ticks % 200 == 0) {
+            Town lt = town();
+            if (lt != null) lt.lastSeen.put(body.getUniqueId(), body.getLocation());
+        }
         if (ticks % 40 == 0 && TownLog.problem(workStatus)) TownLog.settler(this, workStatus, NamedTextColor.YELLOW);
         noticePlayers();
         if (--defenseCheck <= 0) {

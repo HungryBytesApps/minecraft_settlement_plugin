@@ -20,6 +20,7 @@ import org.bukkit.entity.Villager;
 import org.bukkit.inventory.ItemStack;
 
 import java.time.Duration;
+import org.bukkit.Location;
 import java.util.*;
 import java.util.function.Consumer;
 
@@ -420,15 +421,58 @@ final class Menus {
                 .append(Component.text("  " + doing, w.guard && w.unarmed() ? NamedTextColor.RED : NamedTextColor.GRAY));
     }
 
+    /** A settler in unloaded land: where it was last seen; bring it back to the bell, or (gone) take it off the list. */
+    static void farAway(SettlementPlugin plugin, Player p, Town t, UUID id, String note) {
+        String name = t.settlers.get(id);
+        if (name == null || plugin.workers().get(id) != null) {
+            settlers(plugin, p, t);
+            return;
+        }
+        Location at = t.lastSeen.get(id);
+        List<DialogBody> body = new ArrayList<>();
+        body.add(line(at == null ? name + " is far away; where is unknown." : name + " was last seen at " + at.getBlockX() + ", " + at.getBlockY() + ", "
+                + at.getBlockZ() + (at.getWorld() == t.world() ? "" : " (" + at.getWorld().getName() + ")") + ".", NamedTextColor.GRAY));
+        if (note != null) body.add(line(note, NamedTextColor.GOLD));
+        List<ActionButton> buttons = new ArrayList<>();
+        if (at != null && t.canManage(p)) buttons.add(button(plugin, "Bring back", NamedTextColor.WHITE, "Loads that spot and brings " + name + " to the bell", 200, pl -> {
+            pl.sendActionBar(Component.text("Looking for " + name + "...", NamedTextColor.GRAY));
+            org.bukkit.Chunk c = at.getChunk(); // loads it
+            c.addPluginChunkTicket(plugin);
+            Bukkit.getScheduler().runTaskLater(plugin, () -> { // its entities load a moment later
+                org.bukkit.entity.Entity en = Bukkit.getEntity(id);
+                c.removePluginChunkTicket(plugin);
+                if (en == null || !en.isValid()) {
+                    farAway(plugin, pl, t, id, name + " isn't there any more.");
+                    return;
+                }
+                Location bell = t.bell.clone();
+                Location to = bell.getWorld().getHighestBlockAt(bell.getBlockX() + 1, bell.getBlockZ()).getLocation().add(0.5, 1, 0.5);
+                en.teleport(to);
+                t.lastSeen.put(id, to);
+                pl.sendActionBar(Component.text(name + " is back at the bell.", NamedTextColor.GREEN));
+            }, 60L);
+        }));
+        if (t.isOwner(p)) buttons.add(button(plugin, "Remove from list", NamedTextColor.RED, "Only when " + name + " is really gone", 200, pl -> {
+            t.settlers.remove(id);
+            t.lastSeen.remove(id);
+            for (Town.Workplace wp : t.workplaces.values()) wp.workers.remove(id);
+            plugin.towns().save();
+            settlers(plugin, pl, t);
+        }));
+        buttons.add(button(plugin, "Back", NamedTextColor.GRAY, null, 200, pl -> settlers(plugin, pl, t)));
+        show(p, name, body, List.of(), DialogType.multiAction(buttons).columns(1).build());
+    }
+
     /** All settlers, one line each; each line opens that settler's menu. */
     static void settlers(SettlementPlugin plugin, Player p, Town t) {
         List<ActionButton> rows = new ArrayList<>();
         for (Map.Entry<UUID, String> e : t.settlers.entrySet()) {
             Worker w = plugin.workers().get(e.getKey());
             if (w == null) {
+                UUID id = e.getKey();
                 rows.add(ActionButton.create(Component.text(e.getValue() + "  ", NamedTextColor.DARK_GRAY).append(Component.text("far away", NamedTextColor.DARK_GRAY)),
-                        null, 380, click(plugin, (view, audience) -> {
-                            if (audience instanceof Player pl) Bukkit.getScheduler().runTask(plugin, () -> settlers(plugin, pl, t));
+                        Component.text("Where is " + e.getValue() + "?"), 380, click(plugin, (view, audience) -> {
+                            if (audience instanceof Player pl) Bukkit.getScheduler().runTask(plugin, () -> farAway(plugin, pl, t, id, null));
                         }, ONCE)));
                 continue;
             }

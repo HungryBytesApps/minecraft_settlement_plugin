@@ -126,7 +126,11 @@ final class Towns {
                 for (Map.Entry<String, Integer> h : wp.herds.entrySet()) w.set("herd-sizes." + h.getKey(), h.getValue());
                 for (Map.Entry<String, Boolean> o : wp.options.entrySet()) w.set("options." + o.getKey(), o.getValue());
             }
-            for (Map.Entry<UUID, String> e : t.settlers.entrySet()) s.set("settlers." + e.getKey(), e.getValue());
+            for (Map.Entry<UUID, String> e : t.settlers.entrySet()) {
+                s.set("settlers." + e.getKey(), e.getValue());
+                String at = Keys.ser(t.lastSeen.get(e.getKey()));
+                if (at != null) s.set("last-seen." + e.getKey(), at);
+            }
         }
         try {
             plugin.getDataFolder().mkdirs();
@@ -239,6 +243,8 @@ final class Towns {
                 for (String k : settlers.getKeys(false)) {
                     try {
                         t.settlers.put(UUID.fromString(k), settlers.getString(k, "Settler"));
+                        Location at = Keys.deser(s.getString("last-seen." + k));
+                        if (at != null) t.lastSeen.put(UUID.fromString(k), at);
                     } catch (IllegalArgumentException ignored) {
                     }
                 }
