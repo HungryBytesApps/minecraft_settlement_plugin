@@ -33,8 +33,10 @@ final class LumberjackJob {
 
     static Activity next(Worker w, Town t, Town.Workplace wp) {
         Predicate<Material> keep = m -> Tag.SAPLINGS.isTagged(m) || m == Material.MANGROVE_PROPAGULE || m.name().endsWith("_AXE") || Work.gear(m);
-        if (Work.needsDeposit(w, keep, false)) {
-            Activity d = Work.deposit(w, t, keep);
+        // Saplings for replanting: 16 of a kind is plenty, the rest goes to storage.
+        java.util.function.ToIntFunction<Material> limit = m -> Tag.SAPLINGS.isTagged(m) || m == Material.MANGROVE_PROPAGULE ? 16 : Integer.MAX_VALUE;
+        if (Work.needsDeposit(w, keep, limit, false)) {
+            Activity d = Work.deposit(w, t, keep, limit);
             if (d != null) return d;
         }
         // Saplings, apples and sticks from the leaves: pick them up.
@@ -77,8 +79,8 @@ final class LumberjackJob {
             }
             w.skip(base, 6000);
         }
-        if (Work.needsDeposit(w, keep, true)) {
-            Activity d = Work.deposit(w, t, keep);
+        if (Work.needsDeposit(w, keep, limit, true)) {
+            Activity d = Work.deposit(w, t, keep, limit);
             if (d != null) return d;
         }
         if (base != null) w.workStatus = "The settlement has enough wood";

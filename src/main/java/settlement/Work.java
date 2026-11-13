@@ -44,7 +44,7 @@ final class Work {
             if (inv == null) return;
             Material m = first(inv, test);
             if (m == null) return;
-            take(w, inv, m, max);
+            if (take(w, inv, m, max) == 0) w.skip(b, 1200); // couldn't take any (pockets full): not this chest again for a minute
             t.countsChanged();
         });
     }
@@ -97,6 +97,31 @@ final class Work {
             if (it != null && !it.getType().isAir() && !keep.test(it.getType())) totals.merge(it.getType(), it.getAmount(), Integer::sum);
         }
         return totals;
+    }
+
+    /** Like {@link #excess(Worker, Predicate)}, but of what it keeps only up to {@code limit} each (the rest is extra). */
+    static Map<Material, Integer> excess(Worker w, Predicate<Material> keep, java.util.function.ToIntFunction<Material> limit) {
+        Map<Material, Integer> totals = new HashMap<>();
+        for (ItemStack it : w.pockets.getContents()) {
+            if (it != null && !it.getType().isAir()) totals.merge(it.getType(), it.getAmount(), Integer::sum);
+        }
+        Map<Material, Integer> out = new HashMap<>();
+        for (Map.Entry<Material, Integer> e : totals.entrySet()) {
+            int extra = keep.test(e.getKey()) ? e.getValue() - limit.applyAsInt(e.getKey()) : e.getValue();
+            if (extra > 0) out.put(e.getKey(), extra);
+        }
+        return out;
+    }
+
+    static boolean needsDeposit(Worker w, Predicate<Material> keep, java.util.function.ToIntFunction<Material> limit, boolean anything) {
+        Map<Material, Integer> ex = excess(w, keep, limit);
+        if (ex.isEmpty()) return false;
+        if (anything) return true;
+        return ex.values().stream().mapToInt(Integer::intValue).sum() >= 48 || w.pockets.firstEmpty() == -1;
+    }
+
+    static Activity deposit(Worker w, Town t, Predicate<Material> keep, java.util.function.ToIntFunction<Material> limit) {
+        return deposit(w, t, () -> excess(w, keep, limit), "Bringing things to storage");
     }
 
     /** Pockets (nearly) full or a good load: time to bring things to storage. {@code anything}: any load at all. */

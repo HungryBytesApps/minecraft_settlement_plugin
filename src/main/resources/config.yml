@@ -152,8 +152,8 @@ chat-lines:
 # Settlers' bands play along with a music disc, heard only near the band.
 # How often a settlement may have a band (minutes between songs).
 music-every-minutes: 20
-# Loudness: 1.0 = heard up to 16 blocks away, 2.0 = 32 blocks.
-music-volume: 1.0
+# Loudness: 0.3 = soft (default), 1.0 = like a jukebox, 2.0 = louder and heard further (32 blocks).
+music-volume: 0.3
 # Which discs (an empty list [] = no bands). All: 13, cat, blocks, chirp, far, mall, mellohi, stal, strad,
 # ward, 11, wait, otherside, 5, pigstep, relic, creator, creator_music_box, precipice, tears, lava_chicken.
 music-discs: [cat, chirp, far, mall, mellohi, stal, strad, wait, blocks, otherside, relic, creator_music_box, precipice]

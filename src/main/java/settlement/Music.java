@@ -72,7 +72,7 @@ final class Music {
         if (band.size() < 2) return null;
         nextBand.put(key, now + 1200); // getting together: not another band meanwhile
         String disc = discs.get(leader.random.nextInt(discs.size()));
-        float volume = (float) Math.max(0.2, Math.min(4.0, c.getDouble("music-volume", 1.0)));
+        float volume = (float) Math.max(0.05, Math.min(4.0, c.getDouble("music-volume", 0.3)));
         int pause = Math.max(1, c.getInt("music-every-minutes", 20)) * 1200;
         Band b = new Band(key, disc, volume, pause);
         Member first = null;

@@ -132,7 +132,15 @@ final class FurnaceJob {
             return target != null && target > 0 && t.count(o, radius) < target;
         };
         Set<Material> cookKeeps = wp.job() == Worker.Job.COOK ? Cook.keep(t, radius) : Set.of();
-        Predicate<Material> keep = m -> recipes.containsKey(m) || isFuel(m) || Work.gear(m) || asked.containsKey(m) || cookKeeps.contains(m);
+        // Keeps only what's still wanted to smelt (not every input it could smelt), fuel and gear.
+        Predicate<Material> keepAll = m -> wantedInput.test(m) || isFuel(m) || Work.gear(m) || asked.containsKey(m) || cookKeeps.contains(m);
+        // Pockets full of things it keeps: only the good fuel stays, the rest (wood, extra stacks) goes back too.
+        // Never piles up: fuel up to 32 of a kind (charcoal it made goes to storage too), the cook's ingredients up to 16.
+        java.util.function.ToIntFunction<Material> limit = m -> wantedInput.test(m) || Work.gear(m) || asked.containsKey(m) ? Integer.MAX_VALUE
+                : isFuel(m) ? 32 : 16;
+        boolean full = w.pockets.firstEmpty() == -1 && Work.excess(w, keepAll, limit).isEmpty();
+        Predicate<Material> keep = !full ? keepAll
+                : m -> Work.gear(m) || asked.containsKey(m) || GOOD_FUEL.contains(m) || (wantedInput.test(m) && !isFuel(m)) || cookKeeps.contains(m);
         // Asked for something it can't make (nothing to smelt anywhere): say sorry.
         for (Material o : asked.keySet()) {
             if (w.count(o) >= asked.get(o)) continue;
@@ -160,8 +168,8 @@ final class FurnaceJob {
         boolean fuelFits = carries(w, m -> isFuel(m) && fits(curFuel, m));
         boolean resultFits = out == null || out.getType().isAir() || w.pockets.firstEmpty() >= 0 || w.pockets.containsAtLeast(new ItemStack(out.getType()), 1);
 
-        if (Work.needsDeposit(w, keep, false)) {
-            Activity d = Work.deposit(w, t, keep);
+        if (Work.needsDeposit(w, keep, limit, false)) {
+            Activity d = Work.deposit(w, t, keep, limit);
             if (d != null) return d;
         }
         // Go to the furnace: take out the results, put in what it carries.
@@ -189,7 +197,7 @@ final class FurnaceJob {
             if (!w.workStatus.isEmpty()) foodNote = w.workStatus;
         }
         // Get things to cook/smelt (while the furnace runs low), and fuel.
-        if ((!carryInput && (!hasInputHere || in.getAmount() < 16)) || !batchOk) {
+        if ((!carryInput && (!hasInputHere || in.getAmount() < 16)) || (!batchOk && w.pockets.firstEmpty() >= 0)) {
             Activity a = Work.fetch(w, t, wantedInput, 64, "Getting things to " + verb(wp));
             if (a != null) return a;
         }
@@ -209,8 +217,8 @@ final class FurnaceJob {
             w.workStatus = "Tending the " + Work.nice(fb.getType());
             return new GoAndDo(w, fb, 2.0, "Tending the " + Work.nice(fb.getType()), b -> b.getState(false) instanceof Furnace, b -> tend(w, b, wantedInput));
         }
-        if (Work.needsDeposit(w, keep, true)) {
-            Activity d = Work.deposit(w, t, keep);
+        if (Work.needsDeposit(w, keep, limit, true)) {
+            Activity d = Work.deposit(w, t, keep, limit);
             if (d != null) return d;
         }
         if (hasInputHere) w.workStatus = capital(verb(wp)) + "ing";
