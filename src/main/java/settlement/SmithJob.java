@@ -29,7 +29,8 @@ final class SmithJob {
     static final List<Material> PRODUCTS = products();
 
     private static List<Material> products() {
-        List<Material> out = new ArrayList<>(List.of(Material.ARROW, Material.BOW, Material.CROSSBOW, Material.SHIELD, Material.SHEARS));
+        List<Material> out = new ArrayList<>(List.of(Material.ARROW, Material.BOW, Material.CROSSBOW, Material.SHIELD, Material.SHEARS,
+                Material.FISHING_ROD));
         for (String metal : METALS)
             for (String piece : PIECES) {
                 Material m = Material.matchMaterial(metal + "_" + piece); // only what exists (no stone armor)

@@ -111,7 +111,7 @@ final class TargetsMenu {
         int radius = plugin.settings().townRadius();
         List<ActionButton> cells = new ArrayList<>();
         String show = job == Worker.Job.SMITH ? smithShow.get(p.getUniqueId()) : null;
-        if (job == Worker.Job.SMITH) { // a button per material: all stone, all iron... (two rows of 6)
+        if (job == Worker.Job.SMITH) { // a button per material: all stone, all iron... (one row of 8)
             List<String> names = new ArrayList<>();
             names.add("all");
             names.addAll(SmithJob.METALS);
@@ -125,7 +125,7 @@ final class TargetsMenu {
                     list(plugin, pl, t, job, fromLedger);
                 }));
             }
-            while (cells.size() % 6 != 0) cells.add(ActionButton.create(Component.empty(), null, 60, null));
+            while (cells.size() % 8 != 0) cells.add(ActionButton.create(Component.empty(), null, 60, null));
         }
         for (Material m : products(t, job)) {
             if (show != null) {
@@ -143,7 +143,7 @@ final class TargetsMenu {
             cells.add(ActionButton.create(label, tip, 180, Menus.click(plugin, (view, audience) -> {
                 if (audience instanceof Player pl) org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> list(plugin, pl, t, job, fromLedger));
             }, Menus.ONCE)));
-            for (int step : new int[]{-64, -16, 16, 64}) {
+            for (int step : new int[]{-64, -8, -1, 1, 8, 64}) {
                 cells.add(Menus.button(plugin, (step > 0 ? "+" : "−") + Math.abs(step), step > 0 ? NamedTextColor.GREEN : NamedTextColor.RED,
                         null, 34, pl -> {
                             int now = Math.max(0, t.targets.getOrDefault(m, 0) + step);
@@ -163,7 +163,7 @@ final class TargetsMenu {
             else Menus.ledger(plugin, pl, t);
         });
         String title = fromLedger ? "Storage targets: " + station(job) : "What to make";
-        Menus.show(p, title, List.of(), List.of(), DialogType.multiAction(cells).columns(6).exitAction(back).build());
+        Menus.show(p, title, List.of(), List.of(), DialogType.multiAction(cells).columns(8).exitAction(back).build());
     }
 
     /** The item's own (small) icon inside the text. */
