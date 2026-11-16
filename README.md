@@ -118,7 +118,7 @@ the work. **In use** (checkbox) switches the workstation off without removing th
   top; the workstation menu says if it is). Fish whose storage target is reached go back into the water; junk
   only when chosen in the **Junk filter**, and then up to its storage target (kept junk shows in the fisher's
   storage targets); treasure always kept.
-- **Smithing table – smith**: stone, copper, iron, gold, diamond and netherite tools, weapons and armor, bows, arrows, shields, shears and fishing rods, **only what you set a storage target for**. Buttons above the list show one material at a time. Netherite: the diamond one + a netherite ingot + an upgrade template.
+- **Smithing table – smith**: leather armor, and stone, copper, iron, gold, diamond and netherite tools, weapons and armor, bows, arrows, shields, shears and fishing rods, **only what you set a storage target for**. Buttons above the list show one material at a time (click it again: all). Netherite: the diamond one + a netherite ingot + an upgrade template.
 
 Tools wear out (axes per log, shears per sheep, weapons per hit, bows per shot, shields per blocked hit;
 Unbreaking helps). Missing tool → a chat message (at most every 5 minutes per settler).

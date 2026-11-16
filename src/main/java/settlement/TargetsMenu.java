@@ -111,16 +111,14 @@ final class TargetsMenu {
         int radius = plugin.settings().townRadius();
         List<ActionButton> cells = new ArrayList<>();
         String show = job == Worker.Job.SMITH ? smithShow.get(p.getUniqueId()) : null;
-        if (job == Worker.Job.SMITH) { // a button per material: all stone, all iron... (one row of 8)
-            List<String> names = new ArrayList<>();
-            names.add("all");
-            names.addAll(SmithJob.METALS);
+        if (job == Worker.Job.SMITH) { // a button per material: only leather, only iron... (one row of 8); again: all
+            List<String> names = new ArrayList<>(SmithJob.METALS);
             names.add("other");
             for (String n : names) {
-                boolean on = n.equals("all") ? show == null : n.equals(show);
+                boolean on = n.equals(show);
                 String label = n.equals("golden") ? "Gold" : Character.toUpperCase(n.charAt(0)) + n.substring(1);
-                cells.add(Menus.button(plugin, label, on ? NamedTextColor.YELLOW : NamedTextColor.GRAY, null, 60, pl -> {
-                    if (n.equals("all")) smithShow.remove(pl.getUniqueId());
+                cells.add(Menus.button(plugin, label, on ? NamedTextColor.YELLOW : NamedTextColor.GRAY, on ? "Show all" : "Only " + label.toLowerCase(), 60, pl -> {
+                    if (n.equals(smithShow.get(pl.getUniqueId()))) smithShow.remove(pl.getUniqueId());
                     else smithShow.put(pl.getUniqueId(), n);
                     list(plugin, pl, t, job, fromLedger);
                 }));

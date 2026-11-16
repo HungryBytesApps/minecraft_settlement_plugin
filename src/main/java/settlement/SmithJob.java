@@ -22,7 +22,7 @@ final class SmithJob {
     private SmithJob() {}
 
     /** The materials it works in (menu filter), then "other" (bows, arrows, shields, shears). */
-    static final List<String> METALS = List.of("stone", "copper", "iron", "golden", "diamond", "netherite");
+    static final List<String> METALS = List.of("leather", "stone", "copper", "iron", "golden", "diamond", "netherite");
     private static final List<String> PIECES = List.of("sword", "axe", "pickaxe", "shovel", "hoe", "spear",
             "helmet", "chestplate", "leggings", "boots");
 
@@ -39,7 +39,7 @@ final class SmithJob {
         return List.copyOf(out);
     }
 
-    /** Which material a product is made of (stone, copper, iron, golden, diamond, netherite), or null: other. */
+    /** Which material a product is made of (leather, stone, copper, iron, golden, diamond, netherite), or null: other. */
     static String metal(Material m) {
         String n = m.getKey().getKey();
         for (String metal : METALS) if (n.startsWith(metal + "_")) return metal;
