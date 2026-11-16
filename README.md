@@ -118,7 +118,7 @@ the work. **In use** (checkbox) switches the workstation off without removing th
   top; the workstation menu says if it is). Fish whose storage target is reached go back into the water; junk
   only when chosen in the **Junk filter**, and then up to its storage target (kept junk shows in the fisher's
   storage targets); treasure always kept.
-- **Smithing table – smith**: weapons, armor, bows and arrows, **only what you set a storage target for**.
+- **Smithing table – smith**: stone, copper, iron, gold, diamond and netherite tools, weapons and armor, bows, arrows, shields and shears, **only what you set a storage target for**. Buttons above the list show one material at a time. Netherite: the diamond one + a netherite ingot + an upgrade template.
 
 Tools wear out (axes per log, shears per sheep, weapons per hit, bows per shot, shields per blocked hit;
 Unbreaking helps). Missing tool → a chat message (at most every 5 minutes per settler).
@@ -135,6 +135,7 @@ like are made by whoever needs them.
 ## Storage and targets
 
 - Harvests go to an allowed chest that already holds that item, otherwise the nearest one with room.
+- Putting things in, settlers tidy the chest: full stacks, alike things together, no gaps (`sort-storage: false` turns it off).
 - No room: settlers keep things in their pockets (9 slots), stop, and you get a message.
 - Ledger → **Storage targets**: per workstation its products with −64/−16/+16/+64 and ∞.
   - No target = ∞ (keep making it), 0 = don't keep any.

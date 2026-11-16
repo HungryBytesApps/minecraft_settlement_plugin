@@ -48,6 +48,7 @@ final class TargetsMenu {
             default -> {
             }
         }
+        if (job == Worker.Job.SMITH) return new ArrayList<>(SmithJob.PRODUCTS); // per material: stone, copper, iron...
         List<Material> list = new ArrayList<>(out);
         list.sort(Comparator.comparingInt(TargetsMenu::group).thenComparing(TargetsMenu::nice));
         return list;
@@ -102,11 +103,35 @@ final class TargetsMenu {
         else Menus.ledger(plugin, p, t);
     }
 
+    /** The smith's list: which material it shows (null: all). Per player. */
+    private static final Map<UUID, String> smithShow = new HashMap<>();
+
     /** One workstation's products, a row each: icon, name, in storage / target, then − and + right after it. */
     private static void list(SettlementPlugin plugin, Player p, Town t, Worker.Job job, boolean fromLedger) {
         int radius = plugin.settings().townRadius();
         List<ActionButton> cells = new ArrayList<>();
+        String show = job == Worker.Job.SMITH ? smithShow.get(p.getUniqueId()) : null;
+        if (job == Worker.Job.SMITH) { // a button per material: all stone, all iron... (two rows of 6)
+            List<String> names = new ArrayList<>();
+            names.add("all");
+            names.addAll(SmithJob.METALS);
+            names.add("other");
+            for (String n : names) {
+                boolean on = n.equals("all") ? show == null : n.equals(show);
+                String label = n.equals("golden") ? "Gold" : Character.toUpperCase(n.charAt(0)) + n.substring(1);
+                cells.add(Menus.button(plugin, label, on ? NamedTextColor.YELLOW : NamedTextColor.GRAY, null, 60, pl -> {
+                    if (n.equals("all")) smithShow.remove(pl.getUniqueId());
+                    else smithShow.put(pl.getUniqueId(), n);
+                    list(plugin, pl, t, job, fromLedger);
+                }));
+            }
+            while (cells.size() % 6 != 0) cells.add(ActionButton.create(Component.empty(), null, 60, null));
+        }
         for (Material m : products(t, job)) {
+            if (show != null) {
+                String metal = SmithJob.metal(m);
+                if (show.equals("other") ? metal != null : !show.equals(metal)) continue;
+            }
             Integer target = t.targets.get(m); // none = no limit (smith: don't make); 0 = keep none
             int stored = t.count(m, radius);
             boolean reached = target != null && stored >= target && (target > 0 || !madeToOrder(m));

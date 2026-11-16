@@ -42,8 +42,15 @@ final class FilterMenu {
         put(g, "Ores & metals", ores);
         Set<Material> stone = new HashSet<>(FurnaceJob.inputs(Worker.Job.FURNACE_WORKER));
         stone.addAll(FurnaceJob.products(Worker.Job.FURNACE_WORKER));
+        stone.addAll(List.of(Material.FLINT, Material.GRAVEL));
         put(g, "Stone, glass & other", stone);
-        put(g, "Weapons, tools & armor", SmithJob.PRODUCTS);
+        Set<Material> gear = new HashSet<>(SmithJob.PRODUCTS);
+        gear.addAll(List.of(Material.ARROW, Material.SPECTRAL_ARROW, Material.TIPPED_ARROW, Material.BOW, Material.CROSSBOW));
+        put(g, "Weapons, tools & armor", gear);
+        put(g, "Mob drops", List.of(Material.ROTTEN_FLESH, Material.BONE, Material.STRING, Material.GUNPOWDER, Material.SPIDER_EYE,
+                Material.ENDER_PEARL, Material.SLIME_BALL, Material.PHANTOM_MEMBRANE, Material.GHAST_TEAR, Material.MAGMA_CREAM,
+                Material.PRISMARINE_SHARD, Material.PRISMARINE_CRYSTALS, Material.INK_SAC, Material.GLOW_INK_SAC, Material.BREEZE_ROD,
+                Material.ARROW));
         put(g, "Fuel", List.of(Material.COAL, Material.CHARCOAL, Material.COAL_BLOCK, Material.DRIED_KELP_BLOCK, Material.BLAZE_ROD));
         // Wood only in Wood (logs are also furnace input and fuel).
         Set<Material> wood = new HashSet<>(wood());

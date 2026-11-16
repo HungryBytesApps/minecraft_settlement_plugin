@@ -21,13 +21,29 @@ import java.util.function.Predicate;
 final class SmithJob {
     private SmithJob() {}
 
-    static final List<Material> PRODUCTS = List.of(
-            Material.ARROW, Material.BOW, Material.CROSSBOW, Material.SHIELD,
-            Material.STONE_SWORD, Material.IRON_SWORD, Material.DIAMOND_SWORD,
-            Material.STONE_AXE, Material.IRON_AXE, Material.DIAMOND_AXE,
-            Material.IRON_HOE, Material.SHEARS,
-            Material.IRON_HELMET, Material.IRON_CHESTPLATE, Material.IRON_LEGGINGS, Material.IRON_BOOTS,
-            Material.DIAMOND_HELMET, Material.DIAMOND_CHESTPLATE, Material.DIAMOND_LEGGINGS, Material.DIAMOND_BOOTS);
+    /** The materials it works in (menu filter), then "other" (bows, arrows, shields, shears). */
+    static final List<String> METALS = List.of("stone", "copper", "iron", "golden", "diamond", "netherite");
+    private static final List<String> PIECES = List.of("sword", "axe", "pickaxe", "shovel", "hoe", "spear",
+            "helmet", "chestplate", "leggings", "boots");
+
+    static final List<Material> PRODUCTS = products();
+
+    private static List<Material> products() {
+        List<Material> out = new ArrayList<>(List.of(Material.ARROW, Material.BOW, Material.CROSSBOW, Material.SHIELD, Material.SHEARS));
+        for (String metal : METALS)
+            for (String piece : PIECES) {
+                Material m = Material.matchMaterial(metal + "_" + piece); // only what exists (no stone armor)
+                if (m != null && m.isItem()) out.add(m);
+            }
+        return List.copyOf(out);
+    }
+
+    /** Which material a product is made of (stone, copper, iron, golden, diamond, netherite), or null: other. */
+    static String metal(Material m) {
+        String n = m.getKey().getKey();
+        for (String metal : METALS) if (n.startsWith(metal + "_")) return metal;
+        return null;
+    }
 
     /** What one craft needs (material → amount) and gives. */
     private record Plan(Material product, int amount, Map<Material, Integer> needs) {}
@@ -89,6 +105,13 @@ final class SmithJob {
     /** A recipe for the product whose materials are in storage plus pockets, or null. */
     private static Plan plan(Worker w, Town t, Material product) {
         int radius = w.plugin.settings().townRadius();
+        if ("netherite".equals(metal(product))) { // smithing: the diamond one + a netherite ingot + the upgrade template
+            Material diamond = Material.matchMaterial("diamond_" + product.getKey().getKey().substring("netherite_".length()));
+            if (diamond == null) return null;
+            Map<Material, Integer> needs = Map.of(diamond, 1, Material.NETHERITE_INGOT, 1, Material.NETHERITE_UPGRADE_SMITHING_TEMPLATE, 1);
+            for (Map.Entry<Material, Integer> e : needs.entrySet()) if (t.count(e.getKey(), radius) + w.count(e.getKey()) < e.getValue()) return null;
+            return new Plan(product, 1, needs);
+        }
         for (Recipe r : Bukkit.getRecipesFor(new ItemStack(product))) {
             List<RecipeChoice> choices = new ArrayList<>();
             if (r instanceof ShapedRecipe sr) {

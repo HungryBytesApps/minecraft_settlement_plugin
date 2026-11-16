@@ -10,6 +10,8 @@ import org.bukkit.entity.LivingEntity;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -193,7 +195,36 @@ final class Work {
             w.pockets.setItem(i, it.getAmount() > 0 ? it : null);
             moved.merge(m, done, Integer::sum);
         }
+        if (!moved.isEmpty() && w.plugin.getConfig().getBoolean("sort-storage", true)) sort(inv);
         return moved;
+    }
+
+    /**
+     * Tidy a chest: full stacks, alike things together (all logs, all ingots...), from the first slot on, no gaps.
+     * Enchanted, named or damaged things stay their own stacks.
+     */
+    static void sort(Inventory inv) {
+        ItemStack[] now = inv.getStorageContents();
+        List<ItemStack> merged = new ArrayList<>();
+        for (ItemStack it : now) {
+            if (it == null || it.getType().isAir()) continue;
+            ItemStack left = it.clone();
+            for (ItemStack m : merged) {
+                if (left.getAmount() <= 0) break;
+                if (!m.isSimilar(left) || m.getAmount() >= m.getMaxStackSize()) continue;
+                int n = Math.min(left.getAmount(), m.getMaxStackSize() - m.getAmount());
+                m.setAmount(m.getAmount() + n);
+                left.setAmount(left.getAmount() - n);
+            }
+            if (left.getAmount() > 0) merged.add(left);
+        }
+        merged.sort(Comparator.comparing((ItemStack it) -> {
+            String n = it.getType().getKey().getKey();
+            return n.substring(n.lastIndexOf('_') + 1) + " " + n; // oak_log, birch_log together; then by name
+        }).thenComparing(it -> -it.getAmount()));
+        ItemStack[] sorted = new ItemStack[now.length];
+        for (int i = 0; i < merged.size() && i < sorted.length; i++) sorted[i] = merged.get(i);
+        if (!java.util.Arrays.equals(now, sorted)) inv.setStorageContents(sorted);
     }
 
     // ---- Tools ----
