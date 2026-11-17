@@ -94,10 +94,14 @@ final class Lift {
         }
     }
 
-    /** Elevators near a spot: without rails first (rails only in an emergency). */
+    /**
+     * Elevators near a spot: the ones without rails; an elevator with rails only when there's no other
+     * (or in an emergency, after the ones without).
+     */
     static List<String> pick(World w, Location at, int r, boolean emergency) {
         List<String> out = new ArrayList<>(near(w, at.getBlockX(), at.getBlockZ(), r));
-        out.removeIf(id -> rails(id) && !emergency);
+        boolean plain = out.stream().anyMatch(id -> !rails(id));
+        if (plain && !emergency) out.removeIf(Lift::rails);
         out.sort(Comparator.comparing(Lift::rails));
         return out;
     }
@@ -145,23 +149,19 @@ final class Lift {
      */
     static String[] mineStart(Worker w, Town t) {
         World world = t.bell.getWorld();
-        int r = w.plugin.settings().townRadius();
-        for (String id : pick(world, t.bell, r, false)) {
+        Set<String> ids = new LinkedHashSet<>();
+        for (int[] q : t.squares()) ids.addAll(pick(world, new Location(world, q[0], t.bell.getY(), q[1]), (int) Math.ceil(q[2] * 1.42) + 2, false));
+        for (String id : ids) {
+            int[] pf = platform(id);
+            if (pf == null || !t.inside((pf[0] + pf[2]) / 2.0, (pf[1] + pf[3]) / 2.0, 0)) continue; // in the settlement (any part of it)
             int[] f = floors(id);
             if (f.length < 2) continue;
-            int low = f[0], top = f[f.length - 1];
-            if (top - low < 12) continue; // doesn't really go down
-            Location board = boarding(world, id, low, null);
+            int top = f[f.length - 1];
+            if (top - f[0] < 8) continue; // it doesn't go down (a tower, say)
+            Location board = boarding(world, id, top, t.bell); // where it gets on, up top
             if (board == null) continue;
-            int[] p = platform(id);
-            double cx = (p[0] + p[2] + 1) / 2.0, cz = (p[1] + p[3] + 1) / 2.0;
-            double ax = board.getX() - cx, az = board.getZ() - cz;
-            int dir = Math.abs(ax) > Math.abs(az) ? (ax > 0 ? 3 : 1) : (az > 0 ? 0 : 2);
-            int fx = Mine.DIRS[dir][0], fz = Mine.DIRS[dir][1], sx = -fz, sz = fx;
-            // entrance (t=-1, s=1) is the spot next to the platform
-            int ox = board.getBlockX() + fx - sx, oz = board.getBlockZ() + fz - sz;
-            // (the id has commas itself: written with ; here)
-            String data = ox + "," + (low + 1) + "," + oz + "," + dir + "," + id.replace(',', ';') + "," + (top + 1);
+            // E, id (its commas written as ;), where it stands up top
+            String data = "E," + id.replace(',', ';') + "," + board.getBlockX() + "," + board.getBlockY() + "," + board.getBlockZ();
             if (Asks.declined(t, "site:" + data)) continue; // you said no to this one
             return new String[]{data};
         }
@@ -174,6 +174,30 @@ final class Lift {
     private static boolean resting(Worker w) {
         Integer u = failedUntil.get(w.body.getUniqueId());
         return u != null && Bukkit.getCurrentTick() < u;
+    }
+
+    /** Elevator mine: ride to the floor of level k (null: already there, or no elevator). */
+    static Activity toFloor(Worker w, Mine m, int k, boolean emergency) {
+        if (resting(w) || !Mine.isFloor(k)) return null;
+        String id = resolve(m);
+        if (id == null) return null;
+        int floor = k - Mine.FLOOR;
+        int from = nearestFloor(id, w.body.getLocation().getBlockY());
+        if (from == Integer.MIN_VALUE || (from == floor && Math.abs(w.body.getLocation().getY() - (floor + 1)) < 2)) return null;
+        return new Ride(w, id, from, floor, m.hub(k));
+    }
+
+    /** Elevator mine: ride up to the top floor (null: already there). */
+    static Activity toTop(Worker w, Mine m, boolean emergency) {
+        if (resting(w)) return null;
+        String id = resolve(m);
+        if (id == null) return null;
+        int[] f = floors(id);
+        if (f.length == 0) return null;
+        int top = f[f.length - 1];
+        int from = nearestFloor(id, w.body.getLocation().getBlockY());
+        if (from == top || from == Integer.MIN_VALUE) return null;
+        return new Ride(w, id, from, top, null);
     }
 
     /** Down: the elevator from up top to the mine's start, or straight to a level it has a floor at (connected). */

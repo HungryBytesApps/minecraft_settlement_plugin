@@ -125,12 +125,17 @@ the work. **In use** (checkbox) switches the workstation off without removing th
   cobbled deepslate, granite, diorite, andesite, tuff, dirt, gravel, flint, coal, raw copper/iron/gold, lapis,
   redstone, diamond, emerald). Each at its best level: coal, copper and stone around y 48, iron 16, lapis 0,
   gold and deepslate -16, redstone and diamond -53.
-  - **The spot**: the miner looks for open natural ground in the settlement, away from buildings and chests, with
-    nothing old or built under it (or next to an elevator's lowest floor, when an elevator goes down far enough).
-    It marks the spot (glowing), comes to tell the founder ("Got a minute?": right-click it) and waits for a yes
-    (Ledger → **Requests**). Show me / Teleport there / Yes / No (it looks for another spot). Only the founder answers.
-  - **The mine**: a 2-wide staircase going down and back (a landing every 9 blocks). At a level: a hub room by the
-    landing, corridors (3 wide) to three sides, side tunnels every 4 blocks (3 stone between them). Log frames every 8
+  - **The spot**: first it looks for an elevator (the Elevator plugin) in the settlement (expansions too) that goes
+    down. Found: it asks the founder (Ledger → **Requests**) if it may use it; then it mines **at the elevator's
+    floors**: at the floor nearest to where the ore it needs is found, a hub next to the elevator with its tunnels. No
+    floor there (no floor deep enough for diamonds, say): it asks for one ("Could the elevator get a floor at about
+    y -53?"); Yes or No, it doesn't ask again, and it uses that floor as soon as you build it. Meanwhile it mines what
+    it can at the other floors, or waits. No elevator: open natural ground in the settlement, away from buildings and
+    chests, with nothing old or built under it; it marks the spot (glowing), comes to tell the founder ("Got a
+    minute?": right-click it) and waits for a yes. Show me / Teleport there / Yes / No (it looks for another spot).
+    Only the founder answers.
+  - **The mine** (without an elevator): a 2-wide staircase going down and back (a landing every 9 blocks). At a level:
+    a hub room by the landing (or by the elevator), corridors (3 wide) to three sides, side tunnels every 4 blocks (3 stone between them). Log frames every 8
     blocks: studs in the walls, a beam across the ceiling, torches on the studs. Caves, water and lava next to the
     tunnels are closed with cobblestone, sand or gravel overhead too; holes in the floor filled. It only digs natural
     blocks: something built stops that tunnel; a spawner, dungeon, old mineshaft, trial chamber, ancient city, geode
@@ -145,8 +150,8 @@ the work. **In use** (checkbox) switches the workstation off without removing th
     under attack. Guards never go into the mine by themselves. Downed in the mine: a guard goes down and carries it
     up to the bell, where you can help it up.
   - **Elevator** (the Elevator plugin): it uses an elevator like you do (calls it, same queue and countdown, rides,
-    steps off): to the mine's start, or straight to a level when the elevator has a floor there that's connected
-    to the level's hub. An elevator without rails first; one with rails only in an emergency.
+    steps off). A staircase mine: also straight to a level when an elevator has a floor there that's connected to the
+    level's hub. An elevator without rails first; one with rails only when there is no other (or in an emergency).
   - **Use rails** (stonecutter, off by default): you build a rail line from a level (near its landing or hub) up to the
     surface; a stop is a powered rail with a button or lever next to it (the miner presses it). It rides in a minecart
     (it carries one): nothing can hurt it, monsters on the track are run over. A chest minecart standing at the

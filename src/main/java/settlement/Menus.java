@@ -612,11 +612,11 @@ final class Menus {
             Mine mine = Mine.get(wp);
             if (mine == null || !mine.approved) body.add(line("No mine yet: the miner looks for a spot and asks the founder (Ledger → Requests).", NamedTextColor.GRAY));
             else {
-                body.add(line("Mine at " + mine.ox + ", " + mine.oy + ", " + mine.oz + (mine.elevator != null ? " (from the elevator)" : "")
+                body.add(line((mine.floors() ? "Mine at the elevator's floors (" + mine.ox + ", " + mine.oy + ", " + mine.oz + ")" : "Mine at " + mine.ox + ", " + mine.oy + ", " + mine.oz)
                         + ". Mines what Storage targets ask for, at the best level for it.", NamedTextColor.GRAY));
                 for (Map.Entry<Integer, Mine.Level> e : mine.levels.entrySet()) {
                     int total = mine.plan(e.getValue(), Miner.size(wp)).size();
-                    body.add(line("Level " + mine.landingY(e.getKey()) + ": " + (total == 0 ? 0 : e.getValue().done * 100 / total) + "% dug", NamedTextColor.DARK_GRAY));
+                    body.add(line("Level " + mine.levelY(e.getKey()) + ": " + (total == 0 ? 0 : e.getValue().done * 100 / total) + "% dug", NamedTextColor.DARK_GRAY));
                 }
             }
         }

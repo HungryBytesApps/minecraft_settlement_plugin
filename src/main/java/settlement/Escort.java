@@ -191,7 +191,7 @@ final class Escort {
                     back.poll();
                     if (back.isEmpty() && lift == null) {
                         Mine m = Miner.mine(miner);
-                        Activity l = m == null ? null : Lift.fromStart(g, m, false);
+                        Activity l = m == null || !m.floors() ? null : Lift.toTop(g, m, false);
                         if (l != null && g.body.getLocation().getY() < m.surface - 2) lift = l;
                     }
                     return false;
@@ -202,9 +202,14 @@ final class Escort {
             if (miner.body.getWorld() != g.body.getWorld()) return true;
             double d = miner.body.getLocation().distance(g.body.getLocation());
             Mine mm = Miner.mine(miner);
-            if (mm != null && mm.elevator != null && g.body.getLocation().getY() > mm.oy + 2 && miner.body.getLocation().getY() < mm.oy + 2 && lift == null) {
-                lift = Lift.down(g, mm, -1, false); // the miner went down in the elevator: after it
-                if (lift != null) return false;
+            Town.Workplace mwp = miner.workplace();
+            if (mm != null && mm.floors() && mwp != null && lift == null) {
+                // The miner went to a floor in the elevator: after it.
+                Integer lvl = mm.levelOf(miner.body.getLocation(), Miner.size(mwp));
+                if (lvl != null && Math.abs(g.body.getLocation().getY() - mm.levelY(lvl)) > 3) {
+                    lift = Lift.toFloor(g, mm, lvl, false);
+                    if (lift != null) return false;
+                }
             }
             if (d > 3 && --repath <= 0) {
                 repath = 15;
@@ -300,9 +305,12 @@ final class Escort {
             switch (phase) {
                 case 0 -> { // down to it: the elevator (if the mine starts at one), then the stairs and tunnels
                     if (!Downed.is(miner)) return done();
-                    if (m.elevator != null && g.body.getLocation().getY() > m.oy + 2) {
-                        lift = Lift.down(g, m, -1, true);
-                        if (lift != null) return false;
+                    if (m.floors()) {
+                        Integer lvl = m.levelOf(miner.body.getLocation(), size);
+                        if (lvl != null && Math.abs(g.body.getLocation().getY() - m.levelY(lvl)) > 3) {
+                            lift = Lift.toFloor(g, m, lvl, true);
+                            if (lift != null) return false;
+                        }
                     }
                     hops.addAll(m.downHops(miner.body.getLocation(), size));
                     phase = 1;
@@ -322,8 +330,8 @@ final class Escort {
                 case 2 -> {
                     if (!Downed.is(miner)) return done(); // helped up meanwhile
                     if (walk()) return false;
-                    if (m.elevator != null && g.body.getLocation().getY() < m.surface - 2) {
-                        lift = Lift.fromStart(g, m, true);
+                    if (m.floors() && g.body.getLocation().getY() < m.surface - 2) {
+                        lift = Lift.toTop(g, m, true);
                         phase = 3;
                         if (lift != null) return false;
                     }

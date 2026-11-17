@@ -37,9 +37,24 @@ final class Mine {
     /** Size: how far tunnels go from a hub. */
     final Map<Integer, Level> levels = new TreeMap<>();
 
+    /** Level keys from here up are elevator floors (floor height = key - FLOOR); below: stair landings. */
+    static final int FLOOR = 1000;
+
+    static boolean isFloor(int k) {
+        return k >= 500;
+    }
+
+    /** An elevator mine: no stairs, a level at each elevator floor it needs. */
+    boolean floors() {
+        return elevator != null;
+    }
+
     static final class Level {
         int done;
         boolean hub;
+        /** Elevator floor level: where it steps off (x, z) and which way the level goes from there; set = true. */
+        int ex, ez, edir;
+        boolean framed;
         final Set<String> blocked = new HashSet<>();
         transient List<Col> plan;
         transient int planSize;
@@ -111,8 +126,9 @@ final class Mine {
         return loc(t, 2, landingY(k));
     }
 
-    /** At the top of the stairs (outside). */
+    /** At the top of the stairs (outside); an elevator mine: next to the elevator up top. */
     Location entrance() {
+        if (floors()) return new Location(world, ox + 0.5, oy, oz + 0.5);
         return loc(-1, 1, oy);
     }
 
@@ -123,13 +139,42 @@ final class Mine {
 
     // ---- Levels ----
 
-    /** Hub center of landing k in (t, s). */
+    /** Hub center of landing k in (t, s) (stairs mines). */
     int hubT(int k) {
         return landingRow(k) + away(k) * 4;
     }
 
+    /** Feet height of level k. */
+    int levelY(int k) {
+        return isFloor(k) ? k - FLOOR + 1 : landingY(k);
+    }
+
+    /** Where it arrives at level k: the landing, or next to the elevator. */
+    Location entry(int k) {
+        if (isFloor(k)) {
+            Level l = levels.get(k);
+            if (l != null && l.framed) return new Location(world, l.ex + 0.5, levelY(k), l.ez + 0.5);
+            return new Location(world, ox + 0.5, levelY(k), oz + 0.5);
+        }
+        return landing(k);
+    }
+
+    /** The level's frame: {hub x, hub z, u x, u z, v x, v z} (u: away from the stairs or elevator, v: sideways). */
+    int[] frame(int k) {
+        if (isFloor(k)) {
+            Level l = levels.get(k);
+            int d = l == null ? 0 : l.edir;
+            int fx = DIRS[d][0], fz = DIRS[d][1];
+            int bx = l == null ? ox : l.ex, bz = l == null ? oz : l.ez;
+            return new int[]{bx + fx * 4, bz + fz * 4, fx, fz, -fz, fx};
+        }
+        int a = away(k), ht = hubT(k);
+        return new int[]{ox + fx() * ht + sx() * 2, oz + fz() * ht + sz() * 2, fx() * a, fz() * a, sx(), sz()};
+    }
+
     Block levelAt(int k, int u, int v, int dy) {
-        return at(hubT(k) + away(k) * u, 2 + v, landingY(k) + dy);
+        int[] f = frame(k);
+        return world.getBlockAt(f[0] + f[2] * u + f[4] * v, levelY(k) + dy, f[1] + f[3] * u + f[5] * v);
     }
 
     Location levelLoc(int k, int u, int v) {
@@ -140,9 +185,33 @@ final class Mine {
         return levelLoc(k, 0, 0);
     }
 
-    /** The (t, s) of a level spot, to check it against the stairs. */
-    int[] ts(int k, int u, int v) {
-        return new int[]{hubT(k) + away(k) * u, 2 + v};
+    /** Not for tunnels: the stairs (stairs mines), or the elevator shaft and where you step off (elevator mines). */
+    boolean reserved(int k, int u, int v) {
+        if (isFloor(k)) {
+            if (u <= -3 && Math.abs(v) <= 3) return true;
+            int[] sh = shaft();
+            if (sh == null) return false;
+            Block b = levelAt(k, u, v, 0);
+            return b.getX() >= sh[0] - 2 && b.getX() <= sh[2] + 2 && b.getZ() >= sh[1] - 2 && b.getZ() <= sh[3] + 2;
+        }
+        int[] f = frame(k);
+        int x = f[0] + f[2] * u + f[4] * v - ox, z = f[1] + f[3] * u + f[5] * v - oz;
+        return inStairs(x * fx() + z * fz(), x * sx() + z * sz());
+    }
+
+    private transient int[] shaftBox;
+    private transient int shaftAt = -100000;
+
+    /** The elevator's platform box {minX, minZ, maxX, maxZ} (looked up once a minute), or null. */
+    int[] shaft() {
+        if (elevator == null) return null;
+        int now = Bukkit.getCurrentTick();
+        if (now - shaftAt > 1200) {
+            shaftAt = now;
+            int[] p = Lift.platform(elevator);
+            if (p != null) shaftBox = new int[]{p[0], p[1], p[2], p[3]};
+        }
+        return shaftBox;
     }
 
     /** All tunnel columns of a level, nearest first: ring by ring, corridors then side tunnels. */
@@ -199,20 +268,27 @@ final class Mine {
 
     /** (u, v) of a spot on level k. */
     int[] uv(int k, Location l) {
-        int dx = l.getBlockX() - ox, dz = l.getBlockZ() - oz;
-        int tt = dx * fx() + dz * fz();
-        int s = dx * sx() + dz * sz();
-        return new int[]{(tt - hubT(k)) * away(k), s - 2};
+        int[] f = frame(k);
+        int dx = l.getBlockX() - f[0], dz = l.getBlockZ() - f[1];
+        return new int[]{dx * f[2] + dz * f[3], dx * f[4] + dz * f[5]};
+    }
+
+    /** (u, v, dy) of a block on level k. */
+    int[] uv(int k, Block b) {
+        int[] f = frame(k);
+        int dx = b.getX() - f[0], dz = b.getZ() - f[1];
+        return new int[]{dx * f[2] + dz * f[3], dx * f[4] + dz * f[5], b.getY() - levelY(k)};
     }
 
     /** In a level's tunnels (not on the stairs): which level; null: not. */
     Integer levelOf(Location l, int size) {
         if (l.getWorld() != world) return null;
         for (int k : levels.keySet()) {
-            int y = landingY(k);
+            if (isFloor(k) && !levels.get(k).framed) continue;
+            int y = levelY(k);
             if (Math.abs(l.getBlockY() - y) > 2) continue;
             int[] uv = uv(k, l);
-            if (Math.abs(uv[0]) <= size + 2 && Math.abs(uv[1]) <= size + 2 && !inStairs(hubT(k) + away(k) * uv[0], 2 + uv[1])) return k;
+            if (Math.abs(uv[0]) <= size + 2 && Math.abs(uv[1]) <= size + 2 && (uv[0] >= -3 || !reserved(k, uv[0], uv[1]))) return k;
         }
         return null;
     }
@@ -245,6 +321,14 @@ final class Mine {
     /** Walking hops from a spot in the mine up to the start (entrance). */
     List<Location> upHops(Location from, int size) {
         List<Location> out = new ArrayList<>();
+        if (floors()) { // to the elevator (the ride up is separate)
+            Integer lvl = levelOf(from, size);
+            if (lvl != null) {
+                out.addAll(levelHops(lvl, from, 0, 0));
+                out.add(entry(lvl));
+            }
+            return out;
+        }
         int at = where(from);
         Integer lvl = levelOf(from, size);
         if (lvl != null) {
@@ -259,6 +343,16 @@ final class Mine {
     /** Walking hops from the start (entrance) down to a spot in the mine. */
     List<Location> downHops(Location to, int size) {
         List<Location> out = new ArrayList<>();
+        if (floors()) { // from where the elevator lets it off (the ride down is separate)
+            Integer lvl = levelOf(to, size);
+            if (lvl != null) {
+                out.add(entry(lvl));
+                int[] uv = uv(lvl, to);
+                out.addAll(levelHops(lvl, hub(lvl), uv[0], uv[1]));
+            }
+            out.add(to);
+            return out;
+        }
         out.add(entrance());
         Integer lvl = levelOf(to, size);
         int at = lvl != null ? lvl : where(to);
@@ -333,12 +427,17 @@ final class Mine {
                     lv.done = l.getInt("done");
                     lv.hub = l.getBoolean("hub");
                     lv.blocked.addAll(l.getStringList("blocked"));
+                    lv.framed = l.getBoolean("framed");
+                    lv.ex = l.getInt("ex");
+                    lv.ez = l.getInt("ez");
+                    lv.edir = l.getInt("edir");
                     try {
                         m.levels.put(Integer.parseInt(k), lv);
                     } catch (NumberFormatException ignored) {
                     }
                 }
             }
+            if (m.elevator != null) m.levels.keySet().removeIf(k -> !isFloor(k)); // (older elevator mines with stairs)
             all.put(m.key, m);
         }
     }
@@ -370,6 +469,12 @@ final class Mine {
                 l.set("done", e.getValue().done);
                 l.set("hub", e.getValue().hub);
                 l.set("blocked", new ArrayList<>(e.getValue().blocked));
+                if (e.getValue().framed) {
+                    l.set("framed", true);
+                    l.set("ex", e.getValue().ex);
+                    l.set("ez", e.getValue().ez);
+                    l.set("edir", e.getValue().edir);
+                }
             }
         }
         try {

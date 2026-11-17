@@ -264,8 +264,9 @@ final class Asks {
             Town.Workplace wp = a.workplace == null ? null : t.workplace(Keys.deser(a.workplace));
             if (wp != null) Miner.answer(plugin, t, wp, a.data, yes);
             if (!yes) declined.add(t.id + ":site:" + a.data);
-        } else if (a.kind == Kind.FLOOR && !yes) {
-            declined.add(t.id + ":floor:" + a.data);
+        } else if (a.kind == Kind.FLOOR) {
+            // No: never asked again. Yes: not asked again either; it uses the floor as soon as it's there.
+            declined.add(t.id + (yes ? ":floorok:" : ":floor:") + a.data);
         }
         save();
     }
@@ -308,7 +309,7 @@ final class Asks {
     static void mark(Ask a, boolean on) {
         List<Entity> old = marks.remove(a.id);
         if (old != null) old.forEach(Entity::remove);
-        if (!on || a.data == null || a.at == null || a.at.getWorld() == null) return;
+        if (!on || a.data == null || a.at == null || a.at.getWorld() == null || a.data.startsWith("E,")) return;
         String[] p = a.data.split(",");
         if (p.length < 4) return;
         Mine m = new Mine("show");

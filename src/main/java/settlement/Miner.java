@@ -206,6 +206,11 @@ final class Miner {
     /** Is this spot in (or near) the mine (below the surface)? */
     static boolean isIn(Mine m, Town.Workplace wp, Location l) {
         if (m == null || m.world != l.getWorld() || !m.approved || l.getY() >= m.surface - 2) return false;
+        if (m.floors()) { // an elevator mine: its levels, or at the elevator below the top
+            if (m.levelOf(l, size(wp)) != null) return true;
+            int[] sh = m.shaft();
+            return sh != null && l.getBlockX() >= sh[0] - 8 && l.getBlockX() <= sh[2] + 8 && l.getBlockZ() >= sh[1] - 8 && l.getBlockZ() <= sh[3] + 8;
+        }
         int dx = l.getBlockX() - m.ox, dz = l.getBlockZ() - m.oz;
         int tt = dx * m.fx() + dz * m.fz(), s = dx * m.sx() + dz * m.sz();
         if (tt >= -6 && tt <= 13 && s >= -4 && s <= 8) return true; // the stairs (and the start, the elevator next to it)
@@ -219,8 +224,78 @@ final class Miner {
         return k;
     }
 
+    /** Where each product can be found: {lowest, highest} feet height. */
+    private static int[] range(Material p) {
+        return switch (p) {
+            case RAW_IRON -> new int[]{-24, 56};
+            case EMERALD -> new int[]{-16, 120};
+            case LAPIS_LAZULI -> new int[]{-32, 32};
+            case TUFF -> new int[]{-60, 0};
+            case RAW_GOLD -> new int[]{-55, 0};
+            case COBBLED_DEEPSLATE -> new int[]{-60, -8};
+            case REDSTONE, DIAMOND -> new int[]{-60, -40};
+            case RAW_COPPER -> new int[]{0, 96};
+            default -> new int[]{0, 120}; // stone, coal, dirt, gravel...
+        };
+    }
+
+    /** Elevator mine: the floor (level key) for a product, nearest to where it's best; -1: no floor there. */
+    static int floorFor(Mine m, Material p) {
+        int[] r = range(p);
+        int best = -1, bestD = Integer.MAX_VALUE;
+        for (int f : Lift.floors(Lift.resolve(m))) {
+            int feet = f + 1;
+            if (feet < r[0] || feet > r[1] || feet > m.surface - 8) continue;
+            int d = Math.abs(feet - BEST_Y.get(p));
+            if (d < bestD) {
+                bestD = d;
+                best = f + Mine.FLOOR;
+            }
+        }
+        return best;
+    }
+
+    /** -3: waiting for an elevator floor. */
+    static final int WAIT_FLOOR = -3;
+
+    /** Elevator mine: the floor for the product furthest below its target; a missing floor is asked for. */
+    private static int pickFloor(Worker w, Town t, Mine m) {
+        List<Material> wanted = new ArrayList<>();
+        for (Material p : PRODUCTS) if (shortfall(w, t, p) > 0) wanted.add(p);
+        if (wanted.isEmpty() || w.workplace() == null) return -1;
+        wanted.sort(Comparator.comparingDouble((Material p) -> -shortfall(w, t, p)));
+        boolean missing = false, full = false;
+        for (Material p : wanted) {
+            int k = floorFor(m, p);
+            if (k < 0) {
+                missing = true;
+                askFloor(w, t, m, p);
+                continue;
+            }
+            Mine.Level l = m.levels.get(k);
+            if (l != null && l.hub && l.done >= m.plan(l, size(w.workplace())).size()) {
+                full = true;
+                continue;
+            }
+            return k;
+        }
+        return missing ? WAIT_FLOOR : full ? -2 : -1;
+    }
+
+    /** Ask the founder for an elevator floor at the height of a product (once; no = never again). */
+    private static void askFloor(Worker w, Town t, Mine m, Material p) {
+        int y = BEST_Y.get(p);
+        String data = "y" + y;
+        if (Asks.declined(t, "floor:" + data) || Asks.declined(t, "floorok:" + data)) return;
+        StringBuilder what = new StringBuilder();
+        for (Material o : PRODUCTS) if (BEST_Y.get(o) == y && wanted(w, t, o)) what.append(what.length() == 0 ? "" : ", ").append(FarmerJob.nice(o).toLowerCase(Locale.ROOT));
+        Asks.add(t, Asks.Kind.FLOOR, "Could the elevator get a floor at about y " + y + "? That's where " + what + " is found. "
+                + "I'll use it as soon as it's there.", m.entrance(), w, data);
+    }
+
     /** Which level to work: the one for the product that's furthest below its target (-1: nothing wanted). */
     static int pickLevel(Worker w, Town t, Mine m) {
+        if (m.floors()) return pickFloor(w, t, m);
         Material best = null;
         double most = 0;
         for (Material p : PRODUCTS) {
@@ -245,8 +320,53 @@ final class Miner {
     /** Pickaxe level needed for the wanted products at a level. */
     static int needAt(Worker w, Town t, Mine m, int k) {
         int need = 0;
-        for (Material p : PRODUCTS) if (wanted(w, t, p) && landingFor(m, BEST_Y.get(p)) == k) need = Math.max(need, needFor(p));
+        for (Material p : PRODUCTS) {
+            if (!wanted(w, t, p)) continue;
+            int at = m.floors() ? floorFor(m, p) : landingFor(m, BEST_Y.get(p));
+            if (at == k) need = Math.max(need, needFor(p));
+        }
         return need;
+    }
+
+    /** Elevator mine: where to step off at floor level k and which way the level goes (rock ahead). False: no room. */
+    static boolean frameFloor(Mine m, int k) {
+        Mine.Level l = m.levels.computeIfAbsent(k, x -> new Mine.Level());
+        if (l.framed) return true;
+        String id = Lift.resolve(m);
+        int[] p = id == null ? null : Lift.platform(id);
+        if (p == null) return false;
+        int floor = k - Mine.FLOOR, y = floor + 1;
+        double cx = (p[0] + p[2] + 1) / 2.0, cz = (p[1] + p[3] + 1) / 2.0;
+        int bestScore = -1;
+        for (int x = p[0] - 1; x <= p[2] + 1; x++) {
+            for (int z = p[1] - 1; z <= p[3] + 1; z++) {
+                boolean inside = x >= p[0] && x <= p[2] && z >= p[1] && z <= p[3];
+                if (inside || !PathFinder.walkable(m.world, x, y, z)) continue;
+                double ax = x + 0.5 - cx, az = z + 0.5 - cz;
+                int dir = Math.abs(ax) > Math.abs(az) ? (ax > 0 ? 3 : 1) : (az > 0 ? 0 : 2);
+                int fx = Mine.DIRS[dir][0], fz = Mine.DIRS[dir][1];
+                int score = 0;
+                for (int t2 = 2; t2 <= 9; t2++) {
+                    for (int sv = -3; sv <= 3; sv++) {
+                        Block b = m.world.getBlockAt(x + fx * t2 - fz * sv, y, z + fz * t2 + fx * sv);
+                        if (natural(b.getType()) && b.getType().isSolid()) score++;
+                    }
+                }
+                if (score > bestScore) {
+                    bestScore = score;
+                    l.ex = x;
+                    l.ez = z;
+                    l.edir = dir;
+                }
+            }
+        }
+        if (bestScore < 20) { // no rock next to that floor (a cave, built stuff)
+            m.levels.remove(k);
+            return false;
+        }
+        l.framed = true;
+        Mine.changed();
+        return true;
     }
 
     // ---- In the mine? ----
@@ -285,7 +405,8 @@ final class Miner {
             return null;
         }
         if (k < 0) {
-            w.workStatus = k == -2 ? "The mine is dug out (make it bigger, or start a new mine)" : "Nothing to mine (set storage targets)";
+            w.workStatus = k == -2 ? "The mine is dug out (make it bigger, or start a new mine)"
+                    : k == WAIT_FLOOR ? "Waiting for an elevator floor (Ledger → Requests)" : "Nothing to mine (set storage targets)";
             return underground(w) ? new Shift(w, t, wp, m, -1) : null;
         }
         int now = Bukkit.getCurrentTick();
@@ -422,6 +543,20 @@ final class Miner {
         Mine m = Mine.get(wp);
         if (m == null) m = Mine.create(wp);
         m.world = t.bell.getWorld();
+        if (p[0].equals("E")) { // an elevator mine: E, id, x, y, z (where to stand up top)
+            m.elevator = p[1].replace(';', ',');
+            m.ox = Integer.parseInt(p[2]);
+            m.oy = Integer.parseInt(p[3]);
+            m.oz = Integer.parseInt(p[4]);
+            m.surface = m.oy;
+            m.dir = 0;
+            m.approved = true;
+            m.stairsDone = 0;
+            m.levels.clear();
+            Mine.changed();
+            Mine.save();
+            return;
+        }
         m.ox = Integer.parseInt(p[0]);
         m.oy = Integer.parseInt(p[1]);
         m.oz = Integer.parseInt(p[2]);
@@ -450,12 +585,15 @@ final class Miner {
             this.w = w;
             this.t = t;
             this.wp = wp;
-            int r = radius(w) - 12;
-            Location c = t.bell;
-            for (int x = -r; x <= r; x += 3) {
-                for (int z = -r; z <= r; z += 3) {
-                    if (x * x + z * z > r * r) continue;
-                    for (int d = 0; d < 4; d++) todo.add(new int[]{c.getBlockX() + x, c.getBlockZ() + z, d});
+            // The whole settlement: the main area and every expansion.
+            Set<Long> seenXZ = new HashSet<>();
+            for (int[] q : t.squares()) {
+                int r = q[2] - 4;
+                for (int x = q[0] - r; x <= q[0] + r; x += 3) {
+                    for (int z = q[1] - r; z <= q[1] + r; z += 3) {
+                        if (!seenXZ.add(((long) x << 32) ^ (z & 0xffffffffL))) continue;
+                        for (int d = 0; d < 4; d++) todo.add(new int[]{x, z, d});
+                    }
                 }
             }
             Location s = wp.loc;
@@ -472,7 +610,7 @@ final class Miner {
             if (!elevatorChecked) {
                 elevatorChecked = true;
                 String[] e = Lift.mineStart(w, t);
-                if (e != null) return propose(e, "next to the elevator's lowest floor");
+                if (e != null) return propose(e, "using the elevator: I'll dig at its floors underground, and ask you for a floor where one is missing");
             }
             for (int n = 0; n < 2 && idx < todo.size(); n++) {
                 int[] c = todo.get(idx++);
@@ -483,7 +621,7 @@ final class Miner {
                 done = true;
                 retryAt = Bukkit.getCurrentTick() + 6000;
                 Asks.add(t, Asks.Kind.BLOCKED, "I can't find a good spot for a mine: open natural ground with nothing built close by, "
-                        + "and no caves, water or old structures under it.", wp.loc, w, "nosite");
+                        + "and no caves, water or old structures under it.", null, w, "nosite");
                 return true;
             }
             return false;
@@ -493,9 +631,11 @@ final class Miner {
             done = true;
             retryAt = Integer.MAX_VALUE;
             String[] p = data[0].split(",");
-            Location at = new Location(t.bell.getWorld(), Integer.parseInt(p[0]) + 0.5, Integer.parseInt(p[1]), Integer.parseInt(p[2]) + 0.5);
-            Asks.add(t, Asks.Kind.MINE_SITE, "May I start a mine here" + (where != null ? ", " + where : "") + "? I've marked the spot (it glows).",
-                    at, w, data[0]);
+            boolean lift = p[0].equals("E");
+            Location at = lift ? new Location(t.bell.getWorld(), Integer.parseInt(p[2]) + 0.5, Integer.parseInt(p[3]), Integer.parseInt(p[4]) + 0.5)
+                    : new Location(t.bell.getWorld(), Integer.parseInt(p[0]) + 0.5, Integer.parseInt(p[1]), Integer.parseInt(p[2]) + 0.5);
+            Asks.add(t, Asks.Kind.MINE_SITE, lift ? "May I start a mine " + where + "?"
+                    : "May I start a mine here? I've marked the spot (it glows).", at, w, data[0]);
             Bubbles.say(w.plugin, w.body, "Found a spot for the mine!", 60);
             return true;
         }
@@ -844,6 +984,14 @@ final class Miner {
         private boolean route(Location target) {
             hops.clear();
             Location here = w.body.getLocation();
+            if (m.floors()) { // back to the elevator on this level, then up
+                hops.addAll(m.upHops(here, size(wp)));
+                Activity lift = Lift.toTop(w, m, retreat);
+                if (lift == null) return !hops.isEmpty();
+                if (hops.isEmpty()) ride = lift;
+                else afterDig = () -> ride = lift;
+                return true;
+            }
             int at = m.where(here);
             Integer lvl = m.levelOf(here, size(wp));
             if (lvl != null) at = lvl;
@@ -858,10 +1006,6 @@ final class Miner {
                 return true;
             }
             hops.addAll(m.upHops(here, size(wp)));
-            if (m.elevator != null) {
-                Activity lift = Lift.fromStart(w, m, retreat);
-                if (lift != null) afterDig = () -> ride = lift;
-            }
             return true;
         }
 
@@ -873,9 +1017,29 @@ final class Miner {
             hops.addAll(m.levelHops(lk, from, U, V));
         }
 
-        /** Down to landing i (-1: just to the start) from wherever it is. */
-        private void downTo(int i) {
+        /** Down to landing (or elevator floor) i (-1: just to the start) from wherever it is. True: there (no travel). */
+        private boolean downTo(int i) {
             Location here = w.body.getLocation();
+            if (m.floors()) {
+                Integer lvl = levelOf(here);
+                if (lvl != null && lvl == i) return true;
+                if (i < 0) return true;
+                if (lvl != null) { // first back to the elevator on this level
+                    hops.addAll(m.upHops(here, size(wp)));
+                    afterDig = () -> ride = Lift.toFloor(w, m, i, retreat);
+                    return false;
+                }
+                Activity r = Lift.toFloor(w, m, i, retreat);
+                if (r != null) {
+                    ride = r;
+                    return false;
+                }
+                if (!near(m.entry(i), 2.5)) {
+                    hops.add(m.entry(i));
+                    return false;
+                }
+                return true;
+            }
             int at = m.where(here);
             Integer lvl = levelOf(here);
             if (lvl != null) {
@@ -887,12 +1051,12 @@ final class Miner {
                 Activity r = i >= 0 ? Rails.down(w, t, wp, m, i) : null;
                 if (r != null) {
                     ride = r;
-                    return;
+                    return false;
                 }
                 Activity e = Lift.down(w, m, i, retreat);
                 if (e != null) {
                     ride = e;
-                    return;
+                    return false;
                 }
                 hops.add(m.entrance());
             }
@@ -900,6 +1064,7 @@ final class Miner {
             int to = Math.min(i, dug - 1);
             if (at <= to) for (int j = Math.max(0, at); j <= to; j++) hops.add(m.landing(j));
             else for (int j = at; j >= Math.max(0, to); j--) hops.add(m.landing(j));
+            return hops.isEmpty();
         }
 
         // -- What to do next --
@@ -924,20 +1089,24 @@ final class Miner {
                 return;
             }
             int target = pickLevel(w, t, m);
-            if (target < 0) {
-                leave("Nothing to mine (set storage targets)");
-                return;
-            }
             if (target == -2) {
                 leave("The mine is dug out");
+                return;
+            }
+            if (target == WAIT_FLOOR) {
+                leave("Waiting for an elevator floor (Ledger → Requests)");
+                return;
+            }
+            if (target < 0) {
+                leave("Nothing to mine (set storage targets)");
                 return;
             }
             if (target != k) {
                 k = target;
                 scouted = false;
             }
-            // 1. The stairs down to landing k.
-            List<Mine.Cell> stairs = m.stairs(k);
+            // 1. The stairs down to landing k (not in an elevator mine: the elevator goes down).
+            List<Mine.Cell> stairs = m.floors() ? List.of() : m.stairs(k);
             if (m.stairsDone < stairs.size()) {
                 Mine.Cell c = stairs.get(m.stairsDone);
                 Location stand = m.stairsDone < 2 ? m.entrance() : cellLoc(stairs.get(Math.max(0, m.stairsDone - 2)));
@@ -958,12 +1127,21 @@ final class Miner {
                 w.workStatus = "Digging the stairs down";
                 return;
             }
+            if (m.floors() && !frameFloor(m, k)) {
+                // No room to step off there, or no rock next to it: that floor can't be used.
+                Mine.Level dead = m.levels.computeIfAbsent(k, x -> new Mine.Level());
+                dead.hub = true;
+                dead.done = Integer.MAX_VALUE / 2;
+                Mine.changed();
+                Asks.add(t, Asks.Kind.BLOCKED, "I can't mine at the elevator's floor at y " + (k - Mine.FLOOR + 1)
+                        + ": no room to step off next to the platform, or no rock around it.", m.entrance(), w, "floor" + k);
+                return;
+            }
             Mine.Level lv = m.levels.computeIfAbsent(k, x -> new Mine.Level());
             // Down there: look around first (monsters?).
             Integer lvlHere = levelOf(w.body.getLocation());
-            if (!scouted && !(lvlHere != null && lvlHere == k) && !near(m.landing(k), 3)) {
-                downTo(k);
-                if (lv.hub) addLevelHops(k, m.landing(k), 0, 0);
+            if (!scouted && !(lvlHere != null && lvlHere == k) && !near(m.entry(k), 3)) {
+                if (downTo(k) && lv.hub) addLevelHops(k, m.entry(k), 0, 0);
                 return;
             }
             if (!scouted) {
@@ -1020,8 +1198,7 @@ final class Miner {
             List<Mine.Col> plan = m.plan(lv, size(wp));
             while (lv.done < plan.size()) {
                 Mine.Col c = plan.get(lv.done);
-                int[] ts = m.ts(k, c.u(), c.v());
-                if (lv.blocked.contains(c.seg()) || (c.seg().startsWith("B") && (Mine.inStairs(ts[0], ts[1]) || cutOff(lv, c.v())))) {
+                if (lv.blocked.contains(c.seg()) || (c.seg().startsWith("B") && (m.reserved(k, c.u(), c.v()) || cutOff(lv, c.v())))) {
                     if (c.seg().startsWith("B")) lv.blocked.add(c.seg());
                     lv.done++;
                     continue;
@@ -1037,7 +1214,7 @@ final class Miner {
             if (!near(stand, 2.6)) {
                 boolean inLevel = levelOf(w.body.getLocation()) != null;
                 if (!inLevel) {
-                    downTo(k);
+                    if (!downTo(k)) return;
                     hops.add(m.hub(k));
                 }
                 int[] s = prevOf(c);
@@ -1057,7 +1234,7 @@ final class Miner {
                 ores(c);
                 frame(c);
             };
-            w.workStatus = "Mining at level " + m.landingY(k);
+            w.workStatus = "Mining at level " + m.levelY(k);
         }
 
         private Location cellLoc(Mine.Cell c) {
@@ -1085,7 +1262,7 @@ final class Miner {
         /** Where to stand to dig (u, v): the dug spot before it. */
         private Location standFor(int u, int v, boolean hub) {
             if (hub) {
-                if (u <= -2) return m.landing(k);
+                if (u <= -2) return m.entry(k);
                 return m.levelLoc(k, u - 1, 0);
             }
             int[] p = prevOf(new Mine.Col(u, v, 0, ""));
@@ -1326,22 +1503,25 @@ final class Miner {
         /** Part of the mine's own open space (stairs, hub, tunnels)? */
         private boolean space(Block b) {
             if (b.getWorld() != m.world) return false;
-            int dx = b.getX() - m.ox, dz = b.getZ() - m.oz;
-            int tt = dx * m.fx() + dz * m.fz(), s = dx * m.sx() + dz * m.sz();
             int y = b.getY();
-            if (y >= m.oy - 1 && Mine.inStairs(tt, s)) return true; // the entrance
-            // Stairs
-            if (tt >= -2 && tt <= 9 && s >= 0 && s <= 4) {
-                for (Mine.Cell c : m.stairs(Math.max(k, 0) + 1)) if (c.t() == tt && c.s() == s && y >= c.y() && y <= c.y() + 2) return true;
+            if (!m.floors()) {
+                int dx = b.getX() - m.ox, dz = b.getZ() - m.oz;
+                int tt = dx * m.fx() + dz * m.fz(), s = dx * m.sx() + dz * m.sz();
+                if (y >= m.oy - 1 && Mine.inStairs(tt, s)) return true; // the entrance
+                if (tt >= -2 && tt <= 9 && s >= 0 && s <= 4) {
+                    for (Mine.Cell c : m.stairs(Math.max(k, 0) + 1)) if (c.t() == tt && c.s() == s && y >= c.y() && y <= c.y() + 2) return true;
+                }
             }
+            int size = size(wp);
             for (int lk : m.levels.keySet()) {
-                int fy = m.landingY(lk);
+                if (Mine.isFloor(lk) && !m.levels.get(lk).framed) continue;
+                int fy = m.levelY(lk);
                 if (y < fy || y > fy + 3) continue;
-                int u = (tt - m.hubT(lk)) * m.away(lk), v = s - 2;
-                int dy = y - fy;
-                int size = size(wp);
+                int[] uvd = m.uv(lk, b);
+                int u = uvd[0], v = uvd[1], dy = uvd[2];
                 if (Math.abs(u) <= 2 && Math.abs(v) <= 2) return true;                               // hub
                 if (u == -3 && Math.abs(v) <= 1 && dy <= 2) return true;                             // door
+                if (Mine.isFloor(lk) && u == -4 && Math.abs(v) <= 1 && dy <= 2) return true;         // where it steps off
                 if (u >= 3 && u <= size && Math.abs(v) <= 1 && dy <= 2) return true;                 // A
                 if (Math.abs(u) <= 1 && Math.abs(v) >= 3 && Math.abs(v) <= size && dy <= 2) return true; // L / R
                 if (v != 0 && v % 4 == 0 && Math.abs(u) >= 2 && Math.abs(u) <= size && dy <= 1) return true; // side tunnels
@@ -1379,20 +1559,34 @@ final class Miner {
 
         // -- Frames and torches --
 
+        /** World direction of a step in mine coordinates (t, s): for the stairs' landings. */
         private BlockFace face(int ddt, int dds) {
-            int x = m.fx() * ddt + m.sx() * dds, z = m.fz() * ddt + m.sz() * dds;
+            return faceXZ(m.fx() * ddt + m.sx() * dds, m.fz() * ddt + m.sz() * dds);
+        }
+
+        /** World direction of a step in level coordinates (u, v). */
+        private BlockFace faceUV(int du, int dv) {
+            int[] f = m.frame(k);
+            return faceXZ(f[2] * du + f[4] * dv, f[3] * du + f[5] * dv);
+        }
+
+        private static BlockFace faceXZ(int x, int z) {
             for (BlockFace f : new BlockFace[]{BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST}) {
                 if (f.getModX() == x && f.getModZ() == z) return f;
             }
             return BlockFace.NORTH;
         }
 
-        private Axis axisT() {
-            return m.fx() != 0 ? Axis.X : Axis.Z;
-        }
-
         private Axis axisS() {
             return m.sx() != 0 ? Axis.X : Axis.Z;
+        }
+
+        private Axis axisU() {
+            return m.frame(k)[2] != 0 ? Axis.X : Axis.Z;
+        }
+
+        private Axis axisV() {
+            return m.frame(k)[4] != 0 ? Axis.X : Axis.Z;
         }
 
         private Material logType() {
@@ -1426,7 +1620,7 @@ final class Miner {
             at.getWorld().playSound(at.getLocation(), "minecraft:block.wood.place", SoundCategory.BLOCKS, 0.6f, 1f);
         }
 
-        /** Studs in both side walls, a beam across the ceiling, a torch on each stud. (tt, s) of the two studs. */
+        /** Studs in both side walls, a beam across the ceiling, a torch on each stud (stairs landings, in t/s). */
         private void frameAcross(int[] studA, int[] studB, int y, int height, Axis beamAxis, boolean alongS) {
             for (int dy = 0; dy < height; dy++) {
                 log(m.at(studA[0], studA[1], y + dy), Axis.Y);
@@ -1438,12 +1632,25 @@ final class Miner {
                 if (alongS) log(m.at(studA[0], i, y + height), beamAxis);
                 else log(m.at(i, studA[1], y + height), beamAxis);
             }
-            // Torches on the studs, facing in.
             int dtA = alongS ? 0 : Integer.signum(studB[0] - studA[0]), dsA = alongS ? Integer.signum(studB[1] - studA[1]) : 0;
             Block ta = m.at(studA[0] + dtA, studA[1] + dsA, y + 1);
             Block tb = m.at(studB[0] - dtA, studB[1] - dsA, y + 1);
             if (Tag.LOGS.isTagged(m.at(studA[0], studA[1], y + 1).getType())) torch(ta, face(dtA, dsA));
             if (Tag.LOGS.isTagged(m.at(studB[0], studB[1], y + 1).getType())) torch(tb, face(-dtA, -dsA));
+        }
+
+        /** The same on a level, in u/v: studs at (ua, va) and (ub, vb), one row apart along u or v. */
+        private void frameUV(int ua, int va, int ub, int vb, int height) {
+            for (int dy = 0; dy < height; dy++) {
+                log(m.levelAt(k, ua, va, dy), Axis.Y);
+                log(m.levelAt(k, ub, vb, dy), Axis.Y);
+            }
+            boolean alongV = ua == ub;
+            if (alongV) for (int v = Math.min(va, vb); v <= Math.max(va, vb); v++) log(m.levelAt(k, ua, v, height), axisV());
+            else for (int u = Math.min(ua, ub); u <= Math.max(ua, ub); u++) log(m.levelAt(k, u, va, height), axisU());
+            int du = alongV ? 0 : Integer.signum(ub - ua), dv = alongV ? Integer.signum(vb - va) : 0;
+            if (Tag.LOGS.isTagged(m.levelAt(k, ua, va, 1).getType())) torch(m.levelAt(k, ua + du, va + dv, 1), faceUV(du, dv));
+            if (Tag.LOGS.isTagged(m.levelAt(k, ub, vb, 1).getType())) torch(m.levelAt(k, ub - du, vb - dv, 1), faceUV(-du, -dv));
         }
 
         private void landingFrame(int lk) {
@@ -1452,33 +1659,25 @@ final class Miner {
         }
 
         private void hubFrame() {
-            // On the far wall of the hub (where the main corridor leaves), facing back into the room.
-            int tRow = m.hubT(k) + m.away(k) * 3, y = m.landingY(k);
-            for (int v : new int[]{-2, 2}) for (int dy = 0; dy < 3; dy++) log(m.at(tRow, 2 + v, y + dy), Axis.Y);
-            for (int v = -2; v <= 2; v++) {
-                Block b = m.at(tRow, 2 + v, y + 3);
-                log(b, axisS());
-            }
-            int back = -m.away(k);
-            for (int v : new int[]{-2, 2}) torch(m.at(tRow + back, 2 + v, y + 1), face(back, 0));
-            // The landing side too: a frame over the door.
-            landingFrame(k);
+            // On the far wall of the hub (where the main corridor leaves): studs, a beam, torches facing back into the room.
+            for (int v : new int[]{-2, 2}) for (int dy = 0; dy < 3; dy++) log(m.levelAt(k, 3, v, dy), Axis.Y);
+            for (int v = -2; v <= 2; v++) log(m.levelAt(k, 3, v, 3), axisV());
+            for (int v : new int[]{-2, 2}) torch(m.levelAt(k, 2, v, 1), faceUV(-1, 0));
+            if (!Mine.isFloor(k)) landingFrame(k); // the landing side too
+            else frameUV(-3, -2, -3, 2, 3);       // over the door from the elevator
         }
 
         /** A frame where the plan says so (every 8 blocks, between the side tunnels). */
         private void frame(Mine.Col c) {
-            int u = c.u(), v = c.v(), y = m.landingY(k);
+            int u = c.u(), v = c.v();
             if (c.seg().equals("A") && v == 1 && u >= 10 && u % 8 == 2) {
-                int tt = m.hubT(k) + m.away(k) * u;
-                frameAcross(new int[]{tt, 2 - 2}, new int[]{tt, 2 + 2}, y, 3, axisS(), true);
+                frameUV(u, -2, u, 2, 3);
             } else if ((c.seg().equals("L") || c.seg().equals("R")) && u == 1 && Math.abs(v) >= 10 && Math.abs(v) % 8 == 2) {
-                int ta = m.hubT(k) - 2 * m.away(k), tb = m.hubT(k) + 2 * m.away(k);
-                frameAcross(new int[]{Math.min(ta, tb), 2 + v}, new int[]{Math.max(ta, tb), 2 + v}, y, 3, axisT(), false);
+                frameUV(-2, v, 2, v, 3);
             } else if (c.seg().startsWith("B") && Math.abs(u) % 8 == 4) {
                 // Side tunnel: one stud in the wall with a torch.
-                int tt = m.hubT(k) + m.away(k) * u, s = 2 + v + 1;
-                if (log(m.at(tt, s, y), Axis.Y) & log(m.at(tt, s, y + 1), Axis.Y) || Tag.LOGS.isTagged(m.at(tt, s, y + 1).getType())) {
-                    torch(m.at(tt, s - 1, y + 1), face(0, -1));
+                if (log(m.levelAt(k, u, v + 1, 0), Axis.Y) & log(m.levelAt(k, u, v + 1, 1), Axis.Y) || Tag.LOGS.isTagged(m.levelAt(k, u, v + 1, 1).getType())) {
+                    torch(m.levelAt(k, u, v, 1), faceUV(0, -1));
                 }
             }
         }

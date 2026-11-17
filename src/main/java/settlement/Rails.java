@@ -219,13 +219,13 @@ final class Rails {
 
     /** Down by minecart from the top end to level k (rails on, a route, a minecart in the pockets). */
     static Activity down(Worker w, Town t, Town.Workplace wp, Mine m, int k) {
-        if (!on(wp) || w.count(Material.MINECART) == 0) return null;
+        if (m.floors() || !on(wp) || w.count(Material.MINECART) == 0) return null;
         Route r = route(m, k);
         return r == null ? null : new Ride(w, m, k, r, r.high(), r.low());
     }
 
     static Activity up(Worker w, Town t, Town.Workplace wp, Mine m, int k, Location here) {
-        if (!on(wp) || k < 0 || w.count(Material.MINECART) == 0) return null;
+        if (m.floors() || !on(wp) || k < 0 || w.count(Material.MINECART) == 0) return null;
         Route r = route(m, k);
         if (r == null || r.low().getLocation().distanceSquared(here) > 40 * 40) return null;
         return new Ride(w, m, k, r, r.low(), r.high());
@@ -375,7 +375,7 @@ final class Rails {
 
     /** Pockets heavy and a chest cart at the level's stop: load it and send it up. True: busy with it. */
     static boolean trySendCart(Worker w, Town t, Town.Workplace wp, Mine m, int k) {
-        if (!on(wp) || k < 0) return false;
+        if (m.floors() || !on(wp) || k < 0) return false;
         int load = 0;
         for (ItemStack it : w.pockets.getContents()) if (it != null && cargo(it.getType())) load++;
         if (load < 4) return false;
