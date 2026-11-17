@@ -30,7 +30,8 @@ Right-click a **bell** → create a settlement. The settlement is the square aro
 - Everything follows the shape: border particles (outer edge only), patrols, fields, chests, loaded chunks, alarms.
 
 ### Bell menu (the settlement's rules)
-- **Recruit settler**: costs items, more for every settler (`recruit-cost` tiers, `recruit-cost-increase`).
+- **Recruit settler**: costs items, more as the settlement grows: `recruit-cost` by tiers (from 0 settlers, from 3...),
+  or a plain list that costs `recruit-cost-increase` % more for every settler.
   A new settler (or a hired villager) walks to the bell and waits there for instructions (`newcomer-wait-seconds`, default 180),
   or until you give it a job or make it a guard; then it goes about its free time.
 - **Rename**, **Radius**.
@@ -88,7 +89,7 @@ the work. **In use** (checkbox) switches the workstation off without removing th
 - **Furnace – furnace worker**: only what smokers and blast furnaces can't do (stone types, glass, bricks,
   dyes, charcoal…) and **only what you set a storage target for**.
 - Furnace jobs fetch fuel from storage (coal, charcoal, wood). A cold furnace is only lit for a full batch (8 items, one coal), unless fewer are wanted.
-- **Loom – herder**: only looks after animals in a pen (fenced in with fences, walls or gates; wild ones are left alone). per kind of animal a checkbox and **Adults** (2–20): breeds up to that number with food
+- **Loom – herder**: only looks after animals in a pen (fenced in with fences, walls or gates, up to about 40x40; wild ones are left alone; named or leashed animals are never slaughtered). Per kind of animal a checkbox and **Adults** (2–20): breeds up to that number with food
   from storage and slaughters the extra adults. Unchecked kinds are left alone (no breeding, no killing).
   Shears sheep (shears from storage), collects drops and eggs, closes gates behind it, climbs over a fence
   with a carpet on top. **Bees** (On): harvests full beehives and bee nests, honey with a glass
@@ -118,7 +119,43 @@ the work. **In use** (checkbox) switches the workstation off without removing th
   top; the workstation menu says if it is). Fish whose storage target is reached go back into the water; junk
   only when chosen in the **Junk filter**, and then up to its storage target (kept junk shows in the fisher's
   storage targets); treasure always kept.
-- **Smithing table – smith**: leather armor, and stone, copper, iron, gold, diamond and netherite tools, weapons and armor, bows, arrows, shields, shears and fishing rods, **only what you set a storage target for**. Buttons above the list show one material at a time (click it again: all). Netherite: the diamond one + a netherite ingot + an upgrade template.
+- **Smithing table – smith**: leather armor, and stone, copper, iron, gold, diamond and netherite tools, weapons and armor, bows, arrows, shields, shears, fishing rods, torches, rails, powered and detector rails, minecarts and chest minecarts, **only what you set a storage target for**. Buttons above the list show one material at a time (click it again: all). Netherite: the diamond one + a netherite ingot + an upgrade template.
+
+- **Stonecutter – miner**: digs a mine for what its **storage targets** ask for (made to order: cobblestone,
+  cobbled deepslate, granite, diorite, andesite, tuff, dirt, gravel, flint, coal, raw copper/iron/gold, lapis,
+  redstone, diamond, emerald). Each at its best level: coal, copper and stone around y 48, iron 16, lapis 0,
+  gold and deepslate -16, redstone and diamond -53.
+  - **The spot**: the miner looks for open natural ground in the settlement, away from buildings and chests, with
+    nothing old or built under it (or next to an elevator's lowest floor, when an elevator goes down far enough).
+    It marks the spot (glowing), comes to tell the founder ("Got a minute?": right-click it) and waits for a yes
+    (Ledger → **Requests**). Show me / Teleport there / Yes / No (it looks for another spot). Only the founder answers.
+  - **The mine**: a 2-wide staircase going down and back (a landing every 9 blocks). At a level: a hub room by the
+    landing, corridors (3 wide) to three sides, side tunnels every 4 blocks (3 stone between them). Log frames every 8
+    blocks: studs in the walls, a beam across the ceiling, torches on the studs. Caves, water and lava next to the
+    tunnels are closed with cobblestone, sand or gravel overhead too; holes in the floor filled. It only digs natural
+    blocks: something built stops that tunnel; a spawner, dungeon, old mineshaft, trial chamber, ancient city, geode
+    or stronghold stops it too and becomes a request. **Mine size** (stonecutter): 16 to 128 blocks from the hub,
+    also past the settlement's border. **Start a new mine** (founder): forget this one.
+  - Needs a pickaxe (it takes the cheapest one that will do: stone for stone and coal, iron for gold, redstone and
+    diamond), torches and logs (from storage), and some food. Keeps what's wanted plus 64 cobblestone to seal with;
+    other stone is thrown away; ore is always kept. Full pockets: it brings everything up.
+  - **Danger**: it fights with its pickaxe; 3 or more monsters, or badly hurt: it runs out of the mine, you get a
+    request, and it goes to ask the guards. About 1 guard per 3 monsters follows it down, clears the level and walks
+    back up on its own; `miner-guards-stay` guards (at least 1) always stay up top, none go while the settlement is
+    under attack. Guards never go into the mine by themselves. Downed in the mine: a guard goes down and carries it
+    up to the bell, where you can help it up.
+  - **Elevator** (the Elevator plugin): it uses an elevator like you do (calls it, same queue and countdown, rides,
+    steps off): to the mine's start, or straight to a level when the elevator has a floor there that's connected
+    to the level's hub. An elevator without rails first; one with rails only in an emergency.
+  - **Use rails** (stonecutter, off by default): you build a rail line from a level (near its landing or hub) up to the
+    surface; a stop is a powered rail with a button or lever next to it (the miner presses it). It rides in a minecart
+    (it carries one): nothing can hurt it, monsters on the track are run over. A chest minecart standing at the
+    level's stop + a hopper under the stop up top: it sends its ore up in the cart (you build what sends the empty
+    cart back). It waits while another cart is on the line; a cart that doesn't come back: a request.
+  - Its outfit (miner) is in the resource pack: `<person>_miner.png`.
+  - Works in work time only. While it works, the land around it stays loaded (`miner-keep-loaded`), also when
+    nobody is near (3x3 chunks around it, only where it is).
+- **Ledger → Requests**: what settlers ask or tell the founder; glows on the ledger when new.
 
 Tools wear out (axes per log, shears per sheep, weapons per hit, bows per shot, shields per blocked hit;
 Unbreaking helps). Missing tool → a chat message (at most every 5 minutes per settler).
