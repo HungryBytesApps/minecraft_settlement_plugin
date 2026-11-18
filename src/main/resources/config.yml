@@ -48,9 +48,6 @@ show-names: true
 work-speed: 0.15
 walk-speed: 0.11
 
-# Work area radius around a workplace (composter): default for new workplaces, and the maximum.
-default-work-radius: 6
-max-work-radius: 12
 # How far from the bell settlers wander in their free time.
 social-radius: 16
 
@@ -158,10 +155,6 @@ music-volume: 0.3
 # Settlers tidy a storage chest when they put things in: full stacks, alike things together, no gaps.
 sort-storage: true
 
-# Miner (stonecutter): keep the land around a working miner loaded (it works while nobody is near).
-miner-keep-loaded: true
-# Guards that always stay up top when a miner asks for help in the mine (at least 1).
-miner-guards-stay: 1
 # Which discs (an empty list [] = no bands). All: 13, cat, blocks, chirp, far, mall, mellohi, stal, strad,
 # ward, 11, wait, otherside, 5, pigstep, relic, creator, creator_music_box, precipice, tears, lava_chicken.
 music-discs: [cat, chirp, far, mall, mellohi, stal, strad, wait, blocks, otherside, relic, creator_music_box, precipice]

@@ -142,7 +142,7 @@ final class Social {
         List<Worker> options = new ArrayList<>();
         Location me = w.body.getLocation();
         for (Worker o : w.plugin.workers().all()) {
-            if (o == w || o.job() == Worker.Job.NONE || o.body.getWorld() != me.getWorld()) continue;
+            if (o == w || o.job() == Worker.Job.NONE || o.body.getWorld() != me.getWorld() || !java.util.Objects.equals(o.townId, w.townId)) continue;
             if (o.body.getLocation().distanceSquared(me) <= 32 * 32) options.add(o);
         }
         return options.isEmpty() ? null : options.get(w.random.nextInt(options.size()));
@@ -165,7 +165,7 @@ final class Social {
         Location best = null;
         double bestD = 64;
         for (Worker o : w.plugin.workers().all()) {
-            if (o == w || o.body.getWorld() != me.getWorld()) continue;
+            if (o == w || o.body.getWorld() != me.getWorld() || !java.util.Objects.equals(o.townId, w.townId)) continue;
             double d = o.body.getLocation().distanceSquared(me);
             if (d < bestD) {
                 bestD = d;

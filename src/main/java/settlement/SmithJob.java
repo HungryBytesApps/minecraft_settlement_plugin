@@ -30,8 +30,7 @@ final class SmithJob {
 
     private static List<Material> products() {
         List<Material> out = new ArrayList<>(List.of(Material.ARROW, Material.BOW, Material.CROSSBOW, Material.SHIELD, Material.SHEARS,
-                Material.FISHING_ROD, Material.TORCH, Material.RAIL, Material.POWERED_RAIL, Material.DETECTOR_RAIL, Material.MINECART,
-                Material.CHEST_MINECART));
+                Material.FISHING_ROD));
         for (String metal : METALS)
             for (String piece : PIECES) {
                 Material m = Material.matchMaterial(metal + "_" + piece); // only what exists (no stone armor)
@@ -52,27 +51,34 @@ final class SmithJob {
 
     static Activity next(Worker w, Town t, Town.Workplace wp) {
         int radius = w.plugin.settings().townRadius();
-        // Products go to storage, except the ones a wanted product is made from (diamond gear → netherite, minecart → chest minecart).
+        // Products go to storage, except the ones a wanted product is made from (diamond gear → netherite).
         Set<Material> parts = new HashSet<>();
         for (Material product : PRODUCTS) {
             int target = t.targets.getOrDefault(product, 0);
-            if (target <= 0 || t.count(product, radius) >= target) continue;
+            if (target <= 0 || t.count(product, radius) + w.count(product) >= target) continue;
             if ("netherite".equals(metal(product))) {
                 Material d = Material.matchMaterial("diamond_" + product.getKey().getKey().substring("netherite_".length()));
                 if (d != null) parts.add(d);
             }
-            if (product == Material.CHEST_MINECART) parts.add(Material.MINECART);
         }
         Predicate<Material> keep = m -> (!PRODUCTS.contains(m) || parts.contains(m)) && !m.isAir();
         if (Work.needsDeposit(w, keep, true)) {
             Activity d = Work.deposit(w, t, keep);
             if (d != null) return d;
         }
+        if (org.bukkit.Bukkit.getCurrentTick() < w.storageFullUntil) { // nowhere to put what it makes: don't make more
+            w.workStatus = "Storage is full";
+            return null;
+        }
+        if (w.isSkipped(wp.loc.getBlock())) { // can't get to the table lately
+            w.workStatus = "Can't get to the smithing table";
+            return null;
+        }
         boolean anyWanted = false;
         String missing = null;
         for (Material product : PRODUCTS) {
             int target = t.targets.getOrDefault(product, 0);
-            if (target <= 0 || t.count(product, radius) >= target) continue;
+            if (target <= 0 || t.count(product, radius) + w.count(product) >= target) continue; // (counting what it carries too)
             anyWanted = true;
             Plan plan = plan(w, t, product);
             if (plan == null) {

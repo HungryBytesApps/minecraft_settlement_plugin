@@ -298,6 +298,7 @@ final class Mover {
             Block b = e.getKey();
             if (!(b.getBlockData() instanceof Openable o) || !o.isOpen()) {
                 it.remove();
+                passingGate.remove(b); // someone else shut it
                 continue;
             }
             // Gates: shut right behind it, so no animal slips out (an animal in the way gets pushed back).

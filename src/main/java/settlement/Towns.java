@@ -149,13 +149,58 @@ final class Towns {
     }
 
     private void load() {
+        load(null);
+    }
+
+    /** A town whose world isn't loaded yet (its settlers wait for it, they aren't sent away). */
+    boolean isUnloaded(String id) {
+        return id != null && unloaded.containsKey(id);
+    }
+
+    /** A world unloading: its towns wait on disk until it's back (no stale world kept around). */
+    void worldUnloading(org.bukkit.World world) {
+        java.util.List<String> gone = new java.util.ArrayList<>();
+        for (Town t : byId.values()) if (t.bell.getWorld() == world) gone.add(t.id);
+        if (gone.isEmpty()) return;
+        save();
+        ConfigurationSection root = YamlConfiguration.loadConfiguration(file).getConfigurationSection("towns");
+        for (String id : gone) {
+            Tickets.releasePrefix("town:" + id);
+            Tickets.releasePrefix("find:" + id);
+            byId.remove(id);
+            ConfigurationSection s = root == null ? null : root.getConfigurationSection(id);
+            if (s != null) unloaded.put(id, s.getValues(true));
+        }
+    }
+
+    /** A world was loaded later (a world plugin): load the towns that were waiting for it. */
+    void worldLoaded() {
+        if (unloaded.isEmpty()) return;
+        java.util.Set<String> waiting = new java.util.HashSet<>(unloaded.keySet());
+        load(waiting);
+        for (String id : waiting) {
+            Town t = get(id);
+            if (t != null) plugin.keepLoaded(t, true); // keep its land loaded like the others
+        }
+    }
+
+    /** Chest keys are saved with '.' as '_': put the world's real name back. */
+    private static String fixKey(String k, Location bell) {
+        String world = bell.getWorld().getName();
+        String saved = world.replace('.', '_');
+        return !world.equals(saved) && k.startsWith(saved + ",") ? world + k.substring(saved.length()) : k;
+    }
+
+    private void load(java.util.Set<String> only) {
         if (!file.exists()) return;
         ConfigurationSection root = YamlConfiguration.loadConfiguration(file).getConfigurationSection("towns");
         if (root == null) return;
         for (String id : root.getKeys(false)) {
+            if (only != null && !only.contains(id)) continue;
             ConfigurationSection s = root.getConfigurationSection(id);
             if (s == null) continue;
             Location bell = Keys.deser(s.getString("bell"));
+            if (bell != null) unloaded.remove(id);
             if (bell == null) { // its world isn't loaded (yet): keep it as it is, don't lose it on the next save
                 unloaded.put(id, s.getValues(true));
                 continue;
@@ -195,7 +240,7 @@ final class Towns {
             if (chests != null) {
                 for (String k : chests.getKeys(false)) {
                     List<Boolean> v = chests.getBooleanList(k);
-                    if (v.size() == 2) t.chestRules.put(k, new boolean[]{v.get(0), v.get(1)});
+                    if (v.size() == 2) t.chestRules.put(fixKey(k, bell), new boolean[]{v.get(0), v.get(1)});
                 }
             }
             ConfigurationSection pt = s.getConfigurationSection("potion-targets");
@@ -212,7 +257,7 @@ final class Towns {
                         Material mat = Material.matchMaterial(m);
                         if (mat != null) f.items.add(mat);
                     }
-                    t.chestFilters.put(k, f);
+                    t.chestFilters.put(fixKey(k, bell), f);
                 }
                 // Both halves of a double chest share one filter again.
                 for (String k : new ArrayList<>(t.chestFilters.keySet())) {

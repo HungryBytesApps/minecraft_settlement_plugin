@@ -62,6 +62,24 @@ final class SettlerInventory implements InventoryHolder {
         p.openInventory(si.inv);
     }
 
+    private static boolean storing;
+
+    /** The settler's pockets changed some other way (a hand-over, an egg back): show that, so it isn't overwritten. */
+    static void refresh(Worker w) {
+        if (storing) return;
+        SettlerInventory si = open.get(w.body.getUniqueId());
+        if (si != null) si.load();
+    }
+
+    /** Close every window (plugin shutting down): what's in them goes back to the settler first. */
+    static void closeAll() {
+        for (SettlerInventory si : new java.util.ArrayList<>(open.values())) {
+            si.store();
+            for (var h : new java.util.ArrayList<>(si.inv.getViewers())) h.closeInventory();
+        }
+        open.clear();
+    }
+
     /** Close it (settler died or left). */
     static void close(Worker w) {
         SettlerInventory si = open.remove(w.body.getUniqueId());
@@ -100,7 +118,12 @@ final class SettlerInventory implements InventoryHolder {
             ItemStack it = inv.getItem(9 + i);
             w.pockets.setItem(i, it == null ? null : it.clone());
         }
-        w.savePockets();
+        storing = true;
+        try {
+            w.savePockets();
+        } finally {
+            storing = false;
+        }
         w.holdTool();
     }
 

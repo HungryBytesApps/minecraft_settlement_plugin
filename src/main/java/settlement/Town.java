@@ -68,6 +68,9 @@ final class Town {
         Worker.Job job() {
             int now = Bukkit.getCurrentTick();
             if (jobSeen == null || now - jobSeenAt >= 20 || now < jobSeenAt) {
+                if (jobSeen != null && !loc.getWorld().isChunkLoaded(loc.getBlockX() >> 4, loc.getBlockZ() >> 4)) {
+                    return jobSeen; // not loaded: keep what we knew (don't load land to look)
+                }
                 jobSeen = Worker.Job.of(loc.getBlock());
                 jobSeenAt = now;
             }
@@ -438,16 +441,28 @@ final class Town {
         return target == null || count(item, radius) < target;
     }
 
+    /** Same, counting what this settler already carries toward storage. */
+    boolean wants(Material item, int radius, Worker w) {
+        Integer target = targets.get(item);
+        return target == null || count(item, radius) + w.count(item) < target;
+    }
+
     /** Where to put this item: an allowed chest that already has it, else the nearest allowed one with space. */
     /**
      * Where to put this item: first a chest whose filter lists it, then a chest that already holds it, then any.
      * A chest with filter "Only" takes nothing else.
      */
     Block storeChest(Material m, Location near, int radius) {
+        return storeChest(m, near, radius, null);
+    }
+
+    /** w != null: not a chest it couldn't get to lately. */
+    Block storeChest(Material m, Location near, int radius, Worker w) {
         Block filtered = null, withItem = null, any = null;
         double dFil = Double.MAX_VALUE, dWith = Double.MAX_VALUE, dAny = Double.MAX_VALUE;
         for (Block b : containers(radius)) {
             if (!rule(b)[0]) continue;
+            if (w != null && w.isSkipped(b)) continue;
             Filter f = filter(b);
             boolean listed = f.mode != FilterMode.OFF && f.items.contains(m);
             if (f.mode == FilterMode.ONLY && !listed) continue;
@@ -474,10 +489,16 @@ final class Town {
 
     /** Nearest allowed chest to take this item from. */
     Block takeChest(Material m, Location near, int radius) {
+        return takeChest(m, near, radius, null);
+    }
+
+    /** w != null: not a chest it couldn't get to lately. */
+    Block takeChest(Material m, Location near, int radius, Worker w) {
         Block best = null;
         double bestD = Double.MAX_VALUE;
         for (Block b : containers(radius)) {
             if (!rule(b)[1]) continue;
+            if (w != null && w.isSkipped(b)) continue;
             Inventory inv = inventory(b);
             if (inv == null || !inv.contains(m)) continue;
             double d = b.getLocation().distanceSquared(near);
@@ -508,13 +529,16 @@ final class Town {
     }
 
     /** The enabled workplace with the fewest workers (nearest first). */
-    Workplace freeWorkplace(Location near) {
+    /** A switched-on station nobody works at yet (never the one in skip). */
+    Workplace freeWorkplace(Location near, Location skip) {
         Workplace best = null;
         double bestD = Double.MAX_VALUE;
         for (Workplace wp : workplaces.values()) {
-            if (!wp.enabled || wp.job() == Worker.Job.NONE) continue;
+            if (!wp.enabled || !wp.workers.isEmpty() || wp.loc.equals(skip)) continue;
             if (wp.loc.getWorld() != near.getWorld()) continue;
-            double d = wp.workers.size() * 1_000_000.0 + wp.loc.distanceSquared(near);
+            if (!wp.loc.getWorld().isChunkLoaded(wp.loc.getBlockX() >> 4, wp.loc.getBlockZ() >> 4)) continue;
+            if (wp.job() == Worker.Job.NONE) continue;
+            double d = wp.loc.distanceSquared(near);
             if (d < bestD) {
                 bestD = d;
                 best = wp;

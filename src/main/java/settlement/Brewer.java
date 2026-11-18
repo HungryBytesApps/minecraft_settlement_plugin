@@ -231,6 +231,10 @@ final class Brewer {
 
     static Activity next(Worker w, Town t, Town.Workplace wp) {
         Block sb = wp.loc.getBlock();
+        if (w.isSkipped(sb)) { // couldn't get to the stand lately: wait (not straight back to it)
+            w.workStatus = "Can't get to the brewing stand";
+            return null;
+        }
         if (!(sb.getState(false) instanceof BrewingStand stand)) return null;
         BrewerInventory inv = stand.getInventory();
         int radius = w.plugin.settings().townRadius();
@@ -403,8 +407,10 @@ final class Brewer {
             if (k != null && k.type() != PotionType.WATER) any = true;
         }
         if (!any) return null;
-        Block chest = t.storeChest(Material.POTION, w.body.getLocation(), radius);
+        if (Bukkit.getCurrentTick() < w.storageFullUntil) return null;
+        Block chest = t.storeChest(Material.POTION, w.body.getLocation(), radius, w);
         if (chest == null) {
+            w.storageFullUntil = Bukkit.getCurrentTick() + 400;
             w.warnStorageFull(Material.POTION);
             w.workStatus = "No room in storage for potions";
             return null;

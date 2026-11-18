@@ -30,8 +30,7 @@ final class Worker {
         LUMBERJACK("Lumberjack", Material.IRON_AXE, Material.FLETCHING_TABLE, true),
         SMITH("Smith", Material.AIR, Material.SMITHING_TABLE, false),
         BREWER("Brewer", Material.AIR, Material.BREWING_STAND, false),
-        FISHER("Fisher", Material.FISHING_ROD, Material.BARREL, false),
-        MINER("Miner", Material.IRON_PICKAXE, Material.STONECUTTER, false);
+        FISHER("Fisher", Material.FISHING_ROD, Material.BARREL, false);
 
         final String title;
         final Material tool;   // the kind of tool it holds (only when it really has one)
@@ -192,6 +191,7 @@ final class Worker {
             if (it != null && !it.getType().isAir()) items.add(it.serializeAsBytes());
         }
         body.getPersistentDataContainer().set(Keys.POCKETS, PersistentDataType.LIST.byteArrays(), items);
+        SettlerInventory.refresh(this);
     }
 
     Town town() {
@@ -358,8 +358,12 @@ final class Worker {
         applyLook();
     }
 
+    /** The station it was last sent away from: auto assign won't put it straight back there. */
+    Location leftWorkplace;
+
     void leaveWorkplace() {
         Town.Workplace wp = workplace();
+        if (workplace != null) leftWorkplace = workplace;
         if (wp != null && wp.workers.remove(body.getUniqueId())) plugin.towns().save();
         if (workplace != null) {
             workplace = null;
@@ -447,12 +451,12 @@ final class Worker {
     private void checkWorkplace(Town t) {
         if (guard) return;
         Town.Workplace wp = workplace();
-        if (workplace != null && (wp == null || !wp.enabled || wp.job() == Job.NONE || !wp.workers.contains(body.getUniqueId()))) {
-            leaveWorkplace(); // gone, switched off, or you sent it away
+        if (workplace != null && (wp == null || wp.job() == Job.NONE || !wp.workers.contains(body.getUniqueId()))) {
+            leaveWorkplace(); // gone, or you sent it away (switched off: it stays, it just doesn't work there)
             wp = null;
         }
         if (wp == null && t.autoJobs) {
-            Town.Workplace free = t.freeWorkplace(body.getLocation());
+            Town.Workplace free = t.freeWorkplace(body.getLocation(), leftWorkplace);
             if (free != null) {
                 assign(free);
                 Bubbles.say(plugin, body, "I'll be the new " + free.job().title.toLowerCase(Locale.ROOT) + "!", 60);
@@ -494,22 +498,22 @@ final class Worker {
             return;
         }
         if (activity != null) {
+            Activity cur = activity;
             boolean done;
             try {
-                done = activity.tick();
+                done = cur.tick();
             } catch (RuntimeException ex) {
                 int now = Bukkit.getCurrentTick();
                 if (now >= errorLoggedUntil) { // full error, at most once a minute per settler
                     errorLoggedUntil = now + 1200;
-                    plugin.getLogger().log(java.util.logging.Level.WARNING, name + " (" + activity.label() + ") ran into an error", ex);
-                    TownLog.settler(this, "ran into an error while " + activity.label().toLowerCase(java.util.Locale.ROOT) + " (see the server log)", NamedTextColor.RED);
+                    plugin.getLogger().log(java.util.logging.Level.WARNING, name + " (" + cur.label() + ") ran into an error", ex);
+                    TownLog.settler(this, "ran into an error while " + cur.label().toLowerCase(java.util.Locale.ROOT) + " (see the server log)", NamedTextColor.RED);
                 }
                 done = true;
             }
-            if (done) {
-                Activity a = activity;
+            if (done && activity == cur) { // (it may have been stopped already: it left, or went down)
                 activity = null;
-                a.stop();
+                cur.stop();
                 decisionCooldown = 5;
             }
         }
@@ -525,7 +529,7 @@ final class Worker {
         if (--defenseCheck <= 0) {
             defenseCheck = 20;
             Town t = town();
-            if (t != null && !guard && !(activity instanceof Defense.Reaction) && !(job() == Job.MINER && Miner.underground(this))) {
+            if (t != null && !guard && !(activity instanceof Defense.Reaction)) {
                 Activity r = Defense.react(this, t);
                 if (r == null) r = Shelter.check(this, t); // rain / thunder
                 if (r != null) start(r);
@@ -614,10 +618,6 @@ final class Worker {
             return;
         }
         boolean night = isNight();
-        if (job() == Job.MINER && Miner.underground(this) && night && !plugin.settings().workAtNight()) {
-            start(Miner.leave(this)); // up out of the mine first
-            return;
-        }
         if (night && (!plugin.settings().workAtNight() || job() == Job.NONE)) {
             workStatus = job() == Job.NONE ? "" : "Done for the day";
             if (outside) start(new Social.GoHome(this, t));
@@ -645,6 +645,10 @@ final class Worker {
     private Activity jobNext(Town t) {
         Town.Workplace wp = workplace();
         if (wp == null) return null;
+        if (!wp.enabled) {
+            workStatus = "The workstation is switched off";
+            return null;
+        }
         return switch (job()) {
             case FARMER -> FarmerJob.next(this, t, wp);
             case COOK, SMELTER, FURNACE_WORKER -> FurnaceJob.next(this, t, wp);
@@ -653,7 +657,6 @@ final class Worker {
             case SMITH -> SmithJob.next(this, t, wp);
             case BREWER -> Brewer.next(this, t, wp);
             case FISHER -> Fishing.next(this, t, wp);
-            case MINER -> Miner.next(this, t, wp);
             case NONE -> null;
         };
     }

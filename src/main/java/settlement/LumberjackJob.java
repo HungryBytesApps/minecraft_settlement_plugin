@@ -39,6 +39,10 @@ final class LumberjackJob {
             Activity d = Work.deposit(w, t, keep, limit);
             if (d != null) return d;
         }
+        if (org.bukkit.Bukkit.getCurrentTick() < w.storageFullUntil || w.pockets.firstEmpty() < 0) { // storage full: keep what it has, stop
+            w.workStatus = "Storage is full";
+            return null;
+        }
         // Saplings, apples and sticks from the leaves: pick them up.
         Activity pick = Work.collectDrops(w, t, LumberjackJob::wanted, 20);
         if (pick != null) return pick;
@@ -63,7 +67,7 @@ final class LumberjackJob {
             else w.skip(spot, 600); // the leaves may still drop some
         }
         // Real trees only (a log on the ground with natural leaves), inside or just outside the settlement.
-        Block base = Work.nearestOf(w, Fields.trees(t, radius, outside), b -> isTreeBase(b) && t.wants(b.getType(), radius));
+        Block base = Work.nearestOf(w, Fields.trees(t, radius, outside), b -> isTreeBase(b) && t.wants(b.getType(), radius, w));
         if (base != null) {
             Work.claim(w, base);
             if (!Work.hasTool(w, "_AXE")) {
@@ -84,7 +88,8 @@ final class LumberjackJob {
             Activity d = Work.deposit(w, t, keep, limit);
             if (d != null) return d;
         }
-        if (base != null) w.workStatus = "The settlement has enough wood";
+        boolean trees = Work.nearestOf(w, Fields.trees(t, radius, outside), LumberjackJob::isTreeBase) != null;
+        if (trees) w.workStatus = "The settlement has enough wood";
         else if (!Fields.saplings(t, radius, outside).isEmpty()) w.workStatus = "Waiting for the saplings to grow";
         else w.workStatus = outside ? "No trees just outside the settlement" : "No trees in the settlement";
         return null;
@@ -97,7 +102,9 @@ final class LumberjackJob {
     /** The lowest log of a tree: a log standing on dirt. */
     private static boolean isTreeBase(Block b) {
         Material m = b.getType();
-        return Tag.LOGS.isTagged(m) && !m.name().startsWith("STRIPPED_") && plantable(b.getRelative(BlockFace.DOWN));
+        if (!Tag.LOGS.isTagged(m) || m.name().startsWith("STRIPPED_") || m.name().endsWith("_WOOD") || m.name().endsWith("_HYPHAE")) return false;
+        if (b.getBlockData() instanceof org.bukkit.block.data.Orientable o && o.getAxis() != org.bukkit.Axis.Y) return false; // lying: a build
+        return plantable(b.getRelative(BlockFace.DOWN));
     }
 
     /** All logs of the tree, top first. Null if it's not a real tree (no natural leaves) or too big. */
@@ -119,6 +126,7 @@ final class LumberjackJob {
                         if (dx == 0 && dy == 0 && dz == 0) continue;
                         Block n = b.getRelative(dx, dy, dz);
                         if (n.getBlockData() instanceof Leaves l && !l.isPersistent()) leaves = true;
+                        if (built(n.getType())) return null; // planks, glass, a door... next to it: someone's building, not a tree
                         if (n.getType() == kind && n.getY() >= base.getY() && Math.abs(n.getX() - base.getX()) <= 6
                                 && Math.abs(n.getZ() - base.getZ()) <= 6 && seen.add(n)) todo.add(n);
                     }
@@ -128,6 +136,11 @@ final class LumberjackJob {
         if (!leaves) return null;
         logs.sort((a, b2) -> Integer.compare(b2.getY(), a.getY()));
         return logs;
+    }
+
+    private static boolean built(Material m) {
+        return Tag.PLANKS.isTagged(m) || Tag.DOORS.isTagged(m) || Tag.TRAPDOORS.isTagged(m) || Tag.STAIRS.isTagged(m) || Tag.SLABS.isTagged(m)
+                || Tag.FENCES.isTagged(m) || Tag.WOOL.isTagged(m) || Tag.BEDS.isTagged(m) || m.name().contains("GLASS") || m.name().endsWith("BRICKS");
     }
 
     /** Natural leaves around the trunk at feet and head height: in the way of getting to it. Nearest first. */

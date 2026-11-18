@@ -41,7 +41,7 @@ final class Bees {
 
     static Activity next(Worker w, Town t) {
         int radius = w.plugin.settings().townRadius();
-        boolean honey = t.wants(Material.HONEY_BOTTLE, radius), comb = t.wants(Material.HONEYCOMB, radius);
+        boolean honey = t.wants(Material.HONEY_BOTTLE, radius, w), comb = t.wants(Material.HONEYCOMB, radius, w);
         if (!honey && !comb) return null;
         Block hive = Work.nearestOf(w, Fields.hives(t, radius), b -> full(b) && !w.isSkipped(b));
         if (hive == null) return null;

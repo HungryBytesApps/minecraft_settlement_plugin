@@ -35,7 +35,6 @@ final class Potter implements Activity {
                 case SMITH -> "Sharpening tools";
                 case BREWER -> "Sorting herbs";
                 case FISHER -> "Mending the nets";
-                case MINER -> "Sorting the ore";
                 default -> "Tidying up";
             };
             int r = wp.job().usesArea ? 6 : 4;

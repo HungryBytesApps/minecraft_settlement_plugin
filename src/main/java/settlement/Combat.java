@@ -274,7 +274,9 @@ final class Combat {
             int n = Math.min(amount, it.getAmount());
             ItemStack part = it.clone();
             part.setAmount(n);
-            if (!w.pockets.addItem(part).isEmpty()) break;
+            Map<Integer, ItemStack> left = w.pockets.addItem(part);
+            if (!left.isEmpty()) n -= left.values().iterator().next().getAmount(); // only part of it fit
+            if (n <= 0) break;
             it.setAmount(it.getAmount() - n);
             inv.setItem(i, it.getAmount() > 0 ? it : null);
             amount -= n;

@@ -36,7 +36,7 @@ final class Ledger {
                 ItemStack it = inv.getItem(i);
                 if (!is(it)) continue;
                 Town t = plugin.ownTown(p);
-                int n = t == null ? 0 : t.log.unseen + Asks.unseen(t);
+                int n = t == null ? 0 : t.log.unseen;
                 String want = n > 0 ? "Settlement Ledger ⚠ " + n : "Settlement Ledger";
                 Component name = it.getItemMeta().displayName();
                 String have = name == null ? "" : net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(name);
@@ -45,7 +45,7 @@ final class Ledger {
                         meta.displayName(n > 0 ? Component.text("Settlement Ledger", NamedTextColor.GOLD).decoration(TextDecoration.ITALIC, false)
                                 .append(Component.text(" ⚠ " + n, NamedTextColor.RED))
                                 : Component.text("Settlement Ledger", NamedTextColor.GOLD).decoration(TextDecoration.ITALIC, false));
-                        meta.lore(n > 0 ? List.of(lore("Right-click to manage your settlement"), lore(n + " new: see Problems and Requests"))
+                        meta.lore(n > 0 ? List.of(lore("Right-click to manage your settlement"), lore(n + " new problem" + (n == 1 ? "" : "s") + ": see Problems"))
                                 : List.of(lore("Right-click to manage your settlement")));
                         meta.setEnchantmentGlintOverride(n > 0);
                     });

@@ -79,9 +79,14 @@ final class Defense {
      * without coming near a settler (stuck in a pit, in water, behind a fence).
      */
     private static boolean harmless(SettlementPlugin plugin, Town t, LivingEntity e, int now) {
+        // Archers and creepers are a threat close by even when guards can't get to them.
+        boolean reachesOver = e instanceof org.bukkit.entity.AbstractSkeleton || e instanceof org.bukkit.entity.Pillager
+                || e instanceof org.bukkit.entity.Witch || e instanceof org.bukkit.entity.Blaze || e instanceof org.bukkit.entity.Ghast
+                || e instanceof org.bukkit.entity.Creeper;
         Worker near = nearestSettler(plugin, t, e.getLocation(), 6);
+        if (near != null && reachesOver) return false;
+        if (t.unreachable.containsKey(e.getUniqueId())) return true; // guards can't get to it (in a pit, behind a wall)
         if (near != null) return false; // close to someone: a real threat
-        if (t.unreachable.containsKey(e.getUniqueId())) return true;
         Location at = e.getLocation();
         Location first = t.stuckSpot.get(e.getUniqueId());
         if (first == null || first.getWorld() != at.getWorld() || first.distanceSquared(at) > 4 * 4) {
@@ -600,8 +605,8 @@ final class Defense {
             }
             if (w.borrowedWeapon == null || returning) return true;
             returning = true;
-            Block back = w.borrowedFrom != null && Town.isStorage(w.borrowedFrom) ? w.borrowedFrom
-                    : t.storeChest(w.borrowedWeapon.getType(), w.body.getLocation(), w.plugin.settings().townRadius());
+            Block back = w.borrowedFrom != null && Town.isStorage(w.borrowedFrom) && !w.isSkipped(w.borrowedFrom) ? w.borrowedFrom
+                    : t.storeChest(w.borrowedWeapon.getType(), w.body.getLocation(), w.plugin.settings().townRadius(), w);
             if (back == null) {
                 w.borrowedWeapon = null; // nowhere to put it: keep it
                 w.borrowedFrom = null;

@@ -86,7 +86,7 @@ final class Seats {
     static Location gatheringSpot(Town t, int radius) {
         int now = Bukkit.getCurrentTick();
         Integer at = gatherAt.get(t.id);
-        if (at != null && now - at < 1200 && gatherSpot.containsKey(t.id)) return gatherSpot.get(t.id);
+        if (at != null && now - at < 6000 && gatherSpot.containsKey(t.id)) return gatherSpot.get(t.id);
         World w = t.bell.getWorld();
         List<Block> seats = new ArrayList<>();
         List<Block> fires = new ArrayList<>();

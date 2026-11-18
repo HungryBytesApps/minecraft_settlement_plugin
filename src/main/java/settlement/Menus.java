@@ -147,7 +147,7 @@ final class Menus {
         buttons.add(button(plugin, "Rename settlement", NamedTextColor.WHITE, "Give the settlement a new name", w, pl -> renameTown(plugin, pl, t)));
         buttons.add(notify);
         buttons.add(button(plugin, "Auto assign jobs: " + (t.autoJobs ? "On" : "Off"), t.autoJobs ? NamedTextColor.GREEN : NamedTextColor.RED,
-                "On: a settler without a job joins the workstation with the fewest workers. Off: you choose who works where.",
+                "On: a settler without a job takes a workstation nobody works at yet. Off: you choose who works where.",
                 w, pl -> {
                     t.autoJobs = !t.autoJobs;
                     plugin.towns().save();
@@ -333,10 +333,6 @@ final class Menus {
                 t.log.unseen > 0 ? NamedTextColor.GOLD : NamedTextColor.WHITE,
                 "What went wrong lately: missing tools and materials, full storage, places they can't reach, settlers stuck...", w,
                 pl -> TownLog.open(plugin, pl, t, 0)));
-        int asks = Asks.unseen(t);
-        buttons.add(button(plugin, asks > 0 ? "📜 Requests (" + asks + " new)" : "Requests (" + Asks.of(t).size() + ")",
-                asks > 0 ? NamedTextColor.GOLD : NamedTextColor.WHITE,
-                "What settlers ask you or tell you: a spot for a mine, things they found, guards needed...", w, pl -> Asks.list(plugin, pl, t)));
         show(p, t.name, body, List.of(), DialogType.multiAction(buttons).columns(2).exitAction(close(plugin)).build());
     }
 
@@ -521,7 +517,16 @@ final class Menus {
                 t.invalidate();
                 showChest(plugin, pl, t, chest);
             }));
-            else buttons.add(button(plugin, "OK", NamedTextColor.GRAY, null, 100, pl -> {}));
+            else if (t.owner.equals(p.getUniqueId())) { // the founder can always take it back (not open it)
+                buttons.add(button(plugin, "Make it a normal chest", NamedTextColor.YELLOW,
+                        "You founded this settlement: make this a normal chest again", 170, pl -> {
+                            if (!t.owner.equals(pl.getUniqueId())) return;
+                            PrivateChests.set(chest, null);
+                            t.invalidate();
+                            showChest(plugin, pl, t, chest);
+                        }));
+                buttons.add(button(plugin, "OK", NamedTextColor.GRAY, null, 100, pl -> {}));
+            } else buttons.add(button(plugin, "OK", NamedTextColor.GRAY, null, 100, pl -> {}));
             show(p, "Chest", body, List.of(), DialogType.multiAction(buttons).columns(1).exitAction(chestExit(plugin, p)).build());
             return;
         }
@@ -557,6 +562,10 @@ final class Menus {
                 pl -> FilterMenu.categories(plugin, pl, t, chest)));
         buttons.add(button(plugin, "Private: Off", NamedTextColor.RED,
                 "On: only you can open, change or break it. Settlers never use it, whatever the settlement's settings. Hoppers can't take from it.", w, pl -> {
+                    if (PrivateChests.owner(chest) != null || !t.canManage(pl) || !Town.isStorage(chest)) { // the menu is old: things changed
+                        pl.sendActionBar(Component.text("That chest is someone's private chest now.", NamedTextColor.RED));
+                        return;
+                    }
                     PrivateChests.set(chest, pl.getUniqueId());
                     t.invalidate();
                     showChest(plugin, pl, t, chest);
@@ -608,18 +617,6 @@ final class Menus {
         if (job == Worker.Job.FISHER) body.add(line(Fishing.anyOpen(wp.loc.getBlock())
                 ? "Open water: fish, junk and treasure." : "No open water within 7 blocks (needs 5x5, 2 deep, nothing on top): fish and junk, no treasure.", NamedTextColor.GRAY));
         if (job == Worker.Job.BREWER) body.add(line("Brews the potions you set targets for (Storage targets). Needs water nearby.", NamedTextColor.GRAY));
-        if (job == Worker.Job.MINER) {
-            Mine mine = Mine.get(wp);
-            if (mine == null || !mine.approved) body.add(line("No mine yet: the miner looks for a spot and asks the founder (Ledger → Requests).", NamedTextColor.GRAY));
-            else {
-                body.add(line((mine.floors() ? "Mine at the elevator's floors (" + mine.ox + ", " + mine.oy + ", " + mine.oz + ")" : "Mine at " + mine.ox + ", " + mine.oy + ", " + mine.oz)
-                        + ". Mines what Storage targets ask for, at the best level for it.", NamedTextColor.GRAY));
-                for (Map.Entry<Integer, Mine.Level> e : mine.levels.entrySet()) {
-                    int total = mine.plan(e.getValue(), Miner.size(wp)).size();
-                    body.add(line("Level " + mine.levelY(e.getKey()) + ": " + (total == 0 ? 0 : e.getValue().done * 100 / total) + "% dug", NamedTextColor.DARK_GRAY));
-                }
-            }
-        }
 
         // Sliders: applied when you click any button or close the window (no Save button).
         List<DialogInput> inputs = new ArrayList<>();
@@ -710,41 +707,6 @@ final class Menus {
                     "Only real trees (logs on the ground with natural leaves), never your buildings", w, pl -> {
                         wp.options.put("OUTSIDE", !wp.isOn("OUTSIDE"));
                         plugin.towns().save();
-                        showWorkplace(plugin, pl, t, wp);
-                    }));
-        }
-        if (job == Worker.Job.MINER) {
-            int size = Miner.size(wp);
-            buttons.add(wbutton(plugin, apply, "Mine size: " + size, NamedTextColor.WHITE,
-                    "How far the tunnels go from the hub on each level (it may go past the settlement's border)", w, pl -> {
-                        int next = Miner.SIZES[0];
-                        for (int sz : Miner.SIZES) if (sz > size) {
-                            next = sz;
-                            break;
-                        }
-                        wp.herds.put("MINE_SIZE", next);
-                        plugin.towns().save();
-                        showWorkplace(plugin, pl, t, wp);
-                    }));
-            boolean rails = Rails.on(wp);
-            buttons.add(wbutton(plugin, apply, "Use rails: " + (rails ? "On" : "Off"), rails ? NamedTextColor.GREEN : NamedTextColor.RED,
-                    "Rails you build from a level up to the surface: the miner rides them in a minecart, and sends ore up in a chest minecart "
-                            + "(a hopper under the top stop). A stop: a powered rail with a button or lever next to it.", w, pl -> {
-                        wp.options.put("RAILS", !Rails.on(wp));
-                        plugin.towns().save();
-                        showWorkplace(plugin, pl, t, wp);
-                    }));
-            if (t.isOwner(p) && Mine.get(wp) != null) buttons.add(wbutton(plugin, apply, "Start a new mine", NamedTextColor.RED,
-                    "Forget this mine (the tunnels stay): the miner looks for a new spot and asks you again", w, pl -> {
-                        for (java.util.UUID id : wp.workers) {
-                            Worker wk = plugin.workers().get(id);
-                            if (wk != null && Miner.underground(wk)) {
-                                pl.sendActionBar(Component.text("Wait until " + wk.name + " is out of the mine.", NamedTextColor.YELLOW));
-                                showWorkplace(plugin, pl, t, wp);
-                                return;
-                            }
-                        }
-                        Miner.reset(wp);
                         showWorkplace(plugin, pl, t, wp);
                     }));
         }
@@ -859,6 +821,7 @@ final class Menus {
     }
 
     private static void showSettler(SettlementPlugin plugin, Player p, Worker w) {
+        if (w.pausedFor == p) w.pauseUntil = Bukkit.getCurrentTick() + 400; // still talking to it
         Town.Workplace wp = w.workplace();
         List<DialogBody> body = new ArrayList<>();
         body.add(DialogBody.plainMessage(Component.text(w.title() + " — " + w.doing() + "   ", NamedTextColor.GRAY)

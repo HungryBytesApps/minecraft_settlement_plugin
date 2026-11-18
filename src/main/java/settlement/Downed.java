@@ -40,11 +40,22 @@ final class Downed {
     }
 
     /** Down instead of dead. */
+    /** When it dies if nobody helps (real time, so a restart or unloaded land doesn't reset it). */
+    static final NamespacedKey DEADLINE = new NamespacedKey(Keys.NS, "downed_deadline");
+
     static void down(Worker w) {
+        down(w, -1);
+    }
+
+    /** ticksLeft < 0: just went down (the full time, and everyone is told). */
+    private static void down(Worker w, long ticksLeft) {
         if (is(w)) return;
         SettlementPlugin plugin = w.plugin;
         int minutes = Math.max(1, plugin.getConfig().getInt("downed-minutes", 5));
-        w.downedUntil = Bukkit.getCurrentTick() + minutes * 1200;
+        boolean fresh = ticksLeft < 0;
+        if (fresh) ticksLeft = minutes * 1200L;
+        w.downedUntil = Bukkit.getCurrentTick() + (int) Math.max(20, ticksLeft);
+        w.body.getPersistentDataContainer().set(DEADLINE, PersistentDataType.LONG, System.currentTimeMillis() + ticksLeft * 50);
         w.stopAll();
         w.body.setHealth(1);
         w.body.setInvulnerable(true);
@@ -53,11 +64,8 @@ final class Downed {
         w.body.setCollidable(false); // can't be pushed around
         clickArea(w, true);
         mark(w.body, true);
-        if (w.job() == Worker.Job.MINER && Miner.underground(w)) { // down in the mine: a guard comes to carry it up
-            Miner.ticket(w, true);
-            Escort.rescue(w);
-        }
         w.body.getPersistentDataContainer().set(KEY, PersistentDataType.BYTE, (byte) 1);
+        if (!fresh) return; // back after a restart or reload: no new alarm
         Bubbles.say(plugin, w.body, "Aargh...", 60);
         w.body.getWorld().playSound(w.body.getLocation(), "minecraft:entity.player.hurt", SoundCategory.NEUTRAL, 1f, 0.8f);
         Location l = w.body.getLocation();
@@ -95,17 +103,16 @@ final class Downed {
     static void moved(Worker w) {
         w.downedAt = w.body.getLocation();
         clickArea(w, true);
-        Miner.ticket(w, false);
     }
 
     /** Back on its feet (revived). */
     static void up(Worker w) {
         w.downedUntil = 0;
         w.body.getPersistentDataContainer().remove(KEY);
+        w.body.getPersistentDataContainer().remove(DEADLINE);
         w.body.setInvulnerable(false);
         w.body.setCollidable(true);
         w.downedAt = null;
-        Miner.ticket(w, false);
         w.body.setPose(Pose.STANDING, false);
         clickArea(w, false);
         w.body.setHealth(Math.max(1, Combat.maxHealth(w.body) * 0.4));
@@ -121,7 +128,6 @@ final class Downed {
         boolean guard = w.guard;
         Town t = w.town();
         clickArea(w, false);
-        Miner.ticket(w, false);
         boolean grave = Graves.bury(w.plugin, w, at);
         w.plugin.forget(w);
         w.body.getWorld().spawnParticle(Particle.POOF, at.clone().add(0, 0.5, 0), 12, 0.3, 0.2, 0.3, 0.01);
@@ -134,7 +140,10 @@ final class Downed {
     static void restore(Worker w) {
         if (w.body.getPersistentDataContainer().has(KEY, PersistentDataType.BYTE)) {
             w.body.getPersistentDataContainer().remove(KEY);
-            down(w);
+            Long until = w.body.getPersistentDataContainer().get(DEADLINE, PersistentDataType.LONG);
+            down(w, until == null ? -1 : Math.max(0, (until - System.currentTimeMillis()) / 50));
+        } else {
+            mark(w.body, false); // a Find glow left from before a restart or unload: off (it can't time out otherwise)
         }
     }
 

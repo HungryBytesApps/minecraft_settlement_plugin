@@ -150,7 +150,7 @@ final class Work {
         Map<Material, Integer> ex = what.get();
         Material first = ex.entrySet().stream().max(Map.Entry.comparingByValue()).map(Map.Entry::getKey).orElse(null);
         if (first == null) return null;
-        Block chest = t.storeChest(first, w.body.getLocation(), radius);
+        Block chest = t.storeChest(first, w.body.getLocation(), radius, w);
         if (chest == null) {
             w.storageFullUntil = Bukkit.getCurrentTick() + 400;
             w.warnStorageFull(first);
@@ -283,22 +283,31 @@ final class Work {
 
     /** Walk to the nearest dropped item it wants (within range, in the settlement) and pick up everything wanted there. */
     static Activity collectDrops(Worker w, Town t, Predicate<Material> wanted, double range) {
+        return collectDrops(w, t, wanted, range, null);
+    }
+
+    /** around != null: only what lies near that spot, and nothing a player threw or owns (a guard after a fight). */
+    static Activity collectDrops(Worker w, Town t, Predicate<Material> wanted, double range, Location around) {
         Location me = w.body.getLocation();
         org.bukkit.entity.Item best = null;
         double bestD = Double.MAX_VALUE;
         // Anywhere in the settlement, plus close around the worker (a lumberjack outside).
         int r = w.plugin.settings().townRadius();
         java.util.Set<org.bukkit.entity.Item> items = new java.util.HashSet<>();
-        if (t.bell.getWorld() == me.getWorld()) {
+        if (around != null) {
+            if (around.getWorld() != me.getWorld()) return null;
+            items.addAll(me.getWorld().getNearbyEntitiesByType(org.bukkit.entity.Item.class, around, range, 8, range));
+        } else if (t.bell.getWorld() == me.getWorld()) {
             int[] box = t.box(0);
             Location c = new Location(me.getWorld(), (box[0] + box[1] + 1) / 2.0, t.bell.getY(), (box[2] + box[3] + 1) / 2.0);
             items.addAll(me.getWorld().getNearbyEntitiesByType(org.bukkit.entity.Item.class, c, (box[1] - box[0]) / 2.0 + 1, 16, (box[3] - box[2]) / 2.0 + 1));
         }
-        items.addAll(me.getWorld().getNearbyEntitiesByType(org.bukkit.entity.Item.class, me, range, 8, range));
+        if (around == null) items.addAll(me.getWorld().getNearbyEntitiesByType(org.bukkit.entity.Item.class, me, range, 8, range));
         for (org.bukkit.entity.Item it : items) {
             if (!it.isValid() || it.getPickupDelay() > 20 || !wanted.test(it.getItemStack().getType())) continue;
-            if (!t.contains(it.getLocation(), r) && it.getLocation().distanceSquared(me) > range * range) continue;
-            if (taken(w, it.getUniqueId())) continue;
+            if (around != null && !lootable(it)) continue; // a player's things
+            if (around == null && !t.contains(it.getLocation(), r) && it.getLocation().distanceSquared(me) > range * range) continue;
+            if (taken(w, it.getUniqueId()) || w.isSkipped(it.getLocation().getBlock())) continue; // (couldn't get to it lately)
             double d = it.getLocation().distanceSquared(me);
             if (d < bestD) {
                 bestD = d;
@@ -308,15 +317,48 @@ final class Work {
         if (best == null || w.pockets.firstEmpty() == -1) return null;
         claim(w, best.getUniqueId());
         Block at = best.getLocation().getBlock();
-        return new GoAndDo(w, at, 1.3, "Picking things up", b -> true, b -> pickUp(w, b.getLocation().add(0.5, 0.5, 0.5), 2.5, wanted));
+        return new GoAndDo(w, at, 1.3, "Picking things up", b -> true, b -> pickUp(w, b.getLocation().add(0.5, 0.5, 0.5), 2.5, wanted, around != null));
+    }
+
+    /** Where players died lately (their things lie there: guards leave them alone). */
+    private static final java.util.List<Location> playerDeaths = new java.util.ArrayList<>();
+    private static final java.util.List<Integer> playerDeathTimes = new java.util.ArrayList<>();
+
+    static void playerDied(Location at) {
+        int now = Bukkit.getCurrentTick();
+        for (int i = playerDeathTimes.size() - 1; i >= 0; i--) {
+            if (now - playerDeathTimes.get(i) > 6000 || now < playerDeathTimes.get(i)) {
+                playerDeathTimes.remove(i);
+                playerDeaths.remove(i);
+            }
+        }
+        playerDeaths.add(at.clone());
+        playerDeathTimes.add(now);
+    }
+
+    /** Loot a guard may take: dropped by a monster, not thrown by or belonging to a player, not where a player died. */
+    static boolean lootable(org.bukkit.entity.Item it) {
+        if (it.getThrower() != null || it.getOwner() != null) return false;
+        int now = Bukkit.getCurrentTick();
+        Location l = it.getLocation();
+        for (int i = 0; i < playerDeaths.size(); i++) {
+            Location d = playerDeaths.get(i);
+            if (now - playerDeathTimes.get(i) <= 6000 && d.getWorld() == l.getWorld() && d.distanceSquared(l) < 6 * 6) return false;
+        }
+        return true;
     }
 
     /** Put wanted items lying around this spot into the pockets. */
     static void pickUp(Worker w, Location at, double r, Predicate<Material> wanted) {
+        pickUp(w, at, r, wanted, false);
+    }
+
+    static void pickUp(Worker w, Location at, double r, Predicate<Material> wanted, boolean lootOnly) {
         boolean any = false;
         for (org.bukkit.entity.Item it : at.getWorld().getNearbyEntitiesByType(org.bukkit.entity.Item.class, at, r, 2, r)) {
             ItemStack stack = it.getItemStack();
             if (!it.isValid() || !wanted.test(stack.getType())) continue;
+            if (lootOnly && !lootable(it)) continue;
             Map<Integer, ItemStack> left = w.pockets.addItem(stack.clone());
             if (left.isEmpty()) it.remove();
             else it.setItemStack(left.values().iterator().next());
@@ -373,32 +415,6 @@ final class Work {
     }
 
     // ---- Finding things ----
-
-    /** Nearest block in the work area (square around the workplace) matching the test. */
-    static Block nearest(Worker w, Town.Workplace wp, int dyDown, int dyUp, Predicate<Block> test) {
-        World world = wp.loc.getWorld();
-        if (world == null || world != w.body.getWorld()) return null;
-        int cx = wp.loc.getBlockX(), cy = wp.loc.getBlockY(), cz = wp.loc.getBlockZ(), r = wp.radius;
-        Location me = w.body.getLocation();
-        Block best = null;
-        double bestD = Double.MAX_VALUE;
-        for (int x = cx - r; x <= cx + r; x++) {
-            for (int z = cz - r; z <= cz + r; z++) {
-                if (!world.isChunkLoaded(x >> 4, z >> 4)) continue;
-                for (int y = cy - dyDown; y <= cy + dyUp; y++) {
-                    Block b = world.getBlockAt(x, y, z);
-                    if (w.isSkipped(b) || !test.test(b)) continue;
-                    double dx = x + 0.5 - me.getX(), dy = y - me.getY(), dz = z + 0.5 - me.getZ();
-                    double d = dx * dx + dy * dy * 4 + dz * dz;
-                    if (d < bestD) {
-                        bestD = d;
-                        best = b;
-                    }
-                }
-            }
-        }
-        return best;
-    }
 
     static String nice(Material m) {
         return FarmerJob.nice(m);

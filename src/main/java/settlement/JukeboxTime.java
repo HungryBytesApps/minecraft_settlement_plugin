@@ -32,9 +32,10 @@ final class JukeboxTime {
             if (b.getState(false) instanceof Jukebox j && j.hasRecord() && !j.isPlaying() && !Work.taken(w, b)) {
                 Work.claim(w, b);
                 return new GoAndDo(w, b, 2.0, "Putting the record away", x -> x.getType() == Material.JUKEBOX, x -> {
-                    if (!(x.getState(false) instanceof Jukebox jb) || !jb.hasRecord() || jb.isPlaying()) return;
+                    if (!(x.getState() instanceof Jukebox jb) || !jb.hasRecord() || jb.isPlaying()) return;
                     ItemStack disc = jb.getRecord().clone();
                     jb.setRecord(null);
+                    jb.update(true); // the block itself knows it's empty now
                     for (ItemStack left : w.pockets.addItem(disc).values()) x.getWorld().dropItemNaturally(x.getLocation().add(0.5, 1, 0.5), left); // never lost
                     x.getWorld().playSound(x.getLocation().add(0.5, 0.5, 0.5), "minecraft:block.wooden_button.click_on", SoundCategory.BLOCKS, 0.6f, 1f);
                 });
@@ -91,14 +92,15 @@ final class JukeboxTime {
                 case 1 -> {
                     if (!carriesDisc(w)) return true;
                     step = new GoAndDo(w, box, 2.0, "Putting on a record", b -> b.getType() == Material.JUKEBOX, b -> {
-                        if (!(b.getState(false) instanceof Jukebox jb) || jb.hasRecord()) return;
+                        if (!(b.getState() instanceof Jukebox jb) || jb.hasRecord()) return;
                         for (int i = 0; i < w.pockets.getSize(); i++) {
                             ItemStack it = w.pockets.getItem(i);
                             if (it == null || !isDisc(it.getType())) continue;
                             jb.setRecord(it.asOne());
                             it.subtract();
                             w.pockets.setItem(i, it.getAmount() > 0 ? it : null);
-                            jb.startPlaying();
+                            jb.update(true); // the block itself knows it holds a record
+                            if (b.getState(false) instanceof Jukebox live) live.startPlaying();
                             break;
                         }
                     });

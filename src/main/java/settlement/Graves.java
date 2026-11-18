@@ -52,6 +52,10 @@ final class Graves implements Listener {
     private static Graves instance;
 
     /** One grave: where, whose, what. */
+    static boolean isGrave(InventoryHolder h) {
+        return h instanceof Grave;
+    }
+
     private static final class Grave implements InventoryHolder {
         final String id;
         final Location at;
@@ -229,8 +233,14 @@ final class Graves implements Listener {
         return new File(plugin.getDataFolder(), "graves.yml");
     }
 
+    /** Graves in worlds that aren't loaded: written back unchanged. */
+    private final java.util.Map<String, ConfigurationSection> unloaded = new java.util.HashMap<>();
+
     private void save() {
         YamlConfiguration y = new YamlConfiguration();
+        for (java.util.Map.Entry<String, ConfigurationSection> e : unloaded.entrySet()) {
+            for (String key : e.getValue().getKeys(false)) y.set("graves." + e.getKey() + "." + key, e.getValue().get(key));
+        }
         for (Grave g : graves.values()) {
             String k = "graves." + g.id;
             y.set(k + ".world", g.at.getWorld().getName());
@@ -258,12 +268,48 @@ final class Graves implements Listener {
         if (s == null) return;
         for (String id : s.getKeys(false)) {
             ConfigurationSection g = s.getConfigurationSection(id);
-            if (g == null) continue;
+            if (g != null) loadOne(id, g);
+        }
+    }
+
+    /** A world unloading: its graves wait on disk until it's back. */
+    @org.bukkit.event.EventHandler
+    public void onWorldUnload(org.bukkit.event.world.WorldUnloadEvent e) {
+        boolean any = false;
+        for (Grave g : graves.values()) if (g.at.getWorld() == e.getWorld()) any = true;
+        if (!any) return;
+        save();
+        ConfigurationSection s = YamlConfiguration.loadConfiguration(file()).getConfigurationSection("graves");
+        for (java.util.Iterator<Grave> it = graves.values().iterator(); it.hasNext(); ) {
+            Grave g = it.next();
+            if (g.at.getWorld() != e.getWorld()) continue;
+            unspawn(g);
+            ConfigurationSection sec = s == null ? null : s.getConfigurationSection(g.id);
+            if (sec != null) unloaded.put(g.id, sec);
+            it.remove();
+        }
+    }
+
+    /** A world loaded later (a world plugin): its graves come back. */
+    @org.bukkit.event.EventHandler
+    public void onWorldLoad(org.bukkit.event.world.WorldLoadEvent e) {
+        for (java.util.Map.Entry<String, ConfigurationSection> en : new HashMap<>(unloaded).entrySet()) {
+            if (!e.getWorld().getName().equals(en.getValue().getString("world", ""))) continue;
+            unloaded.remove(en.getKey());
+            loadOne(en.getKey(), en.getValue());
+        }
+    }
+
+    private void loadOne(String id, ConfigurationSection g) {
+        {
             World w = Bukkit.getWorld(g.getString("world", ""));
-            if (w == null) continue;
+            if (w == null) { // its world isn't loaded: keep it
+                unloaded.put(id, g);
+                return;
+            }
             List<ItemStack> items = new ArrayList<>();
             for (Object o : g.getList("items", List.of())) if (o instanceof ItemStack it) items.add(it);
-            if (items.isEmpty()) continue;
+            if (items.isEmpty()) return;
             Grave gr = new Grave(id, new Location(w, g.getDouble("x"), g.getDouble("y"), g.getDouble("z")), g.getString("name", "A settler"), g.getString("town"));
             gr.inv = inventory(gr, items);
             graves.put(id, gr);

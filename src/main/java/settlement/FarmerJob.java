@@ -143,7 +143,7 @@ final class FarmerJob {
             List<Block> candidates = new ArrayList<>();
             for (Block f : land) candidates.add(f.getRelative(BlockFace.UP));
             candidates.addAll(Fields.plants(t, radius));
-            Block ripe = w.harvestRound >= 24 ? null : Work.nearestOf(w, candidates, b -> harvestable(b) && wantsHarvest(t, b, radius, harvestForCompost));
+            Block ripe = w.harvestRound >= 24 ? null : Work.nearestOf(w, candidates, b -> harvestable(b) && wantsHarvest(t, w, b, radius, harvestForCompost));
             if (ripe != null) {
                 w.harvestRound++;
                 Work.claim(w, ripe);
@@ -164,7 +164,7 @@ final class FarmerJob {
         if (!storageFull && wp.isOn("BONEMEAL")) {
             Block growing = Work.nearestOf(w, land, f -> {
                 Block c = f.getRelative(BlockFace.UP);
-                return SEED.containsKey(c.getType()) && c.getType() != Material.NETHER_WART && !ripe(c) && t.wants(PRODUCE.get(c.getType()), radius);
+                return SEED.containsKey(c.getType()) && c.getType() != Material.NETHER_WART && !ripe(c) && t.wants(PRODUCE.get(c.getType()), radius, w);
             });
             if (growing != null) {
                 if (w.count(Material.BONE_MEAL) > 0) {
@@ -230,13 +230,13 @@ final class FarmerJob {
     }
 
     /** Does the settlement want what this plant gives (or does it go into compost)? */
-    private static boolean wantsHarvest(Town t, Block b, int radius, boolean forCompost) {
+    private static boolean wantsHarvest(Town t, Worker w, Block b, int radius, boolean forCompost) {
         Material product = PRODUCE.get(b.getType());
         if (product == null) return false;
         if (forCompost && COMPOST.containsKey(product)) return true;
-        if (b.getType() == Material.MELON) return t.wants(Material.MELON_SLICE, radius) || ordered(t, Material.MELON, radius) > 0;
+        if (b.getType() == Material.MELON) return t.wants(Material.MELON_SLICE, radius, w) || ordered(t, Material.MELON, radius) > 0;
         if (product == Material.WHEAT && ordered(t, Material.HAY_BLOCK, radius) > 0) return true;
-        return t.wants(product, radius);
+        return t.wants(product, radius, w);
     }
 
     private static Activity harvest(Worker w, Block plant) {
@@ -339,7 +339,7 @@ final class FarmerJob {
     /** To the composter: put in the surplus, take out the bone meal. */
     private static Activity compostTrip(Worker w, Town t, Town.Workplace wp) {
         Block composter = wp.loc.getBlock();
-        if (composter.getType() != Material.COMPOSTER) return null;
+        if (composter.getType() != Material.COMPOSTER || w.isSkipped(composter)) return null; // (can't get to it lately: farm on)
         w.workStatus = "Making compost";
         return new GoAndDo(w, composter, 2.0, "Making compost", b -> b.getType() == Material.COMPOSTER, b -> {
             int radius = w.plugin.settings().townRadius();
@@ -483,7 +483,7 @@ final class FarmerJob {
         Map<Material, Integer> ex = excess(w, t, wp);
         Material first = ex.entrySet().stream().max(Map.Entry.comparingByValue()).map(Map.Entry::getKey).orElse(null);
         if (first == null) return null;
-        Block chest = t.storeChest(first, w.body.getLocation(), radius);
+        Block chest = t.storeChest(first, w.body.getLocation(), radius, w);
         if (chest == null) {
             w.storageFullUntil = Bukkit.getCurrentTick() + 400;
             w.warnStorageFull(first);

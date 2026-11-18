@@ -165,6 +165,10 @@ final class Fishing implements Listener {
         }
         // A few catches in the pockets (or done fishing): into the barrel.
         boolean unload = carried >= CARRY || (carried > 0 && (!anyWanted || !rod));
+        if (w.isSkipped(barrel)) { // can't get to its barrel lately
+            w.workStatus = "Can't get to the barrel";
+            return null;
+        }
         if (unload && fitsInBarrel(inv, w)) {
             w.workStatus = "Putting the catch in the barrel";
             return new GoAndDo(w, barrel, 2.0, "Putting the catch in the barrel", Fishing::isBarrel, bl -> {
@@ -564,6 +568,7 @@ final class Fishing implements Listener {
                 Material m = caught.getType();
                 boolean keep;
                 if (FISH.contains(m)) keep = fishWanted(t, m, radius);
+                else if (!caught.getEnchantments().isEmpty()) keep = true; // treasure (an enchanted rod or bow)
                 else if (JUNK.contains(m)) keep = keepJunk(wp, m) && t.wants(m, radius); // kept junk, up to its storage target
                 else keep = true; // treasure
                 if (keep) {

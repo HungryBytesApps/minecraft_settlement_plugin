@@ -34,7 +34,6 @@ final class TargetsMenu {
             case HERDER -> out.addAll(HerderJob.PRODUCTS);
             case LUMBERJACK -> out.addAll(LumberjackJob.PRODUCTS);
             case SMITH -> out.addAll(SmithJob.PRODUCTS);
-            case MINER -> out.addAll(Miner.PRODUCTS);
             case FISHER -> {
                 out.addAll(Fishing.FISH);
                 for (Town.Workplace wp : t.workplaces.values()) { // the junk a fisher keeps (junk filter): with a limit too
@@ -74,7 +73,7 @@ final class TargetsMenu {
 
     /** Smith and furnace products: made to order (no target or 0 = don't make). */
     private static boolean madeToOrder(Material m) {
-        return SmithJob.PRODUCTS.contains(m) || Miner.PRODUCTS.contains(m) || FurnaceJob.furnaceProduct(m) || Cook.FOOD.containsKey(m)
+        return SmithJob.PRODUCTS.contains(m) || FurnaceJob.furnaceProduct(m) || Cook.FOOD.containsKey(m)
                 || m == Material.MELON || m == Material.HAY_BLOCK;
     }
 
@@ -124,7 +123,7 @@ final class TargetsMenu {
                     list(plugin, pl, t, job, fromLedger);
                 }));
             }
-            while (cells.size() % 8 != 0) cells.add(ActionButton.create(Component.empty(), null, 60, null));
+            while (cells.size() % 8 != 0) cells.add(Menus.button(plugin, " ", NamedTextColor.GRAY, null, 60, pl -> list(plugin, pl, t, job, fromLedger)));
         }
         for (Material m : products(t, job)) {
             if (show != null) {

@@ -61,6 +61,8 @@ final class WorkerListener implements Listener {
                 } else if (in != null) { // a new bell inside a settlement: offer an expansion
                     if (in.isOwner(p)) Menus.newExpansion(plugin, p, in, b);
                     else p.sendActionBar(Component.text("This bell is in " + in.name + ".", NamedTextColor.GRAY));
+                } else if (e.useInteractedBlock() == org.bukkit.event.Event.Result.DENY) {
+                    return; // a protection plugin said no
                 } else if (plugin.canFoundTown(p, b, false)) {
                     Menus.foundTown(plugin, p, b);
                 } else if (Area.newSettlementRadius(plugin, b) < 0) {
@@ -119,6 +121,64 @@ final class WorkerListener implements Listener {
         } else if (Town.isStorage(b)) {
             t.invalidate();
         }
+    }
+
+    /** A town or expansion bell (or a block next to one, it may hang from it). */
+    private Town bellTown(Block b) {
+        Town t = plugin.towns().atBell(b);
+        return t != null ? t : plugin.towns().atExpansionBell(b);
+    }
+
+    private Town holdsBell(Block b) {
+        for (org.bukkit.block.BlockFace f : new org.bukkit.block.BlockFace[]{org.bukkit.block.BlockFace.UP, org.bukkit.block.BlockFace.DOWN,
+                org.bukkit.block.BlockFace.NORTH, org.bukkit.block.BlockFace.SOUTH, org.bukkit.block.BlockFace.EAST, org.bukkit.block.BlockFace.WEST}) {
+            Block n = b.getRelative(f);
+            if (n.getType() != Material.BELL) continue;
+            // Only what it hangs from or stands on (the floor next to a standing bell is just floor).
+            if (n.getBlockData() instanceof org.bukkit.block.data.type.Bell bd) {
+                org.bukkit.block.BlockFace toB = f.getOppositeFace(); // from the bell to this block
+                boolean holds = switch (bd.getAttachment()) {
+                    case FLOOR -> toB == org.bukkit.block.BlockFace.DOWN;
+                    case CEILING -> toB == org.bukkit.block.BlockFace.UP;
+                    default -> toB == bd.getFacing() || toB == bd.getFacing().getOppositeFace(); // the wall(s)
+                };
+                if (!holds) continue;
+            }
+            Town t = bellTown(n);
+            if (t != null) return t;
+        }
+        return null;
+    }
+
+    /** Explosions leave settlement bells (and what they hang from) alone. */
+    @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGH)
+    public void onExplode(org.bukkit.event.entity.EntityExplodeEvent e) {
+        e.blockList().removeIf(b -> (b.getType() == Material.BELL && bellTown(b) != null) || holdsBell(b) != null);
+    }
+
+    @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGH)
+    public void onBlockExplode(org.bukkit.event.block.BlockExplodeEvent e) {
+        e.blockList().removeIf(b -> (b.getType() == Material.BELL && bellTown(b) != null) || holdsBell(b) != null);
+    }
+
+    @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGH)
+    public void onPiston(org.bukkit.event.block.BlockPistonExtendEvent e) {
+        for (Block b : e.getBlocks()) if ((b.getType() == Material.BELL && bellTown(b) != null) || holdsBell(b) != null) { e.setCancelled(true); return; }
+    }
+
+    @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGH)
+    public void onPistonPull(org.bukkit.event.block.BlockPistonRetractEvent e) {
+        for (Block b : e.getBlocks()) if ((b.getType() == Material.BELL && bellTown(b) != null) || holdsBell(b) != null) { e.setCancelled(true); return; }
+    }
+
+    /** Breaking the block a settlement bell hangs from (it would drop the bell). */
+    @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGH)
+    public void onBreakBellSupport(BlockBreakEvent e) {
+        if (e.getBlock().getType() == Material.BELL) return;
+        Town t = holdsBell(e.getBlock());
+        if (t == null) return;
+        e.setCancelled(true);
+        e.getPlayer().sendActionBar(Component.text("This holds up a bell of " + t.name + ".", NamedTextColor.RED));
     }
 
     /** The town bell can't be broken while the town exists. */
@@ -196,9 +256,8 @@ final class WorkerListener implements Listener {
             return;
         }
         Downed.found(w); // found it: the Find marker ends
-        if (Asks.clicked(plugin, p, w)) return; // it has something to tell the founder
         if (w.canManage(p)) { // your own settler: its menu (no ledger needed)
-            w.pauseFor(p, 1200); // waits while you're in its menu
+            w.pauseFor(p, 400); // waits while you're in its menu (each click in it renews this)
             Menus.settler(plugin, p, w);
         } else { // someone else's settler: a greeting (it doesn't stop what it's doing)
             if (Bukkit.getCurrentTick() - w.lastGreet < 60) return;
@@ -322,6 +381,24 @@ final class WorkerListener implements Listener {
         return damager;
     }
 
+    /** Settlers' arrows that hit a block just disappear: no broken pots, pressed buttons or plates, lit TNT. */
+    @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGH)
+    public void onArrowHitBlock(org.bukkit.event.entity.ProjectileHitEvent e) {
+        if (e.getHitBlock() == null || e.getHitEntity() != null) return;
+        if (!(e.getEntity().getShooter() instanceof Entity shooter) || !Worker.isWorker(shooter)) return;
+        e.setCancelled(true);
+        e.getEntity().remove();
+    }
+
+    /** Settlers' arrows don't break item frames or paintings. */
+    @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGH)
+    public void onHangingBreak(org.bukkit.event.hanging.HangingBreakByEntityEvent e) {
+        if (e.getRemover() != null && Worker.isWorker(source(e.getRemover()))) {
+            e.setCancelled(true);
+            if (e.getRemover() instanceof org.bukkit.entity.Arrow a) a.remove();
+        }
+    }
+
     @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGH)
     public void onDamage(org.bukkit.event.entity.EntityDamageByEntityEvent e) {
         Entity victim = e.getEntity();
@@ -414,10 +491,14 @@ final class WorkerListener implements Listener {
         org.bukkit.Location at = w.body.getLocation();
         String name = w.name;
         Town t = w.town();
-        boolean grave = at.getY() > at.getWorld().getMinHeight() && Graves.bury(plugin, w, at);
+        if (at.getY() <= at.getWorld().getMinHeight()) { // fell into the void: the grave goes where it was last seen, or at the bell
+            org.bukkit.Location seen = t == null ? null : t.lastSeen.get(w.body.getUniqueId());
+            at = seen != null && seen.getY() > seen.getWorld().getMinHeight() ? seen : t != null ? t.bell.clone() : null;
+        }
+        boolean grave = at != null && Graves.bury(plugin, w, at);
         plugin.forget(w);
         Notify.send(t, w.owner, Notify.Kind.DEATH, "✝ " + (w.guard ? "Guard " : "Settler ") + name + " has died."
-                + (grave ? " Their things are at the skull (" + at.getBlockX() + ", " + at.getBlockY() + ", " + at.getBlockZ() + ")." : ""), NamedTextColor.RED);
+                + (grave && at != null ? " Their things are at the skull (" + at.getBlockX() + ", " + at.getBlockY() + ", " + at.getBlockZ() + ")." : ""), NamedTextColor.RED);
     }
 
     @EventHandler
@@ -435,6 +516,23 @@ final class WorkerListener implements Listener {
                 if (en.isValid()) plugin.load((org.bukkit.entity.Mannequin) en);
             });
         }
+    }
+
+    /** Guards leave a dead player's things alone. */
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onPlayerDeath(org.bukkit.event.entity.PlayerDeathEvent e) {
+        if (!e.getKeepInventory()) Work.playerDied(e.getEntity().getLocation());
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onWorldUnload(org.bukkit.event.world.WorldUnloadEvent e) {
+        plugin.towns().worldUnloading(e.getWorld());
+    }
+
+    /** A world loaded later (a world plugin): its settlements come back. */
+    @EventHandler
+    public void onWorldLoad(org.bukkit.event.world.WorldLoadEvent e) {
+        plugin.towns().worldLoaded();
     }
 
     /** Land unloading: write the settlers' pockets onto them first (what they took lately isn't lost). */

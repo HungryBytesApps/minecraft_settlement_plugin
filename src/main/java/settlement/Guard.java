@@ -52,6 +52,9 @@ final class Guard implements Activity {
     private Activity sub;           // a trip to a chest (gear, arrows, food)
     private boolean arrowRun;       // archer fetching arrows mid-fight
     private int lootAt = 100;
+    /** Where the last fight was, and until when it looks there for what the monsters dropped. */
+    private Location fightAt;
+    private int lootUntil;
     private int time, gearCheckAt = 20, warnAt, calmUntil;
     private Location patrolTo;
     private LivingEntity chasing;
@@ -85,6 +88,10 @@ final class Guard implements Activity {
             return false;
         }
         if (target != null && (!target.isValid() || target.isDead() || !inRange(target))) {
+            if (target.isDead()) { // killed it: look there for what it dropped (for a minute)
+                fightAt = target.getLocation();
+                lootUntil = time + 1200;
+            }
             target = null;
             gearCheckAt = time + 40; // restock after the fight
             lootAt = time + 40;      // and pick up what they dropped
@@ -117,7 +124,7 @@ final class Guard implements Activity {
         // After a fight: pick up what the monsters dropped, and bring a good load of it to storage.
         if (time >= lootAt && !t.alarm) {
             lootAt = time + 100;
-            Activity pick = Work.collectDrops(w, t, Guard::loot, 16);
+            Activity pick = fightAt != null && time < lootUntil ? Work.collectDrops(w, t, Guard::loot, 10, fightAt) : null;
             if (pick != null) {
                 sub = pick;
                 lootAt = time + 10;
@@ -175,11 +182,14 @@ final class Guard implements Activity {
             chasing = target;
             closest = d;
             progressAt = time;
-        } else if (d < closest - 0.5 || d <= 3.5) {
+        } else if (d < closest - 0.5 || d <= 2.6) { // within reach of a sword
             closest = d;
             progressAt = time;
         }
-        boolean stuck = d > 3 && time - progressAt > 100;
+        // An archer that can see it and shoot it is getting somewhere too.
+        if (bow != null && arrows && (w.weapon == Weapon.RANGED || (w.weapon == Weapon.AUTO && (d > 5 || melee == null)))
+                && d <= 16 && w.body.hasLineOfSight(target)) progressAt = time;
+        boolean stuck = d > 2.6 && time - progressAt > 100;
         if (stuck && bow != null && arrows && w.body.hasLineOfSight(target)) {
             Combat.raiseShield(w, false);
             w.body.getEquipment().setItemInMainHand(bow.clone());
@@ -334,7 +344,7 @@ final class Guard implements Activity {
     }
 
     private void restockArrowsNow() {
-        Block chest = t.takeChest(Material.ARROW, w.body.getLocation(), w.plugin.settings().townRadius());
+        Block chest = t.takeChest(Material.ARROW, w.body.getLocation(), w.plugin.settings().townRadius(), w);
         if (chest == null) {
             ItemStack melee = Combat.bestMelee(w);
             if (melee != null) Combat.melee(w, target, melee);

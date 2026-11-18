@@ -6,7 +6,7 @@ import org.bukkit.plugin.Plugin;
 import java.util.*;
 
 /**
- * Chunk tickets (keep a chunk loaded) shared by everything in the plugin: the settlements, working miners, a
+ * Chunk tickets (keep a chunk loaded) shared by everything in the plugin: the settlements, a
  * search for a far-away settler. A chunk ticket is one per plugin, so they're counted here: a chunk stays loaded
  * while anything still holds it.
  */

@@ -124,7 +124,7 @@ final class GoAndDo implements Activity {
         int tries = 0;
         for (Location l : spots) {
             if (w.mover.go(l, 0.3, w.plugin.settings().workSpeed())) return l;
-            if (++tries >= 6) break; // the nearest few: if none of those can be reached, the rest won't either
+            if (++tries >= 3) break; // the nearest few: if none of those can be reached, the rest won't either
         }
         return null;
     }

@@ -71,6 +71,7 @@ final class Cook {
             }
             if (!ready) continue;
             Block smoker = wp.loc.getBlock();
+            if (w.isSkipped(smoker)) return null; // can't get to it lately
             w.workStatus = "Making " + Work.nice(r.out());
             return new GoAndDo(w, smoker, 2.0, "Making " + Work.nice(r.out()), b -> b.getType() == Material.SMOKER, b -> {
                 for (Map.Entry<Material, Integer> e : r.in().entrySet()) if (w.count(e.getKey()) < e.getValue()) return;

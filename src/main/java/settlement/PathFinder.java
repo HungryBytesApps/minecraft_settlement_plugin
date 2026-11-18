@@ -62,6 +62,7 @@ final class PathFinder {
                 int nx = n.x + d[0], nz = n.z + d[1];
                 if (Math.abs(nx - start.x) > MAX_RANGE || Math.abs(nz - start.z) > MAX_RANGE) continue;
                 boolean diag = d[0] != 0 && d[1] != 0;
+                if (!w.isChunkLoaded(nx >> 4, nz >> 4)) continue; // never load chunks while searching
 
                 if (walkable(w, nx, n.y, nz, walkCache)) {
                     if (diag && !(walkable(w, n.x + d[0], n.y, n.z, walkCache) && walkable(w, n.x, n.y, n.z + d[1], walkCache))) continue;

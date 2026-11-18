@@ -58,7 +58,17 @@ final class Skins {
         return low + (slim ? ":slim" : ":wide");
     }
 
+    /** A skin setting; a typo never breaks anything (it falls back to Steve). */
     static ResolvableProfile profile(String spec) {
+        try {
+            return profileRaw(spec == null ? "steve" : spec.trim());
+        } catch (RuntimeException e) {
+            org.bukkit.Bukkit.getLogger().warning("[Settlement] Bad skin setting '" + spec + "': " + e.getMessage());
+            return profileRaw("steve");
+        }
+    }
+
+    private static ResolvableProfile profileRaw(String spec) {
         if (spec.toLowerCase(Locale.ROOT).startsWith("player:")) {
             return ResolvableProfile.resolvableProfile().name(spec.substring(7)).build();
         }
@@ -92,7 +102,7 @@ final class Skins {
         }
         String[] p = spec.split(":");
         boolean slim = p.length > 1 && p[1].equals("slim");
-        String body = "entity/player/" + (slim ? "slim" : "wide") + "/" + p[0];
+        String body = "entity/player/" + (slim ? "slim" : "wide") + "/" + p[0].toLowerCase(Locale.ROOT);
         return ResolvableProfile.resolvableProfile()
                 .skinPatch(patch -> patch.body(Key.key("minecraft", body))
                         .model(slim ? PlayerTextures.SkinModel.SLIM : PlayerTextures.SkinModel.CLASSIC))

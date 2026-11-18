@@ -111,7 +111,7 @@ final class HerderJob {
         // Sheep with wool: shear (needs shears).
         for (Animals a : herd.getOrDefault(EntityType.SHEEP, List.of())) {
             if (a instanceof Sheep s && s.isAdult() && !s.isSheared() && !Work.taken(w, s.getUniqueId())
-                    && t.wants(woolOf(s), w.plugin.settings().townRadius())) { // enough of this colour: leave it
+                    && t.wants(woolOf(s), w.plugin.settings().townRadius(), w)) { // enough of this colour: leave it
                 if (!Work.hasTool(w, "SHEARS")) {
                     Activity f = Work.fetchTool(w, t, "SHEARS", "shears");
                     if (f != null) return f;

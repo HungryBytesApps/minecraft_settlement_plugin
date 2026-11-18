@@ -123,6 +123,14 @@ final class FurnaceJob {
         int radius = w.plugin.settings().townRadius();
         boolean toOrder = wp.job() == Worker.Job.FURNACE_WORKER; // only what has a storage target
         Map<Material, Integer> asked = Requests.asked(t, w); // made for someone, whatever the targets say
+        // What's already on its way to storage: in the furnace, done in it, or carried as the result.
+        ItemStack smeltingNow = fi.getSmelting(), doneNow = fi.getResult();
+        java.util.function.ToIntFunction<Material> underway = o -> {
+            int n = w.count(o);
+            if (doneNow != null && doneNow.getType() == o) n += doneNow.getAmount();
+            if (smeltingNow != null && recipes.get(smeltingNow.getType()) == o) n += smeltingNow.getAmount();
+            return n;
+        };
         Predicate<Material> wantedInput = m -> {
             Material o = recipes.get(m);
             if (o == null) return false;
@@ -130,7 +138,18 @@ final class FurnaceJob {
             if (asked.containsKey(o) && w.count(o) < asked.get(o)) return true;
             if (!toOrder) return t.wants(o, radius);
             Integer target = t.targets.get(o);
-            return target != null && target > 0 && t.count(o, radius) < target;
+            return target != null && target > 0 && t.count(o, radius) + underway.applyAsInt(o) < target;
+        };
+        // How many more of this input to fetch (what it carries to smelt counts too): never more than the target needs.
+        java.util.function.ToIntFunction<Material> stillNeeded = m -> {
+            Material o = recipes.get(m);
+            if (o == null || !wantedInput.test(m)) return 0;
+            if (asked.containsKey(o) && w.count(o) < asked.get(o)) return 64;
+            if (!toOrder) return 64;
+            Integer target = t.targets.get(o);
+            int carriedIn = 0;
+            for (Map.Entry<Material, Material> r : recipes.entrySet()) if (r.getValue() == o) carriedIn += w.count(r.getKey());
+            return target == null ? 0 : Math.max(0, target - t.count(o, radius) - underway.applyAsInt(o) - carriedIn);
         };
         Set<Material> cookKeeps = wp.job() == Worker.Job.COOK ? Cook.keep(t, radius) : Set.of();
         // Fuel: never what it still has to smelt, or the cook's things. What it makes (charcoal) it keeps only a few of.
@@ -202,8 +221,12 @@ final class FurnaceJob {
         }
         // Get things to cook/smelt (while the furnace runs low), and fuel.
         if ((!carryInput && (!hasInputHere || in.getAmount() < 16)) || (!batchOk && w.pockets.firstEmpty() >= 0)) {
-            Activity a = Work.fetch(w, t, wantedInput, 64, "Getting things to " + verb(wp));
-            if (a != null) return a;
+            int most = 0;
+            for (Material m : recipes.keySet()) most = Math.max(most, stillNeeded.applyAsInt(m));
+            if (most > 0) {
+                Activity a = Work.fetch(w, t, m -> stillNeeded.applyAsInt(m) > 0, Math.min(64, most), "Getting things to " + verb(wp));
+                if (a != null) return a;
+            }
         }
         if (!batchOk) {
             w.workStatus = "Waiting for enough to " + verb(wp) + " (8 for a coal)";

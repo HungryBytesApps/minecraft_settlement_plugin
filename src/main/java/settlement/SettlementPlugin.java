@@ -53,7 +53,6 @@ public final class SettlementPlugin extends JavaPlugin {
             Work.cleanup();
             Requests.cleanup();
             Downed.cleanup();
-            Miner.cleanup();
             listener.cleanup();
             for (Worker w : workers.all()) w.cleanup();
         }, 6000L, 6000L);
@@ -63,10 +62,6 @@ public final class SettlementPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new Fishing(this), this);
         getServer().getPluginManager().registerEvents(new Graves(this), this); // where settlers died: their things
         FisherSkins.load(this); // the fisher skins from MineSkin (once, then from the cache)
-        Mine.load(this); // miners' mines
-        Asks.load(this); // what settlers ask the founder
-        Rails.owner = this;
-        getServer().getScheduler().runTaskTimer(this, Mine::save, 600L, 600L);
         if (Fishing.realLook()) FakeFisher.listen(this); // clicks on the fake fisher reach the settler
 
         for (World w : getServer().getWorlds()) {
@@ -115,7 +110,7 @@ public final class SettlementPlugin extends JavaPlugin {
     }
 
     /** Changes with every version I send, to check the right jar is installed. */
-    static final String BUILD = "2026-11-17 #122";
+    static final String BUILD = "2026-11-18 #127";
 
     @Override
     public boolean onCommand(org.bukkit.command.CommandSender sender, org.bukkit.command.Command cmd, String label, String[] args) {
@@ -144,10 +139,12 @@ public final class SettlementPlugin extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        // Open graves and settler windows close first (and save), so nothing can be taken twice after a reload.
+        SettlerInventory.closeAll();
+        for (org.bukkit.entity.Player p : getServer().getOnlinePlayers()) {
+            if (Graves.isGrave(p.getOpenInventory().getTopInventory().getHolder(false))) p.closeInventory();
+        }
         Graves.hideAll();
-        Asks.hideAll();
-        Miner.releaseAll(this);
-        Mine.save();
         if (Fishing.realLook()) {
             FakeFisher.removeAll(); // fishers back for everyone
             FakeFisher.unlisten();
@@ -183,7 +180,7 @@ public final class SettlementPlugin extends JavaPlugin {
             seat.remove();
         }
         workers.register(m);
-        if (towns.get(townId) == null) {
+        if (towns.get(townId) == null && !towns.isUnloaded(townId)) {
             // Its settlement was disbanded while it was far away: it drops its things and leaves too.
             Worker w = workers.get(m.getUniqueId());
             if (w != null) getServer().getScheduler().runTask(this, () -> {
@@ -405,7 +402,9 @@ public final class SettlementPlugin extends JavaPlugin {
             pz += uz;
         }
         int x = (int) Math.floor(px), z = (int) Math.floor(pz);
-        int y = from.getWorld().getHighestBlockYAt(x, z, org.bukkit.HeightMap.MOTION_BLOCKING_NO_LEAVES) + 1;
+        int y = from.getWorld().isChunkLoaded(x >> 4, z >> 4)
+                ? from.getWorld().getHighestBlockYAt(x, z, org.bukkit.HeightMap.MOTION_BLOCKING_NO_LEAVES) + 1
+                : from.getBlockY(); // never load land just for this
         return new Location(from.getWorld(), x + 0.5, y, z + 0.5);
     }
 
@@ -442,6 +441,11 @@ public final class SettlementPlugin extends JavaPlugin {
                 if (dist > 40) {
                     double f = 40 / dist;
                     int x = (int) Math.floor(me.getX() - dx * f), z = (int) Math.floor(me.getZ() - dz * f);
+                    if (!me.getWorld().isChunkLoaded(x >> 4, z >> 4)) {
+                        workers.unregister(w.body.getUniqueId());
+                        w.body.remove(); // the way out isn't loaded: just go
+                        return true;
+                    }
                     step = new Location(me.getWorld(), x + 0.5, me.getWorld().getHighestBlockYAt(x, z, org.bukkit.HeightMap.MOTION_BLOCKING_NO_LEAVES) + 1, z + 0.5);
                 }
                 if (!w.mover.go(step, 3, settings.walkSpeed()) && time > 200) {
