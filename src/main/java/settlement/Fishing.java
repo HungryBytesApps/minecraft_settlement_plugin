@@ -50,6 +50,9 @@ final class Fishing implements Listener {
     /** Vanilla junk (bamboo only in jungles: left out). */
     static final List<Material> JUNK = List.of(Material.LILY_PAD, Material.BOWL, Material.LEATHER, Material.LEATHER_BOOTS, Material.ROTTEN_FLESH,
             Material.STICK, Material.STRING, Material.POTION, Material.BONE, Material.INK_SAC, Material.TRIPWIRE_HOOK, Material.FISHING_ROD);
+    /** Treasure (open water only): always kept; with a storage target it keeps fishing for it. */
+    static final List<Material> TREASURE = List.of(Material.ENCHANTED_BOOK, Material.BOW, Material.FISHING_ROD, Material.NAME_TAG,
+            Material.NAUTILUS_SHELL, Material.SADDLE);
     private static final Set<Material> KEEP_BY_DEFAULT = Set.of(Material.LEATHER, Material.STRING, Material.BONE, Material.INK_SAC, Material.BOWL);
     static final int SLOTS = 3;
     private static final NamespacedKey PILE = new NamespacedKey(Keys.NS, "fish_pile");
@@ -133,6 +136,12 @@ final class Fishing implements Listener {
         return v != null ? v : KEEP_BY_DEFAULT.contains(m);
     }
 
+    /** A storage target is set for it and not reached yet. */
+    private static boolean belowTarget(Town t, Worker w, Material m, int radius) {
+        Integer target = t.targets.get(m);
+        return target != null && target > 0 && t.count(m, radius) + w.count(m) < target;
+    }
+
     private static boolean fishWanted(Town t, Material fish, int radius) {
         Integer target = t.targets.get(fish);
         return target == null || t.count(fish, radius) < target; // no target: keep all
@@ -153,6 +162,9 @@ final class Fishing implements Listener {
         for (int n : haul.values()) carried += n;
         boolean anyWanted = false;
         for (Material f : FISH) if (fishWanted(t, f, radius)) anyWanted = true;
+        // Kept junk and treasure with a storage target count too: it keeps fishing until those are reached as well.
+        for (Material m : JUNK) if (!anyWanted && keepJunk(wp, m) && belowTarget(t, w, m, radius)) anyWanted = true;
+        for (Material m : TREASURE) if (!anyWanted && m != Material.FISHING_ROD && belowTarget(t, w, m, radius)) anyWanted = true;
         boolean rod = w.count(Material.FISHING_ROD) > 0 || Work.inStorage(w, t, m -> m == Material.FISHING_ROD);
         // Emptied the barrel: on the way to the chests with it.
         if (w.carryToStorage) {
@@ -203,7 +215,7 @@ final class Fishing implements Listener {
         }
         // Enough of every fish: nothing to do.
         if (!anyWanted) {
-            w.workStatus = "Enough fish in storage";
+            w.workStatus = "Enough fish (and what else it fishes for) in storage";
             return null;
         }
         if (w.count(Material.FISHING_ROD) == 0) {

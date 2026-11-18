@@ -87,15 +87,21 @@ the work. **In use** (checkbox) switches the workstation off without removing th
   bowls it makes itself (bowls only when there are none in storage); milk it asks the herder for.
 - **Blast furnace – smelter**: ores and raw metal.
 - **Furnace – furnace worker**: only what smokers and blast furnaces can't do (stone types, glass, bricks,
-  dyes, charcoal…) and **only what you set a storage target for**.
+  dyes, charcoal…) and **only what you set a storage target for**. Without the materials in storage it just waits ("Waiting for flint for
+  arrows"): that's not a problem in the ledger.
 - Furnace jobs fetch fuel from storage (coal, charcoal, wood). A cold furnace is only lit for a full batch (8 items, one coal), unless fewer are wanted.
-- **Loom – herder**: only looks after animals in a pen (fenced in with fences, walls or gates, up to about 40x40; wild ones are left alone; named or leashed animals are never slaughtered). Per kind of animal a checkbox and **Adults** (2–20): breeds up to that number with food
-  from storage and slaughters the extra adults. Unchecked kinds are left alone (no breeding, no killing).
-  Shears sheep (shears from storage), collects drops and eggs, closes gates behind it, climbs over a fence
-  with a carpet on top. **Bees** (On): harvests full beehives and bee nests, honey with a glass
+- **Loom – herder**: only looks after animals in a pen (fenced in with fences, walls or gates, up to about 40x40; wild ones are left alone; named or leashed animals are never slaughtered). Per kind of animal a checkbox. How many it keeps depends on the pen: about one animal per 3
+  blocks of floor (at most 40 per pen), shared evenly by the kinds in it. Half of a kind's share are adults it always
+  keeps; while a storage target for that animal's meat, leather, feathers or hide isn't reached it raises the pen full
+  and slaughters the grown-up extra ones. The workstation menu shows per kind how many there are, how many adults it
+  keeps and how much room the pens have. A pen can be up to about 40x40 (bigger counts as open land).
+  Unchecked kinds are left alone (no
+  breeding, no killing). Animals that got out of their pen are put on a lead (from storage) and walked back in.
+  Shears sheep (shears from storage), collects drops and eggs, shuts gates right behind it (and behind an animal it
+  leads), climbs over a fence with a carpet on top. **Bees** (On): harvests full beehives and bee nests, honey with a glass
   bottle (made from glass) and honeycomb with shears, by storage target; it lights a campfire under the hive for a
   moment first (free, players can't use or break it). A hive without room for one is left alone (notification
-  "Beehive needs room for a campfire"). Milks a cow when someone asks for milk. **Throw eggs**: throws spare eggs into the chicken pen for chicks, only when there are
+  "Beehive needs room for a campfire"). Milks a cow when someone asks for milk. **Throw eggs**: lobs spare eggs (from close by, well inside the pen) into the chicken pen for chicks, only when there are
   fewer chickens than wanted and the eggs' storage target is reached (no egg target = no throwing).
 - **Fletching table – lumberjack**: fells real trees (logs on dirt with natural leaves) with an axe from
   storage, inside or outside the settlement (toggle). **Replant saplings** On/Off. Low leaves around the trunk are cut away first.
@@ -118,7 +124,8 @@ the work. **In use** (checkbox) switches the workstation off without removing th
   **Chest settings**). Catches like vanilla: fish 85%, junk 10%, treasure 5% only in open water (5x5, 2 deep, nothing on
   top; the workstation menu says if it is). Fish whose storage target is reached go back into the water; junk
   only when chosen in the **Junk filter**, and then up to its storage target (kept junk shows in the fisher's
-  storage targets); treasure always kept.
+  storage targets); treasure always kept. It stops fishing when every fish target is reached, unless a kept junk item
+  or a treasure (enchanted book, bow, name tag, nautilus shell, saddle) has a storage target that isn't reached yet.
 - **Smithing table – smith**: leather armor, and stone, copper, iron, gold, diamond and netherite tools, weapons and armor, bows, crossbows, arrows, shields, shears and fishing rods (spears too), **only what you set a storage target for**. Buttons above the list show one material at a time (click it again: all). Netherite: the diamond one + a netherite ingot + an upgrade template.
 
 

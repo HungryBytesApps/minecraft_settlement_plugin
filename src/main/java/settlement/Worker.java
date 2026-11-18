@@ -358,6 +358,9 @@ final class Worker {
         applyLook();
     }
 
+    /** An animal it's leading on a lead (gates stay open until it's through too). */
+    org.bukkit.entity.Entity leading;
+
     /** The station it was last sent away from: auto assign won't put it straight back there. */
     Location leftWorkplace;
 
@@ -474,6 +477,7 @@ final class Worker {
         }
         if (ticks % 20 == 0) Downed.markTick(this);
         if (downedUntil > 0) { // lying on the ground, waiting for help
+            mover.closeDoors(false); // (no gate left open for the animals)
             Downed.tick(this, ticks); // no head turning: lying down, that turns the whole body
             return;
         }
@@ -483,6 +487,7 @@ final class Worker {
             if (pausedFor.isOnline() && pausedFor.getWorld() == body.getWorld() && nowT < pauseUntil
                     && pausedFor.getLocation().distanceSquared(body.getLocation()) < 10 * 10 && !(ticks % 10 == 0 && danger())) {
                 mover.stop();
+                mover.closeDoors(false);
                 if (ticks % 10 == 0) anim.look(pausedFor.getEyeLocation());
                 anim.tick();
                 return;

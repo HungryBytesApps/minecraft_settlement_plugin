@@ -75,14 +75,15 @@ final class SmithJob {
             return null;
         }
         boolean anyWanted = false;
-        String missing = null;
+        String missing = null; // materials there, but it can't get to them (a problem)
+        String waiting = null; // materials simply not in storage (no problem: it waits for them)
         for (Material product : PRODUCTS) {
             int target = t.targets.getOrDefault(product, 0);
             if (target <= 0 || t.count(product, radius) + w.count(product) >= target) continue; // (counting what it carries too)
             anyWanted = true;
             Plan plan = plan(w, t, product);
             if (plan == null) {
-                if (missing == null) missing = Work.nice(product);
+                if (waiting == null) waiting = lastMissing + " for " + Work.nice(product).toLowerCase(java.util.Locale.ROOT);
                 continue;
             }
             // Fetch what it doesn't carry yet, then work at the table.
@@ -110,7 +111,9 @@ final class SmithJob {
             Activity d = Work.deposit(w, t, keepNothing);
             if (d != null) return d;
         }
-        w.workStatus = !anyWanted ? "Nothing to make (set targets in Storage targets)" : "Missing materials for " + missing;
+        w.workStatus = !anyWanted ? "Nothing to make (set targets in Storage targets)"
+                : missing != null ? "Missing materials for " + missing // in storage, but it can't take them
+                : "Waiting for " + waiting; // not in storage: not a problem, it makes it once there is some
         return null;
     }
 
@@ -121,14 +124,22 @@ final class SmithJob {
         table.getWorld().playSound(table.getLocation(), "minecraft:block.anvil.use", SoundCategory.BLOCKS, 0.6f, 1.1f);
     }
 
+    /** What the last failed plan lacked (e.g. "flint"). */
+    private static String lastMissing = "materials";
+
     /** A recipe for the product whose materials are in storage plus pockets, or null. */
     private static Plan plan(Worker w, Town t, Material product) {
+        lastMissing = "materials";
         int radius = w.plugin.settings().townRadius();
         if ("netherite".equals(metal(product))) { // smithing: the diamond one + a netherite ingot + the upgrade template
             Material diamond = Material.matchMaterial("diamond_" + product.getKey().getKey().substring("netherite_".length()));
             if (diamond == null) return null;
             Map<Material, Integer> needs = Map.of(diamond, 1, Material.NETHERITE_INGOT, 1, Material.NETHERITE_UPGRADE_SMITHING_TEMPLATE, 1);
-            for (Map.Entry<Material, Integer> e : needs.entrySet()) if (t.count(e.getKey(), radius) + w.count(e.getKey()) < e.getValue()) return null;
+            for (Map.Entry<Material, Integer> e : needs.entrySet())
+                if (t.count(e.getKey(), radius) + w.count(e.getKey()) < e.getValue()) {
+                    lastMissing = Work.nice(e.getKey()).toLowerCase(java.util.Locale.ROOT);
+                    return null;
+                }
             return new Plan(product, 1, needs);
         }
         for (Recipe r : Bukkit.getRecipesFor(new ItemStack(product))) {
@@ -162,6 +173,9 @@ final class SmithJob {
                     }
                 }
                 if (pick == null) {
+                    List<Material> cs = mc.getChoices();
+                    lastMissing = cs.size() == 1 ? Work.nice(cs.get(0)).toLowerCase(java.util.Locale.ROOT)
+                            : Work.nice(cs.get(0)).toLowerCase(java.util.Locale.ROOT) + " (or similar)";
                     ok = false;
                     break;
                 }

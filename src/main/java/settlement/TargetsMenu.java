@@ -36,6 +36,7 @@ final class TargetsMenu {
             case SMITH -> out.addAll(SmithJob.PRODUCTS);
             case FISHER -> {
                 out.addAll(Fishing.FISH);
+                out.addAll(Fishing.TREASURE); // a target: it keeps fishing for it (open water only)
                 for (Town.Workplace wp : t.workplaces.values()) { // the junk a fisher keeps (junk filter): with a limit too
                     if (wp.job() != Worker.Job.FISHER) continue;
                     for (Material m : Fishing.JUNK) if (Fishing.keepJunk(wp, m)) out.add(m);

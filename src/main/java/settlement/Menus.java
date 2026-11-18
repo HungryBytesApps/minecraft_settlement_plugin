@@ -613,7 +613,13 @@ final class Menus {
             body.add(line(who, NamedTextColor.GRAY));
         }
         if (job.usesArea) body.add(line("Works in the whole settlement.", NamedTextColor.DARK_GRAY));
-        if (job == Worker.Job.HERDER) body.add(line("Adults to keep per animal: breeds up to it, slaughters the rest. Unchecked: left alone.", NamedTextColor.GRAY));
+        if (job == Worker.Job.HERDER) {
+            body.add(line("How many depends on the pen: about one animal per 3 blocks of floor, shared by the kinds in it."
+                    + " Half are adults it keeps; the rest it raises for meat, leather and feather targets. Unchecked: left alone.", NamedTextColor.GRAY));
+            List<String> herd = HerderJob.summary(t, wp, s.townRadius());
+            if (herd.isEmpty()) body.add(line("No animals in pens yet.", NamedTextColor.DARK_GRAY));
+            for (String l : herd) body.add(line(l, NamedTextColor.WHITE));
+        }
         if (job == Worker.Job.FISHER) body.add(line(Fishing.anyOpen(wp.loc.getBlock())
                 ? "Open water: fish, junk and treasure." : "No open water within 7 blocks (needs 5x5, 2 deep, nothing on top): fish and junk, no treasure.", NamedTextColor.GRAY));
         if (job == Worker.Job.BREWER) body.add(line("Brews the potions you set targets for (Storage targets). Needs water nearby.", NamedTextColor.GRAY));
@@ -621,12 +627,10 @@ final class Menus {
         // Sliders: applied when you click any button or close the window (no Save button).
         List<DialogInput> inputs = new ArrayList<>();
         if (job == Worker.Job.HERDER) {
-            // Per kind of animal: a checkbox (look after them at all) and the adults to keep (2-20).
+            // Per kind of animal: a checkbox (look after them at all).
             for (org.bukkit.entity.EntityType kind : HerderJob.FOOD.keySet()) {
                 String id = kind.name().toLowerCase(Locale.ROOT);
                 inputs.add(DialogInput.bool("herding_" + id, Component.text(HerderJob.kindName(kind))).initial(wp.herding(kind)).build());
-                inputs.add(DialogInput.numberRange("herd_" + id, Component.text("Adults"), 2, 20)
-                        .step(1f).initial((float) wp.herdSetting(kind)).width(220).build());
             }
         }
         inputs.add(DialogInput.bool("in_use", Component.text("In use")).initial(wp.enabled).build());
@@ -635,15 +639,7 @@ final class Menus {
             if (job == Worker.Job.HERDER) {
                 for (org.bukkit.entity.EntityType kind : HerderJob.FOOD.keySet()) {
                     String id = kind.name().toLowerCase(Locale.ROOT);
-                    Float h = view.getFloat("herd_" + id);
                     Boolean on = view.getBoolean("herding_" + id);
-                    if (h != null) {
-                        int v = Math.max(2, Math.min(20, Math.round(h)));
-                        if (!Integer.valueOf(v).equals(wp.herds.get(kind.name()))) {
-                            wp.herds.put(kind.name(), v);
-                            changed = true;
-                        }
-                    }
                     if (on != null && on != wp.options.getOrDefault("HERD_" + kind.name(), true)) {
                         wp.options.put("HERD_" + kind.name(), on);
                         changed = true;

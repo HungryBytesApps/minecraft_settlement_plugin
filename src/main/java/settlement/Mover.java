@@ -285,7 +285,7 @@ final class Mover {
         b.setBlockData(o, true);
         world.playSound(b.getLocation().add(0.5, 0.5, 0.5),
                 door ? "minecraft:block.wooden_door.open" : "minecraft:block.fence_gate.open", SoundCategory.BLOCKS, 0.8f, 1f);
-        openedDoors.put(b, Bukkit.getCurrentTick() + 40);
+        openedDoors.put(b, Bukkit.getCurrentTick() + (door ? 40 : w.leading != null ? 80 : 15)); // gates: shut quickly (animals), unless one is led through
     }
 
     /** Close doors this worker opened once nobody is standing in them. */
@@ -308,12 +308,19 @@ final class Mover {
             double d2 = me.getWorld() != b.getWorld() ? 1e9 : gx * gx + gz * gz;
             if (d2 < 0.7 * 0.7) passingGate.add(b);           // it's in the gate now
             boolean through = passingGate.contains(b) && d2 > 1.3 * 1.3; // ...and out the other side
+            org.bukkit.entity.Entity led = w.leading;
+            if (gate && through && led != null && led.isValid() && led.getWorld() == b.getWorld()) {
+                // Leading an animal: it has to be through as well (out of the gate, close behind the settler).
+                Location l = led.getLocation();
+                double lx = b.getX() + 0.5 - l.getX(), lz = b.getZ() + 0.5 - l.getZ();
+                through = lx * lx + lz * lz > 1.3 * 1.3 && l.distanceSquared(me) < 3 * 3;
+            }
             boolean shut = now || (gate && through);
             if (!shut && tick < e.getValue()) continue;
             boolean blocked = !b.getWorld().getNearbyEntities(BoundingBox.of(b), en -> en instanceof LivingEntity
-                    && (!gate || en.equals(w.body) || en instanceof org.bukkit.entity.Player)).isEmpty();
+                    && (!gate || en.equals(w.body) || en.equals(w.leading) || en instanceof org.bukkit.entity.Player)).isEmpty();
             if (blocked && !shut) {
-                e.setValue(tick + 20);
+                e.setValue(tick + (gate ? 5 : 20));
                 continue;
             }
             passingGate.remove(b);
