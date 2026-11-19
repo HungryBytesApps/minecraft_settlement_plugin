@@ -90,14 +90,14 @@ the work. **In use** (checkbox) switches the workstation off without removing th
   dyes, charcoal…) and **only what you set a storage target for**. Without the materials in storage it just waits ("Waiting for flint for
   arrows"): that's not a problem in the ledger.
 - Furnace jobs fetch fuel from storage (coal, charcoal, wood). A cold furnace is only lit for a full batch (8 items, one coal), unless fewer are wanted.
-- **Loom – herder**: only looks after animals in a pen (fenced in with fences, walls or gates, up to about 40x40; wild ones are left alone; named or leashed animals are never slaughtered). Per kind of animal a checkbox. How many it keeps depends on the pen: about one animal per 3
+- **Loom – herder**: only looks after animals in a pen (fenced in with fences, walls or gates, up to about 40x40; wild ones are left alone; named or leashed animals are never slaughtered). How many it keeps depends on the pen: about one animal per 3
   blocks of floor (at most 40 per pen), shared evenly by the kinds in it. Half of a kind's share are adults it always
   keeps; while a storage target for that animal's meat, leather, feathers or hide isn't reached it raises the pen full
-  and slaughters the grown-up extra ones. The workstation menu shows per kind how many there are, how many adults it
-  keeps and how much room the pens have. A pen can be up to about 40x40 (bigger counts as open land).
-  Unchecked kinds are left alone (no
-  breeding, no killing). Animals that got out of their pen are put on a lead (from storage) and walked back in.
-  Shears sheep (shears from storage), collects drops and eggs, shuts gates right behind it (and behind an animal it
+  and slaughters the grown-up extra ones. The workstation menu lists the pens it found: size, animals / room, and
+  the animals in each. A pen can be up to about 40x40 (bigger counts as open land). Animals that got out of their pen are put on a lead (from storage) and walked back in.
+  The gates of a pen with animals in it are for herders only (and guards fighting a monster): other settlers walk
+  around them. Other gates anyone may use.
+  Shears sheep (shears from storage), collects drops, and eggs up to their storage target (no egg target: all of them), shuts gates right behind it (and behind an animal it
   leads), climbs over a fence with a carpet on top. **Bees** (On): harvests full beehives and bee nests, honey with a glass
   bottle (made from glass) and honeycomb with shears, by storage target; it lights a campfire under the hive for a
   moment first (free, players can't use or break it). A hive without room for one is left alone (notification
@@ -143,7 +143,12 @@ like are made by whoever needs them.
 
 ## Storage and targets
 
-- Harvests go to an allowed chest that already holds that item, otherwise the nearest one with room.
+- Things go first to a chest whose filter has that item (and room), then to an allowed chest that already holds that
+  item, otherwise the nearest one with room.
+- Packed blocks are opened when needed: a hay bale gives 9 wheat, an iron block 9 ingots (also gold, copper,
+  diamond, emerald, coal, redstone, lapis, netherite, raw ore, bone, dried kelp and slime blocks).
+- A settler taken off its workstation brings what it carried for that job back to storage (it keeps its own weapons
+  and armor).
 - Putting things in, settlers tidy the chest: full stacks, alike things together, no gaps (`sort-storage: false` turns it off).
 - No room: settlers keep things in their pockets (9 slots), stop, and you get a message.
 - Ledger → **Storage targets**: per workstation its products with −64/−8/−1/+1/+8/+64 and ∞.

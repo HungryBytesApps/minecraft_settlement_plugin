@@ -44,7 +44,7 @@ final class Town {
 
         /** The checkbox: does the herder look after this kind at all? */
         boolean herding(org.bukkit.entity.EntityType type) {
-            return options.getOrDefault("HERD_" + type.name(), true);
+            return true; // (every kind in a pen; the old per-kind switches are gone)
         }
         /** On/off settings (furnace categories): key → on. */
         final Map<String, Boolean> options = new HashMap<>();

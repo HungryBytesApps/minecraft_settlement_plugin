@@ -50,7 +50,14 @@ final class Mover {
     }
 
     private boolean repath() {
-        List<int[]> p = PathFinder.find(w.body.getLocation(), target, reach);
+        // Animal pens' gates are for herders (and guards in a fight); a settler already in a pen may use them to get out.
+        PenGates.avoid = !PenGates.mayUse(w) && !PenGates.inPen(w.body.getLocation());
+        List<int[]> p;
+        try {
+            p = PathFinder.find(w.body.getLocation(), target, reach);
+        } finally {
+            PenGates.avoid = false;
+        }
         if (p == null) {
             path = null;
             failed = true;

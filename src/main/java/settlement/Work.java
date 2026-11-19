@@ -25,6 +25,24 @@ final class Work {
     // ---- Storage ----
 
     /** Take up to {@code max} of one material matching {@code test} from the nearest chest settlers may take from. */
+    /** Storage blocks a settler can break open: one block gives 9 (hay → wheat, iron block → ingots...). */
+    static final Map<Material, Material> UNPACK = Map.ofEntries(
+            Map.entry(Material.HAY_BLOCK, Material.WHEAT), Map.entry(Material.IRON_BLOCK, Material.IRON_INGOT),
+            Map.entry(Material.GOLD_BLOCK, Material.GOLD_INGOT), Map.entry(Material.COPPER_BLOCK, Material.COPPER_INGOT),
+            Map.entry(Material.DIAMOND_BLOCK, Material.DIAMOND), Map.entry(Material.EMERALD_BLOCK, Material.EMERALD),
+            Map.entry(Material.COAL_BLOCK, Material.COAL), Map.entry(Material.REDSTONE_BLOCK, Material.REDSTONE),
+            Map.entry(Material.LAPIS_BLOCK, Material.LAPIS_LAZULI), Map.entry(Material.NETHERITE_BLOCK, Material.NETHERITE_INGOT),
+            Map.entry(Material.RAW_IRON_BLOCK, Material.RAW_IRON), Map.entry(Material.RAW_GOLD_BLOCK, Material.RAW_GOLD),
+            Map.entry(Material.RAW_COPPER_BLOCK, Material.RAW_COPPER), Map.entry(Material.BONE_BLOCK, Material.BONE_MEAL),
+            Map.entry(Material.DRIED_KELP_BLOCK, Material.DRIED_KELP), Map.entry(Material.SLIME_BLOCK, Material.SLIME_BALL));
+
+    /** How many of m are in storage, counting what's packed in blocks (an iron block = 9 ingots). */
+    static int available(Town t, Material m, int radius) {
+        int n = t.count(m, radius);
+        for (Map.Entry<Material, Material> e : UNPACK.entrySet()) if (e.getValue() == m) n += 9 * t.count(e.getKey(), radius);
+        return n;
+    }
+
     static Activity fetch(Worker w, Town t, Predicate<Material> test, int max, String label) {
         int radius = w.plugin.settings().townRadius();
         Block best = null;
@@ -39,7 +57,37 @@ final class Work {
                 best = b;
             }
         }
-        if (best == null) return null;
+        if (best == null) { // none loose: a block of it (hay for wheat, an iron block for ingots), opened up
+            Predicate<Material> packed = m -> UNPACK.containsKey(m) && test.test(UNPACK.get(m));
+            for (Block b : t.containers(radius)) {
+                if (!t.rule(b)[1] || w.isSkipped(b)) continue;
+                Inventory inv = Town.inventory(b);
+                if (inv == null || first(inv, packed) == null) continue;
+                double d = b.getLocation().distanceSquared(w.body.getLocation());
+                if (d < bestD) {
+                    bestD = d;
+                    best = b;
+                }
+            }
+            if (best == null) return null;
+            w.workStatus = label;
+            return new GoAndDo(w, best, 2.0, label, b -> Town.isStorage(b) && t.rule(b)[1], b -> {
+                Inventory inv = Town.inventory(b);
+                if (inv == null) return;
+                Material block = first(inv, packed);
+                if (block == null) return;
+                int blocks = Math.max(1, Math.min(9, (max + 8) / 9)); // enough blocks for what it needs
+                int got = take(w, inv, block, blocks);
+                if (got == 0) {
+                    w.skip(b, 1200);
+                    return;
+                }
+                w.take(block, got); // opened up: 9 each
+                w.give(List.of(new ItemStack(UNPACK.get(block), got * 9)), w.body.getLocation());
+                w.savePockets();
+                t.countsChanged();
+            });
+        }
         w.workStatus = label;
         return new GoAndDo(w, best, 2.0, label, b -> Town.isStorage(b) && t.rule(b)[1], b -> {
             Inventory inv = Town.inventory(b);
@@ -51,12 +99,12 @@ final class Work {
         });
     }
 
-    /** Is there anything matching in storage settlers may take from? */
+    /** Is there anything matching in storage settlers may take from (also packed in a block)? */
     static boolean inStorage(Worker w, Town t, Predicate<Material> test) {
         for (Block b : t.containers(w.plugin.settings().townRadius())) {
             if (!t.rule(b)[1]) continue;
             Inventory inv = Town.inventory(b);
-            if (inv != null && first(inv, test) != null) return true;
+            if (inv != null && first(inv, m -> test.test(m) || (UNPACK.containsKey(m) && test.test(UNPACK.get(m)))) != null) return true;
         }
         return false;
     }
@@ -90,6 +138,11 @@ final class Work {
     static boolean gear(Material m) {
         return Combat.isWeapon(m) || Combat.isBow(m) || Combat.armorSlot(m) != null || m == Material.ARROW
                 || m == Material.POTION || m == Material.SPLASH_POTION;
+    }
+
+    /** Gear a guard carries in its pockets (armor is worn, not carried: spare armor goes to storage). */
+    static boolean carriedGear(Material m) {
+        return gear(m) && Combat.armorSlot(m) == null;
     }
 
     /** Everything in the pockets except what the job keeps. */
@@ -163,7 +216,8 @@ final class Work {
             if (inv == null) return;
             Map<Material, Integer> here = new HashMap<>();
             for (Map.Entry<Material, Integer> e : what.get().entrySet()) {
-                if (b.equals(t.storeChest(e.getKey(), b.getLocation(), radius))) here.put(e.getKey(), e.getValue());
+                Block to = t.storeChest(e.getKey(), b.getLocation(), radius);
+                if (to != null && Town.halves(to).contains(b)) here.put(e.getKey(), e.getValue()); // (either half of a double chest)
             }
             // Nothing went in after all (no room for just this item): wait a bit before trying again.
             if (store(w, inv, here).isEmpty()) w.storageFullUntil = Bukkit.getCurrentTick() + 400;
@@ -317,7 +371,7 @@ final class Work {
         if (best == null || w.pockets.firstEmpty() == -1) return null;
         claim(w, best.getUniqueId());
         Block at = best.getLocation().getBlock();
-        return new GoAndDo(w, at, 1.3, "Picking things up", b -> true, b -> pickUp(w, b.getLocation().add(0.5, 0.5, 0.5), 2.5, wanted, around != null));
+        return new GoAndDo(w, at, 1.3, "Picking things up", b -> true, b -> pickUp(w, t, b.getLocation().add(0.5, 0.5, 0.5), 2.5, wanted, around != null));
     }
 
     /** Where players died lately (their things lie there: guards leave them alone). */
@@ -350,18 +404,34 @@ final class Work {
 
     /** Put wanted items lying around this spot into the pockets. */
     static void pickUp(Worker w, Location at, double r, Predicate<Material> wanted) {
-        pickUp(w, at, r, wanted, false);
+        pickUp(w, null, at, r, wanted, false);
     }
 
-    static void pickUp(Worker w, Location at, double r, Predicate<Material> wanted, boolean lootOnly) {
+    /** Things that pile up by themselves (chickens laying): only as many as the storage target still needs. */
+    private static final java.util.Set<Material> UP_TO_TARGET = java.util.EnumSet.of(Material.EGG);
+
+    static void pickUp(Worker w, Town t, Location at, double r, Predicate<Material> wanted, boolean lootOnly) {
         boolean any = false;
+        int radius = w.plugin.settings().townRadius();
         for (org.bukkit.entity.Item it : at.getWorld().getNearbyEntitiesByType(org.bukkit.entity.Item.class, at, r, 2, r)) {
             ItemStack stack = it.getItemStack();
             if (!it.isValid() || !wanted.test(stack.getType())) continue;
             if (lootOnly && !lootable(it)) continue;
-            Map<Integer, ItemStack> left = w.pockets.addItem(stack.clone());
-            if (left.isEmpty()) it.remove();
-            else it.setItemStack(left.values().iterator().next());
+            ItemStack take = stack.clone();
+            if (t != null && UP_TO_TARGET.contains(take.getType()) && t.targets.get(take.getType()) != null) {
+                int room = t.targets.get(take.getType()) - t.count(take.getType(), radius) - w.count(take.getType());
+                if (room <= 0) continue; // enough: the rest stays where it lies
+                take.setAmount(Math.min(room, take.getAmount()));
+            }
+            int rest = stack.getAmount() - take.getAmount();
+            Map<Integer, ItemStack> left = w.pockets.addItem(take);
+            for (ItemStack l : left.values()) rest += l.getAmount();
+            if (rest <= 0) it.remove();
+            else {
+                ItemStack back = stack.clone();
+                back.setAmount(rest);
+                it.setItemStack(back);
+            }
             any = true;
         }
         if (any) {

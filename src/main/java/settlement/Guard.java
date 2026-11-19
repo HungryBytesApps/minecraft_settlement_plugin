@@ -49,6 +49,11 @@ final class Guard implements Activity {
     private final Worker w;
     private final Town t;
     private LivingEntity target;
+
+    /** Fighting a monster now (may go through an animal pen's gate for it). */
+    boolean fighting() {
+        return target != null;
+    }
     private Activity sub;           // a trip to a chest (gear, arrows, food)
     private boolean arrowRun;       // archer fetching arrows mid-fight
     private int lootAt = 100;
@@ -130,8 +135,8 @@ final class Guard implements Activity {
                 lootAt = time + 10;
                 return false;
             }
-            if (Work.needsDeposit(w, Work::gear, false) || (Work.needsDeposit(w, Work::gear, true) && w.random.nextInt(4) == 0)) {
-                Activity d = Work.deposit(w, t, Work::gear);
+            if (Work.needsDeposit(w, Work::carriedGear, false) || (Work.needsDeposit(w, Work::carriedGear, true) && w.random.nextInt(4) == 0)) {
+                Activity d = Work.deposit(w, t, Work::carriedGear);
                 if (d != null) {
                     sub = d;
                     return false;

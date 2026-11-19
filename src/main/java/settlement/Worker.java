@@ -638,6 +638,14 @@ final class Worker {
             }
         } else {
             workStatus = "No workplace";
+            // No job (any more): what it still carries from it goes back to storage (its own weapons and armor stay).
+            if (!outside) {
+                Activity d = Work.deposit(this, t, Work::carriedGear);
+                if (d != null) {
+                    start(d);
+                    return;
+                }
+            }
         }
         if (outside) {
             start(new Social.GoHome(this, t)); // just recruited or hired, or done outside: back to the settlement

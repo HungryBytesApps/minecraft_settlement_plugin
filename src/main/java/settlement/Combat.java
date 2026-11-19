@@ -182,7 +182,10 @@ final class Combat {
                     it.subtract();
                     inv.setItem(i, it.getAmount() > 0 ? it : null);
                     eq.setItem(slot, one);
-                    if (cur != null && !cur.getType().isAir()) inv.addItem(cur);
+                    // The old piece goes into the pockets, then to storage like anything else (a chest whose filter
+                    // has it first), not into this chest.
+                    if (cur != null && !cur.getType().isAir())
+                        for (ItemStack left : w.pockets.addItem(cur).values()) inv.addItem(left);
                     changed = true;
                 }
             }

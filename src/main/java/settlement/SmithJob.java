@@ -136,7 +136,7 @@ final class SmithJob {
             if (diamond == null) return null;
             Map<Material, Integer> needs = Map.of(diamond, 1, Material.NETHERITE_INGOT, 1, Material.NETHERITE_UPGRADE_SMITHING_TEMPLATE, 1);
             for (Map.Entry<Material, Integer> e : needs.entrySet())
-                if (t.count(e.getKey(), radius) + w.count(e.getKey()) < e.getValue()) {
+                if (Work.available(t, e.getKey(), radius) + w.count(e.getKey()) < e.getValue()) {
                     lastMissing = Work.nice(e.getKey()).toLowerCase(java.util.Locale.ROOT);
                     return null;
                 }
@@ -166,7 +166,7 @@ final class SmithJob {
                 }
                 Material pick = null;
                 for (Material m : mc.getChoices()) {
-                    int have = t.count(m, radius) + w.count(m) - needs.getOrDefault(m, 0);
+                    int have = Work.available(t, m, radius) + w.count(m) - needs.getOrDefault(m, 0);
                     if (have > 0) {
                         pick = m;
                         break;

@@ -614,8 +614,6 @@ final class Menus {
         }
         if (job.usesArea) body.add(line("Works in the whole settlement.", NamedTextColor.DARK_GRAY));
         if (job == Worker.Job.HERDER) {
-            body.add(line("How many depends on the pen: about one animal per 3 blocks of floor, shared by the kinds in it."
-                    + " Half are adults it keeps; the rest it raises for meat, leather and feather targets. Unchecked: left alone.", NamedTextColor.GRAY));
             List<String> herd = HerderJob.summary(t, wp, s.townRadius());
             if (herd.isEmpty()) body.add(line("No animals in pens yet.", NamedTextColor.DARK_GRAY));
             for (String l : herd) body.add(line(l, NamedTextColor.WHITE));
@@ -626,26 +624,9 @@ final class Menus {
 
         // Sliders: applied when you click any button or close the window (no Save button).
         List<DialogInput> inputs = new ArrayList<>();
-        if (job == Worker.Job.HERDER) {
-            // Per kind of animal: a checkbox (look after them at all).
-            for (org.bukkit.entity.EntityType kind : HerderJob.FOOD.keySet()) {
-                String id = kind.name().toLowerCase(Locale.ROOT);
-                inputs.add(DialogInput.bool("herding_" + id, Component.text(HerderJob.kindName(kind))).initial(wp.herding(kind)).build());
-            }
-        }
         inputs.add(DialogInput.bool("in_use", Component.text("In use")).initial(wp.enabled).build());
         java.util.function.BiConsumer<DialogResponseView, Player> apply = (view, pl) -> {
             boolean changed = false;
-            if (job == Worker.Job.HERDER) {
-                for (org.bukkit.entity.EntityType kind : HerderJob.FOOD.keySet()) {
-                    String id = kind.name().toLowerCase(Locale.ROOT);
-                    Boolean on = view.getBoolean("herding_" + id);
-                    if (on != null && on != wp.options.getOrDefault("HERD_" + kind.name(), true)) {
-                        wp.options.put("HERD_" + kind.name(), on);
-                        changed = true;
-                    }
-                }
-            }
             Boolean use = view.getBoolean("in_use");
             if (use != null && use != wp.enabled) {
                 wp.enabled = use;

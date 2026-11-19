@@ -83,7 +83,9 @@ final class HerderJob {
             if (d != null) return d;
         }
         // Meat, wool, leather, eggs, feathers lying around (after slaughtering, shearing, chickens laying): pick them up first.
-        Activity pick = Work.collectDrops(w, t, HerderJob::wanted, 24);
+        // Eggs only up to their storage target: the rest is left (they vanish after a while, like in vanilla).
+        int eggRadius = w.plugin.settings().townRadius();
+        Activity pick = Work.collectDrops(w, t, m -> m == Material.EGG ? t.wants(Material.EGG, eggRadius, w) : wanted(m), 24);
         if (pick != null) return pick;
         Map<EntityType, List<Animals>> herd = herd(t, w.plugin.settings().townRadius());
 
@@ -396,6 +398,7 @@ final class HerderJob {
     /** A pen: its floor, and the animals in it per kind. */
     static final class Pen {
         final Set<Long> floor = new HashSet<>();
+        int minX = Integer.MAX_VALUE, maxX = Integer.MIN_VALUE, minZ = Integer.MAX_VALUE, maxZ = Integer.MIN_VALUE;
         final Map<EntityType, List<Animals>> animals = new LinkedHashMap<>();
         int capacity;
 
@@ -431,7 +434,13 @@ final class HerderJob {
                 List<Location> cells = penCells(a, 1600);
                 if (cells == null) continue;
                 Pen p = new Pen();
-                for (Location l : cells) p.floor.add(key(l.getBlockX(), l.getBlockY(), l.getBlockZ()));
+                for (Location l : cells) {
+                    p.floor.add(key(l.getBlockX(), l.getBlockY(), l.getBlockZ()));
+                    p.minX = Math.min(p.minX, l.getBlockX());
+                    p.maxX = Math.max(p.maxX, l.getBlockX());
+                    p.minZ = Math.min(p.minZ, l.getBlockZ());
+                    p.maxZ = Math.max(p.maxZ, l.getBlockZ());
+                }
                 p.capacity = Math.min(MAX_PER_PEN, Math.max(2, cells.size() / 3));
                 pens.add(p);
             }
@@ -458,25 +467,23 @@ final class HerderJob {
         return null;
     }
 
-    /** For the workstation menu: per kind, the animals, adults kept and room in their pens. */
+    /** For the workstation menu: per pen its size, how full it is and the animals in it. */
     static List<String> summary(Town t, Town.Workplace wp, int radius) {
         Map<EntityType, List<Animals>> herd = herd(t, radius);
         List<Pen> pens = pens(t, herd, wp);
         List<String> out = new ArrayList<>();
-        for (EntityType kind : FOOD.keySet()) {
-            if (!wp.herding(kind)) continue;
-            int n = 0, keep = 0, room = 0, inPens = 0;
-            for (Pen p : pens) {
-                List<Animals> l = p.animals.get(kind);
-                if (l == null) continue;
-                inPens++;
-                n += l.size();
-                keep += p.keep(kind);
-                room += p.share(kind);
+        for (Pen p : pens) {
+            int n = 0;
+            StringBuilder kinds = new StringBuilder();
+            for (Map.Entry<EntityType, List<Animals>> e : p.animals.entrySet()) {
+                int young = e.getValue().size() - adults(e.getValue()).size();
+                n += e.getValue().size();
+                if (kinds.length() > 0) kinds.append(", ");
+                kinds.append(e.getValue().size()).append(' ').append(kindName(e.getKey()).toLowerCase(Locale.ROOT));
+                if (young > 0) kinds.append(" (").append(young).append(" young)");
             }
-            if (inPens == 0) continue;
-            out.add(kindName(kind) + ": " + n + " (keeps " + keep + " adults, room for " + room
-                    + (inPens > 1 ? " in " + inPens + " pens" : "") + ")");
+            if (n == 0) continue;
+            out.add("Pen " + (p.maxX - p.minX + 1) + "x" + (p.maxZ - p.minZ + 1) + " · " + n + "/" + p.capacity + " · " + kinds);
         }
         return out;
     }
