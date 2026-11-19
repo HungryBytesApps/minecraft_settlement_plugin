@@ -270,8 +270,12 @@ final class Town {
     boolean[] rule(Block b) {
         if (PrivateChests.owner(b) != null) return new boolean[]{false, false}; // private: settlers never touch it
         if (fishersBarrel(b)) return new boolean[]{false, true}; // the catch can be taken, nothing put in
-        boolean[] r = chestRules.get(Keys.ser(b.getLocation()));
-        return r != null ? r : new boolean[]{chestDefault, chestDefault};
+        // A double chest is one chest: a rule set on either half counts for both.
+        for (Block h : halves(b)) {
+            boolean[] r = chestRules.get(Keys.ser(h.getLocation()));
+            if (r != null) return r;
+        }
+        return new boolean[]{chestDefault, chestDefault};
     }
 
     /** A barrel a fisher works at: only for the fisher. (A barrel by water without a fisher is a normal barrel.) */
