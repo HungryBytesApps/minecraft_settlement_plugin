@@ -94,7 +94,7 @@ final class HerderJob {
         if (milk != null) return milk;
 
         int radius = w.plugin.settings().townRadius();
-        // The pens and how many each holds: about one animal per 3 blocks of floor, shared by the kinds in it.
+        // The pens and how many each holds: about one animal per 6 blocks of floor, shared by the kinds in it.
         // Half of a kind's share are adults it always keeps; while that animal's meat, leather or feathers are below
         // their storage targets it raises the pen full and slaughters the grown-up extra ones.
         List<Pen> pens = pens(t, herd, wp);
@@ -441,7 +441,7 @@ final class HerderJob {
                     p.minZ = Math.min(p.minZ, l.getBlockZ());
                     p.maxZ = Math.max(p.maxZ, l.getBlockZ());
                 }
-                p.capacity = Math.min(MAX_PER_PEN, Math.max(2, cells.size() / 3));
+                p.capacity = Math.min(MAX_PER_PEN, Math.max(2, cells.size() / 6)); // one animal per 6 blocks of floor
                 pens.add(p);
             }
         }

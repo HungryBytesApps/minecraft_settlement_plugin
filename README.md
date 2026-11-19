@@ -90,7 +90,7 @@ the work. **In use** (checkbox) switches the workstation off without removing th
   dyes, charcoal…) and **only what you set a storage target for**. Without the materials in storage it just waits ("Waiting for flint for
   arrows"): that's not a problem in the ledger.
 - Furnace jobs fetch fuel from storage (coal, charcoal, wood). A cold furnace is only lit for a full batch (8 items, one coal), unless fewer are wanted.
-- **Loom – herder**: only looks after animals in a pen (fenced in with fences, walls or gates, up to about 40x40; wild ones are left alone; named or leashed animals are never slaughtered). How many it keeps depends on the pen: about one animal per 3
+- **Loom – herder**: only looks after animals in a pen (fenced in with fences, walls or gates, up to about 40x40; wild ones are left alone; named or leashed animals are never slaughtered). How many it keeps depends on the pen: about one animal per 6
   blocks of floor (at most 40 per pen), shared evenly by the kinds in it. Half of a kind's share are adults it always
   keeps; while a storage target for that animal's meat, leather, feathers or hide isn't reached it raises the pen full
   and slaughters the grown-up extra ones. The workstation menu lists the pens it found: size, animals / room, and

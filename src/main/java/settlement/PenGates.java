@@ -43,12 +43,14 @@ final class PenGates {
         long k = key(gate.getX(), gate.getY(), gate.getZ());
         int now = Bukkit.getCurrentTick();
         Seen s = gates.get(k);
-        if (s != null && now - s.at() < 200 && now >= s.at()) return s.pen();
+        if (s != null && now - s.at() < 600 && now >= s.at()) return s.pen();
         boolean pen = false;
         busy = true;
         try {
-            for (int[] d : new int[][]{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) {
-                Block side = gate.getRelative(d[0], 0, d[1]);
+            // The two sides you walk through it (not along the fence).
+            org.bukkit.block.BlockFace f = gate.getBlockData() instanceof org.bukkit.block.data.type.Gate g ? g.getFacing() : org.bukkit.block.BlockFace.NORTH;
+            for (org.bukkit.block.BlockFace face : new org.bukkit.block.BlockFace[]{f, f.getOppositeFace()}) {
+                Block side = gate.getRelative(face);
                 if (!Tag.FENCE_GATES.isTagged(side.getType()) && penWithAnimals(side.getWorld(), side.getX(), side.getY(), side.getZ())) {
                     pen = true;
                     break;
