@@ -111,7 +111,7 @@ public final class SettlementPlugin extends JavaPlugin {
     }
 
     /** Changes with every version I send, to check the right jar is installed. */
-    static final String BUILD = "2026-11-20 #148";
+    static final String BUILD = "2026-11-20 #149";
 
     @Override
     public boolean onCommand(org.bukkit.command.CommandSender sender, org.bukkit.command.Command cmd, String label, String[] args) {
@@ -321,6 +321,44 @@ public final class SettlementPlugin extends JavaPlugin {
         v.remove();
         Worker w = makeSettler(at, t, t.owner, given);
         p.sendActionBar(Component.text(w.name + " joined " + t.name + "!", NamedTextColor.GREEN));
+        // Hired outside the settlement: it sets off that way for a few seconds, then is just there (no long trek).
+        if (at.getWorld() != t.bell.getWorld() || !t.contains(at, settings.townRadius() + 2)) w.start(new SetOff(w, t));
+    }
+
+    /** A settler hired outside the settlement: walks off towards it for a moment, then arrives near the bell. */
+    private final class SetOff implements Activity {
+        private final Worker w;
+        private final Town t;
+        private int time;
+
+        SetOff(Worker w, Town t) {
+            this.w = w;
+            this.t = t;
+            Location me = w.body.getLocation();
+            if (me.getWorld() == t.bell.getWorld()) w.mover.go(Mover.stepToward(me, t.bell, 12, 0), 2, settings.walkSpeed());
+        }
+
+        @Override
+        public boolean tick() {
+            if (++time < 80) return false; // about 4 seconds of walking off
+            Location to = arrivalSpot(t);
+            if (to == null) to = t.bell.clone().add(0.5, 0, 0.5);
+            Location from = w.body.getLocation();
+            from.getWorld().spawnParticle(Particle.CLOUD, from.clone().add(0, 1, 0), 8, 0.3, 0.5, 0.3, 0.01);
+            w.mover.stop();
+            w.body.teleport(to);
+            return true;
+        }
+
+        @Override
+        public void stop() {
+            w.mover.stop();
+        }
+
+        @Override
+        public String label() {
+            return "On the way to " + t.name;
+        }
     }
 
     /** Spawn a new settler (a player-like Mannequin). */
