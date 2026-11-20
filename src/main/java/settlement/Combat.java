@@ -196,8 +196,19 @@ final class Combat {
             ItemStack it = inv.getItem(i);
             if (it == null || isBow(it.getType()) || armorSlot(it.getType()) != null) continue;
             if (rank(it.getType()) > have) { // a sword replaces an axe (the axe goes back into the chest)
-                if (w.pockets.firstEmpty() < 0) continue; // no room for it
                 ItemStack one = it.asOne();
+                if (w.pockets.firstEmpty() < 0) { // pockets full: swap, the old one goes into this chest
+                    if (melee == null || !w.pockets.removeItem(melee.asOne()).isEmpty()) continue;
+                    it.subtract();
+                    inv.setItem(i, it.getAmount() > 0 ? it : null);
+                    if (eq.getItemInMainHand().isSimilar(melee)) eq.setItemInMainHand(null);
+                    for (ItemStack left : inv.addItem(melee.asOne()).values()) w.pockets.addItem(left);
+                    w.pockets.addItem(one);
+                    melee = one;
+                    have = rank(one.getType());
+                    changed = true;
+                    continue;
+                }
                 it.subtract();
                 inv.setItem(i, it.getAmount() > 0 ? it : null);
                 // The old one stays in the pockets for now: it goes to storage like anything else (filters first).

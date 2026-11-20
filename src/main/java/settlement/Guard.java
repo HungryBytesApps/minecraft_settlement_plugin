@@ -530,7 +530,7 @@ final class Guard implements Activity {
         Block best = null;
         double bestD = Double.MAX_VALUE;
         for (Block b : t.containers(w.plugin.settings().townRadius())) {
-            if (!t.rule(b)[1]) continue;
+            if (!t.rule(b)[1] || w.isSkipped(b)) continue;
             if (!Combat.hasUpgrade(w, b, wantsBow(), arrowsWanted(), t.guardPotions() ? 2 : 0)) continue;
             double d = b.getLocation().distanceSquared(w.body.getLocation());
             if (d < bestD) {

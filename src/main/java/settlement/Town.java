@@ -275,6 +275,8 @@ final class Town {
             boolean[] r = chestRules.get(Keys.ser(h.getLocation()));
             if (r != null) return r;
         }
+        // A chest with a filter is meant for settlers' things: they may put in it, even when the default says no.
+        if (filter(b).mode != FilterMode.OFF) return new boolean[]{true, chestDefault};
         return new boolean[]{chestDefault, chestDefault};
     }
 

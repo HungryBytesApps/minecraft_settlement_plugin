@@ -102,18 +102,19 @@ final class GoAndDo implements Activity {
         return false;
     }
 
-    /** Walk to an open spot right next to the chest (a side you can stand at). Null if none can be reached. */
+    /** Walk to a spot it can reach the chest from (like a player: within reach, nothing in between). Null if none. */
     private Location goNextTo(Block chest) {
-        // Any spot within 2 blocks it can stand on (like a player's reach): right in front first, then further.
         java.util.List<Location> spots = new java.util.ArrayList<>();
         for (int dx = -2; dx <= 2; dx++) {
             for (int dz = -2; dz <= 2; dz++) {
                 if (dx == 0 && dz == 0) continue;
-                for (int dy : new int[]{0, -1, 1, -2}) {
+                // The floor near the chest's height first; a chest up high is reached from below (up to 3 down).
+                for (int dy : new int[]{0, -1, 1, -2, -3}) {
                     int x = chest.getX() + dx, y = chest.getY() + dy, z = chest.getZ() + dz;
-                    if (PathFinder.walkable(chest.getWorld(), x, y, z)) {
-                        Location l = new Location(chest.getWorld(), x + 0.5, y, z + 0.5);
-                        if (seesChest(l, chest)) spots.add(l); // (not through a wall, like a player)
+                    if (!PathFinder.walkable(chest.getWorld(), x, y, z)) continue;
+                    Location l = new Location(chest.getWorld(), x + 0.5, y, z + 0.5);
+                    if (seesChest(l, chest)) {
+                        spots.add(l);
                         break;
                     }
                 }
@@ -130,16 +131,21 @@ final class GoAndDo implements Activity {
         return null;
     }
 
-    /** From this spot (eye height) the chest itself is the first block in the way. */
+    /**
+     * Like a player: from this spot (eye height) the chest is within reach (4.5) and the first thing in sight, for
+     * at least one of its sides (or its middle). So never through a wall, but a chest up high or under a counter is fine.
+     */
     static boolean seesChest(Location feet, Block chest) {
-        Location eye = feet.clone().add(0, 1.6, 0);
+        Location eye = feet.clone().add(0, 1.62, 0);
+        Location mid = chest.getLocation().add(0.5, 0.5, 0.5);
+        if (eye.distanceSquared(mid) > 4.5 * 4.5) return false;
         java.util.List<Block> mine = Town.halves(chest);
-        // Aim at the middle and at the top of the chest: either one is enough (a chest under a counter, say).
-        for (double ty : new double[]{0.5, 0.9}) {
-            org.bukkit.util.Vector to = chest.getLocation().add(0.5, ty, 0.5).toVector().subtract(eye.toVector());
+        double[][] aims = {{0.5, 0.5, 0.5}, {0.5, 0.95, 0.5}, {0.5, 0.05, 0.5}, {0.05, 0.5, 0.5}, {0.95, 0.5, 0.5}, {0.5, 0.5, 0.05}, {0.5, 0.5, 0.95}};
+        for (double[] a : aims) {
+            org.bukkit.util.Vector to = chest.getLocation().add(a[0], a[1], a[2]).toVector().subtract(eye.toVector());
             double dist = to.length();
             if (dist < 0.01) return true;
-            org.bukkit.util.RayTraceResult r = chest.getWorld().rayTraceBlocks(eye, to.normalize(), dist + 0.5,
+            org.bukkit.util.RayTraceResult r = chest.getWorld().rayTraceBlocks(eye, to.normalize(), dist + 0.3,
                     org.bukkit.FluidCollisionMode.NEVER, true);
             if (r != null && r.getHitBlock() != null && mine.contains(r.getHitBlock())) return true;
         }
