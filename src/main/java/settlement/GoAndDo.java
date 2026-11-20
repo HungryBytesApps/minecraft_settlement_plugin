@@ -112,7 +112,8 @@ final class GoAndDo implements Activity {
                 for (int dy : new int[]{0, -1, 1, -2}) {
                     int x = chest.getX() + dx, y = chest.getY() + dy, z = chest.getZ() + dz;
                     if (PathFinder.walkable(chest.getWorld(), x, y, z)) {
-                        spots.add(new Location(chest.getWorld(), x + 0.5, y, z + 0.5));
+                        Location l = new Location(chest.getWorld(), x + 0.5, y, z + 0.5);
+                        if (seesChest(l, chest)) spots.add(l); // (not through a wall, like a player)
                         break;
                     }
                 }
@@ -127,6 +128,22 @@ final class GoAndDo implements Activity {
             if (++tries >= 3) break; // the nearest few: if none of those can be reached, the rest won't either
         }
         return null;
+    }
+
+    /** From this spot (eye height) the chest itself is the first block in the way. */
+    static boolean seesChest(Location feet, Block chest) {
+        Location eye = feet.clone().add(0, 1.6, 0);
+        java.util.List<Block> mine = Town.halves(chest);
+        // Aim at the middle and at the top of the chest: either one is enough (a chest under a counter, say).
+        for (double ty : new double[]{0.5, 0.9}) {
+            org.bukkit.util.Vector to = chest.getLocation().add(0.5, ty, 0.5).toVector().subtract(eye.toVector());
+            double dist = to.length();
+            if (dist < 0.01) return true;
+            org.bukkit.util.RayTraceResult r = chest.getWorld().rayTraceBlocks(eye, to.normalize(), dist + 0.5,
+                    org.bukkit.FluidCollisionMode.NEVER, true);
+            if (r != null && r.getHitBlock() != null && mine.contains(r.getHitBlock())) return true;
+        }
+        return false;
     }
 
     private boolean near(Location l, double r) {
