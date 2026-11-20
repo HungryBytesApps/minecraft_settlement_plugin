@@ -119,8 +119,21 @@ final class FarmerJob {
         Compost compost = compost(wp);
         boolean makeMeal = compost != Compost.OFF && t.wants(Material.BONE_MEAL, radius);
 
-        // Surplus harvest to the composter (a good load), and a full load to storage.
-        if (makeMeal && compostLoad(w, t, radius) >= 16) return compostTrip(w, t, wp);
+        // Melon blocks and hay bales to order: also from spare slices / wheat in storage (above their own targets).
+        for (Material[] fb : new Material[][]{{Material.MELON_SLICE, Material.MELON}, {Material.WHEAT, Material.HAY_BLOCK}}) {
+            int blocks = ordered(t, fb[1], radius) - w.count(fb[1]) - w.count(fb[0]) / 9;
+            Integer own = t.targets.get(fb[0]);
+            int spare = t.count(fb[0], radius) - (own == null ? 0 : own);
+            int take = Math.min(blocks, spare / 9) * 9;
+            if (take > 0 && !storageFull) {
+                Material from = fb[0];
+                Activity f = Work.fetch(w, t, m -> m == from, Math.min(63, take), "Getting " + nice(from).toLowerCase(java.util.Locale.ROOT) + " for " + nice(fb[1]).toLowerCase(java.util.Locale.ROOT) + "s");
+                if (f != null) return f;
+            }
+        }
+        // Surplus harvest (above its target) to the composter (a good load), and a full load to storage.
+        boolean composting = compost != Compost.OFF && wp.loc.getBlock().getType() == Material.COMPOSTER;
+        if (composting && compostLoad(w, t, radius) >= 16) return compostTrip(w, t, wp);
         if (!storageFull && needsDeposit(w, t, wp, false)) {
             Activity d = deposit(w, t, wp);
             if (d != null) return d;
@@ -183,7 +196,7 @@ final class FarmerJob {
         }
 
         // Nothing else: compost what's left over, bring the rest to storage.
-        if (makeMeal && compostLoad(w, t, radius) > 0) return compostTrip(w, t, wp);
+        if (composting && compostLoad(w, t, radius) > 0) return compostTrip(w, t, wp);
         if (!storageFull && needsDeposit(w, t, wp, true)) {
             Activity d = deposit(w, t, wp);
             if (d != null) return d;
@@ -351,7 +364,7 @@ final class FarmerJob {
             }
             for (Material m : COMPOST.keySet()) {
                 int n = surplus(w, t, radius, m);
-                for (int i = 0; i < n && t.wants(Material.BONE_MEAL, radius); i++) {
+                for (int i = 0; i < n; i++) { // (over-target harvest: into the composter, also when there's bone meal enough)
                     if (!w.take(m, 1)) break;
                     w.harvested.computeIfPresent(m, (k, v) -> Math.max(0, v - 1));
                     used++;
@@ -460,7 +473,8 @@ final class FarmerJob {
         totals.replaceAll((m, n) -> CROP.containsKey(m) ? Math.max(0, n - keep) : n);
         if (wp.isOn("BONEMEAL")) totals.computeIfPresent(Material.BONE_MEAL, (k, n) -> Math.max(0, n - 16));
         if (ordered(t, Material.MELON, radius) > 0) totals.computeIfPresent(Material.MELON_SLICE, (k, n) -> n % 9); // the rest becomes melons
-        if (compost(wp) != Compost.OFF && t.wants(Material.BONE_MEAL, radius)) {
+        if (ordered(t, Material.HAY_BLOCK, radius) > 0) totals.computeIfPresent(Material.WHEAT, (k, n) -> n % 9); // the rest becomes hay
+        if (compost(wp) != Compost.OFF) {
             for (Material m : COMPOST.keySet()) {
                 int s = surplus(w, t, radius, m);
                 if (s > 0) totals.computeIfPresent(m, (k, n) -> Math.max(0, n - s)); // goes into the composter

@@ -139,7 +139,7 @@ final class Fishing implements Listener {
     /** A storage target is set for it and not reached yet. */
     private static boolean belowTarget(Town t, Worker w, Material m, int radius) {
         Integer target = t.targets.get(m);
-        return target != null && target > 0 && t.count(m, radius) + w.count(m) < target;
+        return target != null && target > 0 && t.count(m, radius) + t.carried(w, m) < target;
     }
 
     private static boolean fishWanted(Town t, Material fish, int radius) {

@@ -187,7 +187,7 @@ final class Town {
 
     /** An expansion: an extra square around its own bell. */
     static final class Expansion {
-        final Location bell;
+        Location bell; // (moves when its bell is moved)
         int radius;
 
         Expansion(Location bell, int radius) {
@@ -452,10 +452,37 @@ final class Town {
         return target == null || count(item, radius) < target;
     }
 
-    /** Same, counting what this settler already carries toward storage. */
+    /** Same, counting what this settler already carries toward storage (and what the others carry). */
     boolean wants(Material item, int radius, Worker w) {
         Integer target = targets.get(item);
-        return target == null || count(item, radius) + w.count(item) < target;
+        return target == null || count(item, radius) + carried(w, item) < target;
+    }
+
+    private Map<java.util.UUID, Map<Material, Integer>> carriedCache = Map.of();
+    private int carriedAt = -10000;
+
+    /**
+     * What's on its way to storage: this settler's pockets (exactly), plus the other settlers' (looked at once a
+     * second). So two farmers don't both harvest up to the target.
+     */
+    int carried(Worker w, Material m) {
+        int now = Bukkit.getCurrentTick();
+        if (now - carriedAt >= 20 || now < carriedAt) {
+            Map<java.util.UUID, Map<Material, Integer>> c = new HashMap<>();
+            for (Worker o : w.plugin.workers().all()) {
+                if (!id.equals(o.townId)) continue;
+                Map<Material, Integer> mine = new HashMap<>();
+                for (org.bukkit.inventory.ItemStack it : o.pockets.getContents())
+                    if (it != null && !it.getType().isAir()) mine.merge(it.getType(), it.getAmount(), Integer::sum);
+                c.put(o.body.getUniqueId(), mine);
+            }
+            carriedCache = c;
+            carriedAt = now;
+        }
+        int n = w.count(m);
+        for (Map.Entry<java.util.UUID, Map<Material, Integer>> e : carriedCache.entrySet())
+            if (!e.getKey().equals(w.body.getUniqueId())) n += e.getValue().getOrDefault(m, 0);
+        return n;
     }
 
     /** Where to put this item: an allowed chest that already has it, else the nearest allowed one with space. */

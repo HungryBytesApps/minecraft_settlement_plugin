@@ -55,7 +55,7 @@ final class SmithJob {
         Set<Material> parts = new HashSet<>();
         for (Material product : PRODUCTS) {
             int target = t.targets.getOrDefault(product, 0);
-            if (target <= 0 || t.count(product, radius) + w.count(product) >= target) continue;
+            if (target <= 0 || t.count(product, radius) + t.carried(w, product) >= target) continue;
             if ("netherite".equals(metal(product))) {
                 Material d = Material.matchMaterial("diamond_" + product.getKey().getKey().substring("netherite_".length()));
                 if (d != null) parts.add(d);
@@ -79,7 +79,7 @@ final class SmithJob {
         String waiting = null; // materials simply not in storage (no problem: it waits for them)
         for (Material product : PRODUCTS) {
             int target = t.targets.getOrDefault(product, 0);
-            if (target <= 0 || t.count(product, radius) + w.count(product) >= target) continue; // (counting what it carries too)
+            if (target <= 0 || t.count(product, radius) + t.carried(w, product) >= target) continue; // (counting what it carries too)
             anyWanted = true;
             Plan plan = plan(w, t, product);
             if (plan == null) {

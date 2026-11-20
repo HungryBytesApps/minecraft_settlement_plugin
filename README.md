@@ -27,6 +27,11 @@ Right-click a **bell** → create a settlement. The settlement is the square aro
 - Settlements never overlap: growing stops at a neighbour, and a new settlement near another one gets a smaller
   radius (refused if not even the minimum fits).
 - Shrinking or removing is refused when a workstation with workers or an expansion bell would fall outside.
+- **Move this bell** (founder; main bell and expansion bells): you get a placeholder bell. The bell stays where it
+  is until you place the placeholder somewhere allowed; then the square moves there (same radius) and the old bell is
+  gone. Settlers, workstations, chests and targets stay. Not allowed (it isn't placed, you get the reason): overlapping
+  another settlement, a workstation with workers ending up outside (move that one first), cutting off an expansion.
+  An old placeholder (the bell moved already) just disappears.
 - Everything follows the shape: border particles (outer edge only), patrols, fields, chests, loaded chunks, alarms.
 
 ### Bell menu (the settlement's rules)
@@ -80,13 +85,18 @@ the work. **In use** (checkbox) switches the workstation off without removing th
 - **Composter – farmer**: first harvests everything ripe, then replants. Wheat, carrots, potatoes, beetroot,
   melons and pumpkins (from stems), sugar cane, cactus and bamboo (bottom piece stays), sweet berries, cocoa.
   Replants with the same seed as before (or a neighbour's). Fetches seeds from storage.
-  Melon blocks (9 slices) and hay bales (9 wheat): made to order, only with a storage target. Nether wart on soul sand.
+  Only harvests what's below its storage target; what all settlers carry counts too (two farmers don't both fill it).
+  Melon blocks (9 slices) and hay bales (9 wheat): made to order, only with a storage target, from its harvest and
+  from spare slices / wheat in storage (above their own targets). Nether wart on soul sand.
   - **Make compost**: Off / On / Overflow only (only its own harvest, never things from storage) → bone meal.
+    With On or Overflow, harvest above its target (extra seeds, slices) goes into the composter, not to storage.
   - **Use bone meal**: on crops that are still needed.
 - **Smoker – cook**: cooks raw food, and makes crafting-table food by storage target (no target = don't make):
   bread, cookies, cake (the buckets go back), pumpkin pie, mushroom stew, beetroot soup, rabbit stew. Sugar and
   bowls it makes itself (bowls only when there are none in storage); milk it asks the herder for.
 - **Blast furnace – smelter**: ores and raw metal.
+- Furnaces, smokers and blast furnaces keep the experience of what was made in them, as in vanilla: **Collect XP**
+  in the workstation menu gives it to you (no need to break it or take things out).
 - **Furnace – furnace worker**: only what smokers and blast furnaces can't do (stone types, glass, bricks,
   dyes, charcoal…) and **only what you set a storage target for**. Without the materials in storage it just waits ("Waiting for flint for
   arrows"): that's not a problem in the ledger.
@@ -101,8 +111,9 @@ the work. **In use** (checkbox) switches the workstation off without removing th
   Shears sheep (shears from storage), collects drops, and eggs up to their storage target (no egg target: all of them), shuts gates right behind it (and behind an animal it
   leads), climbs over a fence with a carpet on top. **Bees** (On): harvests full beehives and bee nests, honey with a glass
   bottle (made from glass) and honeycomb with shears, by storage target; it lights a campfire under the hive for a
-  moment first (free, players can't use or break it). A hive without room for one is left alone (notification
-  "Beehive needs room for a campfire"). Milks a cow when someone asks for milk. **Throw eggs**: lobs spare eggs (from close by, well inside the pen) into the chicken pen for chicks, only when there are
+  moment first (free, players can't use or break it), unless a lit campfire already smokes it the vanilla way (up to
+  5 below with open space between, or right under the block the hive stands on, e.g. a scaffold). A hive without
+  either is left alone (notification "Beehive needs room for a campfire"). Milks a cow when someone asks for milk. **Throw eggs**: lobs spare eggs (from close by, well inside the pen) into the chicken pen for chicks, only when there are
   fewer chickens than wanted and the eggs' storage target is reached (no egg target = no throwing).
 - **Fletching table – lumberjack**: fells real trees (logs on dirt with natural leaves) with an axe from
   storage, inside or outside the settlement (toggle). **Replant saplings** On/Off. Low leaves around the trunk are cut away first.

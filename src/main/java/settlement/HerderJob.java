@@ -524,7 +524,7 @@ final class HerderJob {
     static boolean productWanted(Town t, Worker w, EntityType kind, int radius) {
         for (Material m : MEAT.getOrDefault(kind, List.of())) {
             Integer target = t.targets.get(m);
-            if (target != null && target > 0 && t.count(m, radius) + w.count(m) < target) return true;
+            if (target != null && target > 0 && t.count(m, radius) + t.carried(w, m) < target) return true;
         }
         return false;
     }

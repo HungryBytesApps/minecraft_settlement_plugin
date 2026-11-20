@@ -75,6 +75,27 @@ final class Area {
         return null;
     }
 
+    /**
+     * Can this bell (main: e == null) move to there? Null = yes, else why not. The square keeps its radius; it may
+     * not touch another settlement, workstations with workers must stay inside (move those first) and expansion
+     * bells must stay in the settlement (one piece).
+     */
+    static String checkMove(SettlementPlugin plugin, Town t, Town.Expansion e, Location to) {
+        if (to.getWorld() != t.world()) return "A bell can only move within the same world.";
+        int r = e == null ? t.radius : e.radius;
+        int fit = maxFit(plugin, t, to);
+        if (r > fit) return "There it would overlap another settlement (radius " + Math.max(0, fit) + " fits, it's " + r + ").";
+        Location old = e == null ? t.bell : e.bell;
+        if (e == null) t.bell = to;
+        else e.bell = to;
+        try {
+            return stillInside(t, null);
+        } finally {
+            if (e == null) t.bell = old;
+            else e.bell = old;
+        }
+    }
+
     /** Radius for a new settlement at this bell (at most the config's), or -1 if not even the minimum fits. */
     static int newSettlementRadius(SettlementPlugin plugin, Block bell) {
         int r = Math.min(Town.BASE, maxFit(plugin, null, bell.getLocation()));

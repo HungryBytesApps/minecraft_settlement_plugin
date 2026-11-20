@@ -74,7 +74,7 @@ final class LumberjackJob {
             if (a != null) return a;
         }
         // Real trees only (a log on the ground with natural leaves), inside or just outside the settlement.
-        Block base = Work.nearestOf(w, Fields.trees(t, radius, outside), b -> isTreeBase(b) && t.wants(b.getType(), radius, w));
+        Block base = Work.nearestOf(w, Fields.trees(t, radius, outside), b -> isTreeBase(b) && (started(b) || t.wants(b.getType(), radius, w))); // (a tree begun: finished first)
         if (base != null) {
             Work.claim(w, base);
             if (!Work.hasTool(w, "_AXE")) {
@@ -221,9 +221,17 @@ final class LumberjackJob {
                 }
             }
         }
-        if (!leaves) return null;
+        if (!leaves && !started(base)) return null; // (a tree it began felling has no leaves left: still a tree)
         logs.sort((a, b2) -> Integer.compare(b2.getY(), a.getY()));
         return logs;
+    }
+
+    /** Trees it began felling (base → until when it still counts as a tree): the rest of it is finished later. */
+    private static final Map<Block, Integer> startedTrees = new HashMap<>();
+
+    private static boolean started(Block base) {
+        Integer until = startedTrees.get(base);
+        return until != null && org.bukkit.Bukkit.getCurrentTick() < until;
     }
 
     private static boolean built(Material m) {
@@ -303,6 +311,9 @@ final class LumberjackJob {
             for (Block b : logs) if (b.getY() == base.getY()) bases.add(b);
             if (bases.isEmpty()) bases.add(base);
             this.kind = base.getType();
+            int now = org.bukkit.Bukkit.getCurrentTick();
+            if (startedTrees.size() > 500) startedTrees.values().removeIf(u -> u <= now);
+            for (Block b : bases) startedTrees.put(b, now + 72000); // an hour: if it's stopped halfway, it comes back for the rest
         }
 
         @Override
@@ -379,6 +390,7 @@ final class LumberjackJob {
             if (current == null) {
                 while (!logs.isEmpty() && logs.get(0).getType() != kind) logs.remove(0);
                 if (logs.isEmpty()) {
+                    for (Block b : bases) startedTrees.remove(b);
                     if (replant) for (Block b : bases) Replant.add(b, saplingFor(kind)); // a 2x2 tree: all four
                     return true;
                 }

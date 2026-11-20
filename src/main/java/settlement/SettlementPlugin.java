@@ -59,6 +59,7 @@ public final class SettlementPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new SettlerInventory.Events(this), this);
         getServer().getPluginManager().registerEvents(new PrivateChests(this), this);
         getServer().getPluginManager().registerEvents(new Campfires(), this);
+        getServer().getPluginManager().registerEvents(new BellMove(this), this);
         getServer().getPluginManager().registerEvents(new Fishing(this), this);
         getServer().getPluginManager().registerEvents(new Graves(this), this); // where settlers died: their things
         FisherSkins.load(this); // the fisher skins from MineSkin (once, then from the cache)
@@ -110,7 +111,7 @@ public final class SettlementPlugin extends JavaPlugin {
     }
 
     /** Changes with every version I send, to check the right jar is installed. */
-    static final String BUILD = "2026-11-20 #140";
+    static final String BUILD = "2026-11-20 #144";
 
     @Override
     public boolean onCommand(org.bukkit.command.CommandSender sender, org.bukkit.command.Command cmd, String label, String[] args) {

@@ -26,6 +26,25 @@ final class Bees {
         return b.getBlockData() instanceof Beehive h && h.getHoneyLevel() >= h.getMaximumHoneyLevel();
     }
 
+    /**
+     * Already smoked, the vanilla way: a lit campfire up to 5 blocks under the hive, with only open space between, or
+     * right under the first block in the way (a campfire under a scaffold or hay bale the hive stands on).
+     */
+    static boolean smoked(Block hive) {
+        org.bukkit.util.BoundingBox post = new org.bukkit.util.BoundingBox(0.375, 0, 0.375, 0.625, 1, 0.625);
+        for (int dy = 1; dy <= 5; dy++) {
+            Block b = hive.getRelative(BlockFace.DOWN, dy);
+            if (litCampfire(b)) return true;
+            if (!b.getType().isAir() && b.getCollisionShape().overlaps(post)) return litCampfire(b.getRelative(BlockFace.DOWN));
+        }
+        return false;
+    }
+
+    private static boolean litCampfire(Block b) {
+        return (b.getType() == Material.CAMPFIRE || b.getType() == Material.SOUL_CAMPFIRE)
+                && b.getBlockData() instanceof org.bukkit.block.data.Lightable l && l.isLit();
+    }
+
     /** Where a campfire can go: the lowest free spot under the hive (up to 5 down) with solid ground. Null: no room. */
     static Block smokeSpot(Block hive) {
         Block spot = null;
@@ -45,8 +64,9 @@ final class Bees {
         if (!honey && !comb) return null;
         Block hive = Work.nearestOf(w, Fields.hives(t, radius), b -> full(b) && !w.isSkipped(b));
         if (hive == null) return null;
-        Block spot = smokeSpot(hive);
-        if (spot == null) {
+        boolean smoked = smoked(hive); // a campfire is already doing it (one under a scaffold, say): nothing to place
+        Block spot = smoked ? null : smokeSpot(hive);
+        if (!smoked && spot == null) {
             w.skip(hive, 6000);
             int now = Bukkit.getCurrentTick();
             Integer last = warned.get(hive);
@@ -93,7 +113,7 @@ final class Bees {
             h.setHoneyLevel(0);
             b.setBlockData(h);
         }).onArrive(b -> {
-            if (spot.getType().isAir()) Campfires.light(w.plugin, spot, 100); // calm the bees first
+            if (spot != null && spot.getType().isAir()) Campfires.light(w.plugin, spot, 100); // calm the bees first
         }).working(40, "minecraft:block.beehive.work");
     }
 }

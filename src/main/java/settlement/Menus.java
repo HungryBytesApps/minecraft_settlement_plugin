@@ -183,6 +183,9 @@ final class Menus {
                 "Make the settlement bigger or smaller. Place more bells inside it for expansions.", 130, pl -> radius(plugin, pl, t)));
         buttons.add(button(plugin, "Members (" + t.members.size() + ")", NamedTextColor.WHITE,
                 "Players who help run the settlement with the ledger (settlers, workstations, storage targets, hiring)", 130, pl -> members(plugin, pl, t)));
+        buttons.add(button(plugin, "Move this bell", NamedTextColor.YELLOW,
+                "You get a placeholder bell: place it where the bell should go. The settlement moves there (same radius); settlers, storage and workstations stay.", 130,
+                pl -> BellMove.start(plugin, pl, t, null)));
         buttons.add(button(plugin, "Disband settlement", NamedTextColor.RED, "Removes the settlement. All settlers drop their things and leave.", 130, pl -> disband(plugin, pl, t)));
         show(p, t.name, body, List.of(), DialogType.multiAction(buttons).columns(2).exitAction(close(plugin)).build());
     }
@@ -264,8 +267,10 @@ final class Menus {
             Area.changed(plugin, t);
             pl.sendActionBar(Component.text("Expansion removed.", NamedTextColor.YELLOW));
         });
+        ActionButton move = wbutton(plugin, apply, "Move this bell", NamedTextColor.YELLOW,
+                "You get a placeholder bell: place it where this bell should go (same radius)", 150, pl -> BellMove.start(plugin, pl, t, x));
         ActionButton done = wbutton(plugin, apply, "Done", NamedTextColor.WHITE, null, 100, pl -> {});
-        show(p, "Expansion", body, inputs, DialogType.multiAction(List.of(remove)).columns(1).exitAction(done).build());
+        show(p, "Expansion", body, inputs, DialogType.multiAction(List.of(move, remove)).columns(1).exitAction(done).build());
     }
 
     /** Members: who helps run the settlement (founder only). */
@@ -697,6 +702,27 @@ final class Menus {
             // Without a fisher it's a normal barrel, with the settings of a chest.
             if (wp.workers.isEmpty()) buttons.add(wbutton(plugin, apply, "Chest settings", NamedTextColor.WHITE,
                     "Nobody fishes here, so this is a normal barrel: its storage settings", w, pl -> openChest(plugin, pl, t, wp.loc.getBlock(), x -> showWorkplace(plugin, x, t, wp))));
+        }
+        // Furnaces keep the experience of everything smelted in them: collect it here (no need to break the furnace).
+        if (wp.loc.getBlock().getState(false) instanceof org.bukkit.block.Furnace fur) {
+            double xp = 0;
+            for (Map.Entry<org.bukkit.inventory.CookingRecipe<?>, Integer> r : fur.getRecipesUsed().entrySet()) xp += r.getKey().getExperience() * r.getValue();
+            int whole = (int) xp;
+            if (whole > 0) buttons.add(wbutton(plugin, apply, "Collect XP (" + whole + ")", NamedTextColor.GREEN,
+                    "The experience from everything smelted here", w, pl -> {
+                        if (!(wp.loc.getBlock().getState(false) instanceof org.bukkit.block.Furnace f)) return;
+                        double got = 0;
+                        for (Map.Entry<org.bukkit.inventory.CookingRecipe<?>, Integer> r : new java.util.HashMap<>(f.getRecipesUsed()).entrySet()) {
+                            got += r.getKey().getExperience() * r.getValue();
+                            f.setRecipeUsedCount(r.getKey(), 0);
+                        }
+                        int give = (int) got + (Math.random() < got - (int) got ? 1 : 0); // the part after the comma: by chance, as in vanilla
+                        if (give > 0) {
+                            pl.giveExp(give, true);
+                            pl.playSound(pl.getLocation(), "minecraft:entity.experience_orb.pickup", 0.6f, 1f);
+                        }
+                        showWorkplace(plugin, pl, t, wp);
+                    }));
         }
         buttons.add(wbutton(plugin, apply, "Workers (" + wp.workers.size() + ")", NamedTextColor.GREEN, "Who works here: add or remove workers", w,
                 pl -> workers(plugin, pl, t, wp)));
