@@ -35,6 +35,7 @@ final class Seats {
             ok = m.name().contains("CUSHION") || Tag.WOOL_CARPETS.isTagged(m);
         }
         if (!ok) return false;
+        if (b.getBlockData() instanceof org.bukkit.block.data.Waterlogged wl && wl.isWaterlogged()) return false; // not a wet seat
         Block above = b.getRelative(BlockFace.UP), above2 = above.getRelative(BlockFace.UP);
         return PathFinder.passable(above) && PathFinder.passable(above2);
     }
