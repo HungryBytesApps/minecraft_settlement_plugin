@@ -45,6 +45,7 @@ final class Seats {
 
     /** Top of the seat (where you sit). */
     static double surface(Block b) {
+        if (b.getBlockData() instanceof Stairs) return b.getY() + 0.5; // on the step, not on top of its back
         double top = b.getBoundingBox().getMaxY();
         return top > b.getY() ? top : b.getY() + 0.5;
     }
@@ -127,6 +128,10 @@ final class Seats {
         taken.add(seat);
         float yaw = yaw(seat, lookAt);
         Location at = seat.getLocation().add(0.5, surface(seat) - seat.getY() + w.plugin.settings().sitHeight(), 0.5);
+        if (seat.getBlockData() instanceof Stairs st) { // a little forward, off the back
+            org.bukkit.block.BlockFace front = st.getFacing().getOppositeFace();
+            at.add(front.getModX() * 0.15, 0, front.getModZ() * 0.15);
+        }
         at.setYaw(yaw);
         ArmorStand stand = seat.getWorld().spawn(at, ArmorStand.class, a -> {
             a.setMarker(true);
