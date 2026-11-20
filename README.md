@@ -53,7 +53,8 @@ Right-click with it:
   anywhere. Taking: from every allowed chest.
    **Private**: only you can open, change or
   break it (ops with `settlement.admin` can open it too); settlers never use it (bell and ledger settings don't change that), hoppers can't take from it,
-  explosions don't break it. Stored on the chest itself, so it stays private even after disbanding.
+  explosions don't break it. Stored on the chest itself, so it stays private even after disbanding. The founder can
+  make a member's private chest normal again (not open it).
   Only its owner can place a chest next to it to make one big private chest; anyone else's chest stays separate.
 - a **workstation**: its menu (workers, in use, settings).
 - a **wild villager**: hire it. It walks to the settlement, or follows you when it's far away.
@@ -105,6 +106,8 @@ the work. **In use** (checkbox) switches the workstation off without removing th
   fewer chickens than wanted and the eggs' storage target is reached (no egg target = no throwing).
 - **Fletching table – lumberjack**: fells real trees (logs on dirt with natural leaves) with an axe from
   storage, inside or outside the settlement (toggle). **Replant saplings** On/Off. Low leaves around the trunk are cut away first.
+  Makes sticks at its fletching table when sticks are below their storage target: from spare planks in storage (2
+  planks = 4 sticks), or else from spare logs (never planks or logs below their own targets).
 - **Brewing stand – brewer**: brews every potion (also long, strong, splash and lingering) by storage target
   (Storage targets → pick an effect; no target = don't brew), with the real brewing stand: fills glass bottles at
   water near the stand, nether wart, then the ingredients one by one, blaze powder as fuel. Makes blaze powder,
