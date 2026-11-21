@@ -133,7 +133,7 @@ final class FarmerJob {
         }
         // Surplus harvest (above its target) to the composter (a good load), and a full load to storage.
         boolean composting = compost != Compost.OFF && wp.loc.getBlock().getType() == Material.COMPOSTER;
-        if (composting && compostLoad(w, t, radius) >= 16) return compostTrip(w, t, wp);
+        if (composting && compostLoad(w, t, radius) > 0) return compostTrip(w, t, wp); // (right away, not carried around)
         if (!storageFull && needsDeposit(w, t, wp, false)) {
             Activity d = deposit(w, t, wp);
             if (d != null) return d;
@@ -197,6 +197,12 @@ final class FarmerJob {
 
         // Nothing else: compost what's left over, bring the rest to storage.
         if (composting && compostLoad(w, t, radius) > 0) return compostTrip(w, t, wp);
+        // Bone meal wanted: compost spare seeds (and other compostables) from storage, above their targets
+        // (no target: a stack stays).
+        if (composting && makeMeal && !storageFull) {
+            Activity f = fetchForCompost(w, t, radius);
+            if (f != null) return f;
+        }
         if (!storageFull && needsDeposit(w, t, wp, true)) {
             Activity d = deposit(w, t, wp);
             if (d != null) return d;
@@ -333,14 +339,65 @@ final class FarmerJob {
      */
     private static int surplus(Worker w, Town t, int radius, Material m) {
         if (!COMPOST.containsKey(m)) return 0;
-        int have = Math.min(w.count(m), w.harvested.getOrDefault(m, 0));
+        int stored = fromStorage(w, m); // taken from storage to compost: all of it
+        if (stored > 0) return stored + surplusHarvest(w, t, radius, m, w.count(m) - stored);
+        return surplusHarvest(w, t, radius, m, w.count(m));
+    }
+
+    private static int surplusHarvest(Worker w, Town t, int radius, Material m, int count) {
+        int have = Math.min(count, w.harvested.getOrDefault(m, 0));
         if (have <= 0) return 0;
         if (m == Material.MELON_SLICE && ordered(t, Material.MELON, radius) > 0) return 0; // kept for melon blocks
         if (CROP.containsKey(m)) { // seeds: keep enough to plant
             if (t.wants(m, radius)) return 0;
-            return Math.max(0, Math.min(have, w.count(m) - w.plugin.settings().seedsToKeep()));
+            return Math.max(0, Math.min(have, count - w.plugin.settings().seedsToKeep()));
         }
         return t.wants(m, radius) ? 0 : have;
+    }
+
+    /** Compostables taken from storage to compost (per settler): all of it goes into the composter. */
+    private static final Map<java.util.UUID, Map<Material, Integer>> forCompost = new HashMap<>();
+
+    private static int fromStorage(Worker w, Material m) {
+        Map<Material, Integer> f = forCompost.get(w.body.getUniqueId());
+        return f == null ? 0 : Math.min(w.count(m), f.getOrDefault(m, 0));
+    }
+
+    /** What's in storage above what's kept of it (its target, or a stack without one). */
+    private static int spareInStorage(Town t, Material m, int radius) {
+        Integer own = t.targets.get(m);
+        return t.count(m, radius) - (own != null ? own : 64);
+    }
+
+    private static Activity fetchForCompost(Worker w, Town t, int radius) {
+        // Seeds first (that's what piles up), then whatever has the most to spare.
+        Material best = null;
+        int most = 0;
+        for (Material m : COMPOST.keySet()) {
+            if (m == Material.MELON_SLICE && ordered(t, Material.MELON, radius) > 0) continue;
+            if (m == Material.WHEAT && ordered(t, Material.HAY_BLOCK, radius) > 0) continue;
+            int spare = spareInStorage(t, m, radius) + (m.name().endsWith("SEEDS") ? 100000 : 0);
+            if (spareInStorage(t, m, radius) > 0 && spare > most) {
+                most = spare;
+                best = m;
+            }
+        }
+        if (best == null) return null;
+        Material m = best;
+        int amount = Math.min(64, spareInStorage(t, m, radius));
+        int radiusF = radius;
+        Block chest = t.takeChest(m, w.body.getLocation(), radius, w);
+        if (chest == null) return null;
+        w.workStatus = "Getting " + nice(m).toLowerCase(java.util.Locale.ROOT) + " to compost";
+        return new GoAndDo(w, chest, 2.0, "Getting " + nice(m).toLowerCase(java.util.Locale.ROOT) + " to compost",
+                b -> Town.isStorage(b) && t.rule(b)[1], b -> {
+                    org.bukkit.inventory.Inventory inv = Town.inventory(b);
+                    if (inv == null) return;
+                    int got = Work.take(w, inv, m, Math.min(amount, Math.max(0, spareInStorage(t, m, radiusF))));
+                    if (got > 0) forCompost.computeIfAbsent(w.body.getUniqueId(), k -> new HashMap<>()).merge(m, got, Integer::sum);
+                    w.savePockets();
+                    t.countsChanged();
+                });
     }
 
     private static int compostLoad(Worker w, Town t, int radius) {
@@ -366,7 +423,9 @@ final class FarmerJob {
                 int n = surplus(w, t, radius, m);
                 for (int i = 0; i < n; i++) { // (over-target harvest: into the composter, also when there's bone meal enough)
                     if (!w.take(m, 1)) break;
-                    w.harvested.computeIfPresent(m, (k, v) -> Math.max(0, v - 1));
+                    Map<Material, Integer> fs = forCompost.get(w.body.getUniqueId());
+                    if (fs != null && fs.getOrDefault(m, 0) > 0) fs.merge(m, -1, Integer::sum); // from storage first
+                    else w.harvested.computeIfPresent(m, (k, v) -> Math.max(0, v - 1));
                     used++;
                     if (w.random.nextDouble() < COMPOST.get(m) && ++level >= 7) {
                         meal++;
@@ -485,10 +544,7 @@ final class FarmerJob {
     }
 
     private static boolean needsDeposit(Worker w, Town t, Town.Workplace wp, boolean anything) {
-        Map<Material, Integer> ex = excess(w, t, wp);
-        if (ex.isEmpty()) return false;
-        if (anything) return true;
-        return ex.values().stream().mapToInt(Integer::intValue).sum() >= 48 || w.pockets.firstEmpty() == -1;
+        return !excess(w, t, wp).isEmpty(); // what it harvested goes to storage right away
     }
 
     private static Activity deposit(Worker w, Town t, Town.Workplace wp) {

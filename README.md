@@ -88,8 +88,9 @@ the work. **In use** (checkbox) switches the workstation off without removing th
   Only harvests what's below its storage target; what all settlers carry counts too (two farmers don't both fill it).
   Melon blocks (9 slices) and hay bales (9 wheat): made to order, only with a storage target, from its harvest and
   from spare slices / wheat in storage (above their own targets). Nether wart on soul sand.
-  - **Make compost**: Off / On / Overflow only (only its own harvest, never things from storage) → bone meal.
-    With On or Overflow, harvest above its target (extra seeds, slices) goes into the composter, not to storage.
+  - **Make compost**: Off / On / Overflow only → bone meal. With On or Overflow, harvest above its target (extra
+    seeds, slices) goes into the composter, not to storage. While bone meal is below its target it also composts
+    what storage has too much of (seeds first): above that item's target, or above a stack when it has none.
   - **Use bone meal**: on crops that are still needed.
 - **Smoker – cook**: cooks raw food, and makes crafting-table food by storage target (no target = don't make):
   bread, cookies, cake (the buckets go back), pumpkin pie, mushroom stew, beetroot soup, rabbit stew. Sugar and

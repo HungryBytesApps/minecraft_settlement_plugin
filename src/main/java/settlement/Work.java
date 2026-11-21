@@ -193,9 +193,7 @@ final class Work {
     }
 
     static boolean needsGearDeposit(Worker w, boolean anything) {
-        Map<Material, Integer> ex = gearExcess(w);
-        if (ex.isEmpty()) return false;
-        return anything || ex.values().stream().mapToInt(Integer::intValue).sum() >= 48 || w.pockets.firstEmpty() == -1;
+        return !gearExcess(w).isEmpty(); // spare things go to storage right away
     }
 
     static Activity depositGear(Worker w, Town t) {
@@ -226,22 +224,16 @@ final class Work {
     }
 
     static boolean needsDeposit(Worker w, Predicate<Material> keep, java.util.function.ToIntFunction<Material> limit, boolean anything) {
-        Map<Material, Integer> ex = excess(w, keep, limit);
-        if (ex.isEmpty()) return false;
-        if (anything) return true;
-        return ex.values().stream().mapToInt(Integer::intValue).sum() >= 48 || w.pockets.firstEmpty() == -1;
+        return !excess(w, keep, limit).isEmpty(); // anything it doesn't need goes to storage right away (no carrying it around)
     }
 
     static Activity deposit(Worker w, Town t, Predicate<Material> keep, java.util.function.ToIntFunction<Material> limit) {
         return deposit(w, t, () -> excess(w, keep, limit), "Bringing things to storage");
     }
 
-    /** Pockets (nearly) full or a good load: time to bring things to storage. {@code anything}: any load at all. */
+    /** Anything it doesn't need: time to bring it to storage ({@code anything} is no longer used: always). */
     static boolean needsDeposit(Worker w, Predicate<Material> keep, boolean anything) {
-        Map<Material, Integer> ex = excess(w, keep);
-        if (ex.isEmpty()) return false;
-        if (anything) return true;
-        return ex.values().stream().mapToInt(Integer::intValue).sum() >= 48 || w.pockets.firstEmpty() == -1;
+        return !excess(w, keep).isEmpty(); // anything it doesn't need goes to storage right away (no carrying it around)
     }
 
     /** Bring what it made to storage (a chest that already has it, else the nearest with room). */

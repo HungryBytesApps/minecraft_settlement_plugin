@@ -475,7 +475,8 @@ final class Town {
                 if (!id.equals(o.townId)) continue;
                 Map<Material, Integer> mine = new HashMap<>();
                 for (org.bukkit.inventory.ItemStack it : o.pockets.getContents())
-                    if (it != null && !it.getType().isAir()) mine.merge(it.getType(), it.getAmount(), Integer::sum);
+                    // (tools, weapons and armor a settler carries are its own, in use: not on their way to storage)
+                    if (it != null && !it.getType().isAir() && it.getMaxStackSize() > 1) mine.merge(it.getType(), it.getAmount(), Integer::sum);
                 c.put(o.body.getUniqueId(), mine);
             }
             carriedCache = c;
