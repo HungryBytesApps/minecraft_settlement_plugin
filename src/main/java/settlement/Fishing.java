@@ -37,7 +37,7 @@ import java.util.*;
  * Fisher (a barrel within 2 blocks of water): fishes next to its barrel with a rod from storage, keeps the
  * catch in the barrel (3 slots, only for the fisher; a pile of fish on the lid shows how full it is) and
  * carries it to the chests when it fills up. Fish whose storage target is reached go back into the water;
- * junk is kept only when chosen in the junk filter; treasure (in open water) is always kept.
+ * junk is kept only when chosen in the junk filter; treasure (in open water) up to its storage target.
  */
 final class Fishing implements Listener {
     private final SettlementPlugin plugin;
@@ -134,6 +134,14 @@ final class Fishing implements Listener {
     static boolean keepJunk(Town.Workplace wp, Material m) {
         Boolean v = wp.options.get("JUNK_" + m.name());
         return v != null ? v : KEEP_BY_DEFAULT.contains(m);
+    }
+
+    /** Up to its storage target (none: always), not counting the rod it fishes with. */
+    private static boolean wantsCatch(Town t, Worker w, Material m, int radius) {
+        Integer target = t.targets.get(m);
+        if (target == null) return true;
+        int mine = m == Material.FISHING_ROD ? Math.max(0, w.count(m) - 1) : w.count(m);
+        return t.count(m, radius) + t.carried(w, m) - w.count(m) + mine < target;
     }
 
     /** A storage target is set for it and not reached yet. */
@@ -581,9 +589,9 @@ final class Fishing implements Listener {
                 Material m = caught.getType();
                 boolean keep;
                 if (FISH.contains(m)) keep = fishWanted(t, m, radius);
-                else if (!caught.getEnchantments().isEmpty()) keep = true; // treasure (an enchanted rod or bow)
-                else if (JUNK.contains(m)) keep = keepJunk(wp, m) && t.wants(m, radius); // kept junk, up to its storage target
-                else keep = true; // treasure
+                else if (!caught.getEnchantments().isEmpty()) keep = wantsCatch(t, w, m, radius); // an enchanted rod or bow: up to its target
+                else if (JUNK.contains(m)) keep = keepJunk(wp, m) && wantsCatch(t, w, m, radius); // kept junk, up to its storage target
+                else keep = wantsCatch(t, w, m, radius); // treasure: up to its storage target (none set: always kept)
                 if (keep) {
                     w.give(List.of(caught), w.body.getLocation());
                     w.savePockets();

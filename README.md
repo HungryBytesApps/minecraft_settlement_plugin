@@ -139,7 +139,7 @@ the work. **In use** (checkbox) switches the workstation off without removing th
   **Chest settings**). Catches like vanilla: fish 85%, junk 10%, treasure 5% only in open water (5x5, 2 deep, nothing on
   top; the workstation menu says if it is). Fish whose storage target is reached go back into the water; junk
   only when chosen in the **Junk filter**, and then up to its storage target (kept junk shows in the fisher's
-  storage targets); treasure always kept. It stops fishing when every fish target is reached, unless a kept junk item
+  storage targets); treasure kept up to its storage target (no target: always kept; 0: thrown back). It stops fishing when every fish target is reached, unless a kept junk item
   or a treasure (enchanted book, bow, name tag, nautilus shell, saddle) has a storage target that isn't reached yet.
 - **Smithing table – smith**: leather armor, and stone, copper, iron, gold, diamond and netherite tools, weapons and armor, bows, crossbows, arrows, shields, shears and fishing rods (spears too), **only what you set a storage target for**. Buttons above the list show one material at a time (click it again: all). Netherite: the diamond one + a netherite ingot + an upgrade template.
 

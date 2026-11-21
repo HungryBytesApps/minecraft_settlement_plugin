@@ -504,11 +504,16 @@ final class Town {
     Block storeChest(Material m, Location near, int radius, Worker w) {
         Block filtered = null, withItem = null, any = null;
         double dFil = Double.MAX_VALUE, dWith = Double.MAX_VALUE, dAny = Double.MAX_VALUE;
+        boolean filterWaiting = false; // a chest meant for it (its filter) it can't get to right now
         for (Block b : containers(radius)) {
             if (!rule(b)[0]) continue;
-            if (w != null && w.isSkipped(b)) continue;
             Filter f = filter(b);
             boolean listed = f.mode != FilterMode.OFF && f.items.contains(m);
+            if (w != null && w.isSkipped(b)) {
+                // Its own chest, held up a moment (others in the way): wait for it. No way there at all: use another.
+                if (listed && !GoAndDo.noPathLately(b) && inventory(b) != null && hasSpace(inventory(b), m)) filterWaiting = true;
+                continue;
+            }
             if (f.mode == FilterMode.ONLY && !listed) continue;
             Inventory inv = inventory(b);
             if (inv == null || !hasSpace(inv, m)) continue;
@@ -528,8 +533,19 @@ final class Town {
                 any = b;
             }
         }
+        lastFilterWaiting = filtered == null && filterWaiting;
+        if (lastFilterWaiting) return null; // it waits for its own chest, it doesn't go just anywhere
         return filtered != null ? filtered : withItem != null ? withItem : any;
     }
+
+    /** Is there a chest for this item (its filter) it can't get to just now (so it waits instead of using another)? */
+    boolean waitsForOwnChest(Material m, Location near, int radius, Worker w) {
+        if (w == null) return false;
+        return storeChest(m, near, radius, w) == null && lastFilterWaiting; // exactly: its filtered chest is held up a moment
+    }
+
+    /** Set by storeChest: it found nothing because the chest whose filter has the item is held up a moment. */
+    private boolean lastFilterWaiting;
 
     /** Nearest allowed chest to take this item from. */
     Block takeChest(Material m, Location near, int radius) {

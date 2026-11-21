@@ -43,7 +43,16 @@ final class Work {
         return n;
     }
 
+    /** Like fetch, but only loose items (never opens a packed block: hay for wheat it would pack again). */
+    static Activity fetchLoose(Worker w, Town t, Predicate<Material> test, int max, String label) {
+        return fetch(w, t, test, max, label, false);
+    }
+
     static Activity fetch(Worker w, Town t, Predicate<Material> test, int max, String label) {
+        return fetch(w, t, test, max, label, true);
+    }
+
+    private static Activity fetch(Worker w, Town t, Predicate<Material> test, int max, String label, boolean unpack) {
         int radius = w.plugin.settings().townRadius();
         Block best = null;
         double bestD = Double.MAX_VALUE;
@@ -57,6 +66,7 @@ final class Work {
                 best = b;
             }
         }
+        if (best == null && !unpack) return null;
         if (best == null) { // none loose: a block of it (hay for wheat, an iron block for ingots), opened up
             Predicate<Material> packed = m -> UNPACK.containsKey(m) && test.test(UNPACK.get(m));
             for (Block b : t.containers(radius)) {
@@ -176,7 +186,7 @@ final class Work {
             if (Combat.isBow(m)) {
                 if (bestBow == null || m == Material.CROSSBOW) bestBow = m;
             } else if (Combat.isWeapon(m) && (guard || !m.name().endsWith("_AXE"))) {
-                if (bestMelee == null || Combat.damage(m) > Combat.damage(bestMelee)) bestMelee = m;
+                if (bestMelee == null || Combat.rank(m) > Combat.rank(bestMelee)) bestMelee = m; // (the one gearUp picks too)
             }
         }
         Map<Material, Integer> weapons = new HashMap<>();
@@ -184,6 +194,15 @@ final class Work {
             if (it == null || !carriedGear(it.getType())) continue;
             Material m = it.getType();
             if (Combat.isWeapon(m) || Combat.isBow(m)) weapons.merge(m, it.getAmount(), Integer::sum);
+        }
+        // A little food stays (it fetched it to eat after a fight).
+        int food = 0;
+        for (Map.Entry<Material, Integer> e : new ArrayList<>(out.entrySet())) {
+            if (Combat.foodValue(e.getKey()) <= 0) continue;
+            int keep = Math.min(e.getValue(), Math.max(0, 3 - food));
+            food += keep;
+            if (e.getValue() - keep <= 0) out.remove(e.getKey());
+            else out.put(e.getKey(), e.getValue() - keep);
         }
         for (Map.Entry<Material, Integer> e : weapons.entrySet()) {
             int extra = e.getValue() - ((e.getKey() == bestMelee || e.getKey() == bestBow) ? 1 : 0);
@@ -193,7 +212,9 @@ final class Work {
     }
 
     static boolean needsGearDeposit(Worker w, boolean anything) {
-        return !gearExcess(w).isEmpty(); // spare things go to storage right away
+        Map<Material, Integer> ex = gearExcess(w);
+        if (ex.isEmpty()) return false;
+        return anything || ex.values().stream().mapToInt(Integer::intValue).sum() >= 48 || w.pockets.firstEmpty() == -1;
     }
 
     static Activity depositGear(Worker w, Town t) {
@@ -224,16 +245,22 @@ final class Work {
     }
 
     static boolean needsDeposit(Worker w, Predicate<Material> keep, java.util.function.ToIntFunction<Material> limit, boolean anything) {
-        return !excess(w, keep, limit).isEmpty(); // anything it doesn't need goes to storage right away (no carrying it around)
+        Map<Material, Integer> ex = excess(w, keep, limit);
+        if (ex.isEmpty()) return false;
+        if (anything) return true;
+        return ex.values().stream().mapToInt(Integer::intValue).sum() >= 48 || w.pockets.firstEmpty() == -1;
     }
 
     static Activity deposit(Worker w, Town t, Predicate<Material> keep, java.util.function.ToIntFunction<Material> limit) {
         return deposit(w, t, () -> excess(w, keep, limit), "Bringing things to storage");
     }
 
-    /** Anything it doesn't need: time to bring it to storage ({@code anything} is no longer used: always). */
+    /** Pockets (nearly) full or a good load: time to bring things to storage. {@code anything}: any load at all. */
     static boolean needsDeposit(Worker w, Predicate<Material> keep, boolean anything) {
-        return !excess(w, keep).isEmpty(); // anything it doesn't need goes to storage right away (no carrying it around)
+        Map<Material, Integer> ex = excess(w, keep);
+        if (ex.isEmpty()) return false;
+        if (anything) return true;
+        return ex.values().stream().mapToInt(Integer::intValue).sum() >= 48 || w.pockets.firstEmpty() == -1;
     }
 
     /** Bring what it made to storage (a chest that already has it, else the nearest with room). */
@@ -250,15 +277,34 @@ final class Work {
         if (Bukkit.getCurrentTick() < w.storageFullUntil) return null;
         int radius = w.plugin.settings().townRadius();
         Map<Material, Integer> ex = what.get();
-        Material first = ex.entrySet().stream().max(Map.Entry.comparingByValue()).map(Map.Entry::getKey).orElse(null);
-        if (first == null) return null;
-        Block chest = t.storeChest(first, w.body.getLocation(), radius, w);
+        if (ex.isEmpty()) return null;
+        Material first = null;
+        Block chest = null;
+        boolean waiting = false;
+        List<Map.Entry<Material, Integer>> order = new ArrayList<>(ex.entrySet());
+        order.sort(Map.Entry.<Material, Integer>comparingByValue().reversed());
+        for (Map.Entry<Material, Integer> e : order) { // the biggest load that has a chest to go to
+            Block c = t.storeChest(e.getKey(), w.body.getLocation(), radius, w);
+            if (c != null) {
+                first = e.getKey();
+                chest = c;
+                break;
+            }
+            if (t.waitsForOwnChest(e.getKey(), w.body.getLocation(), radius, w)) waiting = true;
+        }
         if (chest == null) {
+            if (waiting) { // its chest is just held up: it waits (not "storage full")
+                w.workStatus = "Waiting to get to the chest";
+                if (w.pockets.firstEmpty() == -1) w.storageFullUntil = Bukkit.getCurrentTick() + 100; // full: no more work meanwhile
+                return null;
+            }
+            Material any = order.get(0).getKey();
             w.storageFullUntil = Bukkit.getCurrentTick() + 400;
-            w.warnStorageFull(first);
+            w.warnStorageFull(any);
             w.workStatus = "No room in storage";
             return null;
         }
+        Material firstF = first;
         w.workStatus = label;
         return new GoAndDo(w, chest, 2.0, label, b -> Town.isStorage(b) && t.rule(b)[0], b -> {
             Inventory inv = Town.inventory(b);
@@ -267,7 +313,7 @@ final class Work {
             for (Map.Entry<Material, Integer> e : what.get().entrySet()) {
                 Block to = t.storeChest(e.getKey(), b.getLocation(), radius, w);
                 // What it came here for goes in anyway (no going back and forth); the rest only if this is its chest.
-                if (e.getKey() == first || (to != null && Town.halves(to).contains(b))) here.put(e.getKey(), e.getValue());
+                if (e.getKey() == firstF || (to != null && Town.halves(to).contains(b))) here.put(e.getKey(), e.getValue());
             }
             // Nothing went in after all (no room for just this item): wait a bit before trying again.
             if (store(w, inv, here).isEmpty()) w.storageFullUntil = Bukkit.getCurrentTick() + 400;

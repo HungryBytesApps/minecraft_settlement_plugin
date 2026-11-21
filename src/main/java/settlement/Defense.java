@@ -157,7 +157,8 @@ final class Defense {
         if (t.alarm && seesHostile(w, t)) {
             return t.reaction == Town.Reaction.CALL_TO_ARMS ? new CallToArms(w, t) : new TakeCover(w, t);
         }
-        if (!t.alarm && w.borrowedWeapon != null && (w.activity == null || w.activity.freeTime())) return new CallToArms(w, t);
+        if (!t.alarm && w.borrowedWeapon != null && org.bukkit.Bukkit.getCurrentTick() >= w.returnWeaponAt
+                && (w.activity == null || w.activity.freeTime())) return new CallToArms(w, t);
         return null;
     }
 
@@ -606,10 +607,16 @@ final class Defense {
             }
             if (w.borrowedWeapon == null || returning) return true;
             returning = true;
-            Block back = w.borrowedFrom != null && Town.isStorage(w.borrowedFrom) && !w.isSkipped(w.borrowedFrom) ? w.borrowedFrom
-                    : t.storeChest(w.borrowedWeapon.getType(), w.body.getLocation(), w.plugin.settings().townRadius(), w);
+            int radius = w.plugin.settings().townRadius();
+            Material kind = w.borrowedWeapon.getType();
+            Block back = w.borrowedFrom != null && Town.isStorage(w.borrowedFrom) && t.rule(w.borrowedFrom)[0] && !w.isSkipped(w.borrowedFrom)
+                    ? w.borrowedFrom : t.storeChest(kind, w.body.getLocation(), radius, w);
             if (back == null) {
-                w.borrowedWeapon = null; // nowhere to put it: keep it
+                if (t.waitsForOwnChest(kind, w.body.getLocation(), radius, w)) { // its chest is just held up: later
+                    w.returnWeaponAt = org.bukkit.Bukkit.getCurrentTick() + 400;
+                    return true;
+                }
+                w.borrowedWeapon = null; // nowhere at all to put it: keep it
                 w.borrowedFrom = null;
                 w.holdTool();
                 return true;

@@ -451,6 +451,8 @@ final class Worker {
 
     /** Weapon taken from storage when called to arms (returned after the fight). */
     ItemStack borrowedWeapon;
+    /** Not before then: try to bring the borrowed weapon back (its chest was held up). */
+    int returnWeaponAt;
     Block borrowedFrom;
 
     /** Keep the workplace valid; claim a free one if we have none. */

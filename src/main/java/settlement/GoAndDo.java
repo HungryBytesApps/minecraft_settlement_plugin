@@ -144,7 +144,8 @@ final class GoAndDo implements Activity {
             for (org.bukkit.block.BlockFace f : new org.bukkit.block.BlockFace[]{org.bukkit.block.BlockFace.UP, org.bukkit.block.BlockFace.DOWN,
                     org.bukkit.block.BlockFace.NORTH, org.bukkit.block.BlockFace.SOUTH, org.bukkit.block.BlockFace.EAST, org.bukkit.block.BlockFace.WEST}) {
                 Block n = part.getRelative(f);
-                if (mine.contains(n) || n.getType().isOccluding() || (n.getType().isSolid() && !PathFinder.passable(n))) continue; // that side is closed
+                // That side is closed by a full block (a wall, another chest); a carpet, slab, trapdoor, lantern... leaves it open.
+                if (mine.contains(n) || n.getType().isOccluding() || Town.isStorage(n) || fullBlock(n)) continue;
                 // The eyes are on that side of the chest.
                 double side = (eye.getX() - c.getX()) * f.getModX() + (eye.getY() - c.getY()) * f.getModY() + (eye.getZ() - c.getZ()) * f.getModZ();
                 if (side <= 0.4) continue;
@@ -156,10 +157,18 @@ final class GoAndDo implements Activity {
                 if (dist < 0.2) return true;
                 org.bukkit.util.RayTraceResult r = chest.getWorld().rayTraceBlocks(eye, to.normalize(), dist,
                         org.bukkit.FluidCollisionMode.NEVER, true);
-                if (r == null || r.getHitBlock() == null || mine.contains(r.getHitBlock()) || r.getHitBlock().equals(n)) return true;
+                if (r == null || r.getHitBlock() == null || mine.contains(r.getHitBlock())) return true;
+                // A low thing on that side (carpet, slab, trapdoor) is fine; a pane, door or fence in between is not.
+                if (r.getHitBlock().equals(n) && r.getHitBlockFace() == org.bukkit.block.BlockFace.UP && n.getBoundingBox().getMaxY() - n.getY() <= 0.55) return true;
             }
         }
         return false;
+    }
+
+    private static boolean fullBlock(Block b) {
+        if (!b.getType().isSolid()) return false;
+        org.bukkit.util.BoundingBox box = b.getBoundingBox();
+        return box.getHeight() >= 0.99 && box.getWidthX() >= 0.99 && box.getWidthZ() >= 0.99;
     }
 
     private boolean near(Location l, double r) {
@@ -209,6 +218,13 @@ final class GoAndDo implements Activity {
      * Can't get there: leave it for a minute. A chest or workstation with no way to it three times within 10
      * minutes goes in the problem log (once could be a settler in the way, a door...).
      */
+    /** No way at all was found to this block lately (not just a hold-up on the way). */
+    static boolean noPathLately(Block b) {
+        int[] f = noWay.get(b);
+        int now = org.bukkit.Bukkit.getCurrentTick();
+        return f != null && now - f[1] <= 12000 && now >= f[1];
+    }
+
     private void unreachable(boolean noPath) {
         w.skip(target, 1200);
         if (!noPath) return;
@@ -219,7 +235,7 @@ final class GoAndDo implements Activity {
         noWay.put(target, f);
         if (noWay.size() > 500) noWay.values().removeIf(v -> now - v[1] > 12000 || now < v[1]);
         if (f[0] < 3) return;
-        noWay.remove(target);
+        f[0] = 0; // (still known as "no way there": it's not waited for)
         Town t = w.town();
         if (t != null && (Town.isStorage(target) || t.workplace(target.getLocation()) != null)) {
             TownLog.settler(w, "can't reach the " + Work.nice(target.getType()) + " at " + target.getX() + ", " + target.getY() + ", " + target.getZ(),

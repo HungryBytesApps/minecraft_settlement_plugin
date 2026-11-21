@@ -413,6 +413,10 @@ final class Brewer {
         if (first == null) return null;
         if (Bukkit.getCurrentTick() < w.storageFullUntil) return null;
         Block chest = t.storeChest(first, w.body.getLocation(), radius, w);
+        if (chest == null && t.waitsForOwnChest(first, w.body.getLocation(), radius, w)) {
+            w.workStatus = "Waiting to get to the chest"; // its own chest is just held up
+            return null;
+        }
         if (chest == null) {
             w.storageFullUntil = Bukkit.getCurrentTick() + 400;
             w.warnStorageFull(first);

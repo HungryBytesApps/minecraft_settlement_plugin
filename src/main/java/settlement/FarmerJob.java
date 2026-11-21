@@ -117,23 +117,27 @@ final class FarmerJob {
         boolean storageFull = Bukkit.getCurrentTick() < w.storageFullUntil;
         craftMelons(w, t, radius);
         Compost compost = compost(wp);
-        boolean makeMeal = compost != Compost.OFF && t.wants(Material.BONE_MEAL, radius);
+        boolean composterOk = wp.loc.getBlock().getType() == Material.COMPOSTER && !w.isSkipped(wp.loc.getBlock()); // (out of reach lately: no composting)
+        boolean makeMeal = compost != Compost.OFF && composterOk && t.wants(Material.BONE_MEAL, radius);
 
         // Melon blocks and hay bales to order: also from spare slices / wheat in storage (above their own targets).
         for (Material[] fb : new Material[][]{{Material.MELON_SLICE, Material.MELON}, {Material.WHEAT, Material.HAY_BLOCK}}) {
             int blocks = ordered(t, fb[1], radius) - w.count(fb[1]) - w.count(fb[0]) / 9;
             Integer own = t.targets.get(fb[0]);
-            int spare = t.count(fb[0], radius) - (own == null ? 0 : own);
+            int spare = Math.min(t.count(fb[0], radius) - (own == null ? 0 : own), takeable(t, fb[0], radius));
             int take = Math.min(blocks, spare / 9) * 9;
             if (take > 0 && !storageFull) {
                 Material from = fb[0];
-                Activity f = Work.fetch(w, t, m -> m == from, Math.min(63, take), "Getting " + nice(from).toLowerCase(java.util.Locale.ROOT) + " for " + nice(fb[1]).toLowerCase(java.util.Locale.ROOT) + "s");
+                Activity f = Work.fetchLoose(w, t, m -> m == from, Math.min(63, take), "Getting " + nice(from).toLowerCase(java.util.Locale.ROOT) + " for " + nice(fb[1]).toLowerCase(java.util.Locale.ROOT) + "s");
                 if (f != null) return f;
             }
         }
         // Surplus harvest (above its target) to the composter (a good load), and a full load to storage.
-        boolean composting = compost != Compost.OFF && wp.loc.getBlock().getType() == Material.COMPOSTER;
-        if (composting && compostLoad(w, t, radius) > 0) return compostTrip(w, t, wp); // (right away, not carried around)
+        boolean composting = compost != Compost.OFF && composterOk;
+        if (composting && compostLoad(w, t, radius) >= 16) {
+            Activity c = compostTrip(w, t, wp);
+            if (c != null) return c; // (composter out of reach lately: farm on)
+        }
         if (!storageFull && needsDeposit(w, t, wp, false)) {
             Activity d = deposit(w, t, wp);
             if (d != null) return d;
@@ -152,7 +156,7 @@ final class FarmerJob {
             w.skip(spot, 1200); // no seed for this spot: the other spots first
         }
         w.planting = false;
-        if (!storageFull || harvestForCompost) {
+        if (!storageFull || (harvestForCompost && java.util.Arrays.stream(w.pockets.getStorageContents()).filter(i -> i == null || i.getType().isAir()).count() >= 2)) { // (room for crop + seeds: nothing dropped)
             List<Block> candidates = new ArrayList<>();
             for (Block f : land) candidates.add(f.getRelative(BlockFace.UP));
             candidates.addAll(Fields.plants(t, radius));
@@ -196,7 +200,10 @@ final class FarmerJob {
         }
 
         // Nothing else: compost what's left over, bring the rest to storage.
-        if (composting && compostLoad(w, t, radius) > 0) return compostTrip(w, t, wp);
+        if (composting && compostLoad(w, t, radius) > 0) {
+            Activity c = compostTrip(w, t, wp);
+            if (c != null) return c;
+        }
         // Bone meal wanted: compost spare seeds (and other compostables) from storage, above their targets
         // (no target: a stack stays).
         if (composting && makeMeal && !storageFull) {
@@ -208,7 +215,9 @@ final class FarmerJob {
             if (d != null) return d;
         }
 
-        if (storageFull) w.workStatus = "No room in storage";
+        if (storageFull) {
+            if (!"Waiting to get to the chest".equals(w.workStatus)) w.workStatus = "No room in storage";
+        }
         else if (spot != null) w.workStatus = "Needs seeds (none in storage)";
         else w.workStatus = "Waiting for crops to grow";
         return null;
@@ -353,6 +362,18 @@ final class FarmerJob {
             return Math.max(0, Math.min(have, count - w.plugin.settings().seedsToKeep()));
         }
         return t.wants(m, radius) ? 0 : have;
+    }
+
+    /** How many of this are in chests it may take from. */
+    private static int takeable(Town t, Material m, int radius) {
+        int n = 0;
+        for (Block b : t.containers(radius)) {
+            if (!t.rule(b)[1]) continue;
+            org.bukkit.inventory.Inventory inv = Town.inventory(b);
+            if (inv == null) continue;
+            for (ItemStack it : inv.getContents()) if (it != null && it.getType() == m) n += it.getAmount();
+        }
+        return n;
     }
 
     /** Compostables taken from storage to compost (per settler): all of it goes into the composter. */
@@ -533,7 +554,7 @@ final class FarmerJob {
         if (wp.isOn("BONEMEAL")) totals.computeIfPresent(Material.BONE_MEAL, (k, n) -> Math.max(0, n - 16));
         if (ordered(t, Material.MELON, radius) > 0) totals.computeIfPresent(Material.MELON_SLICE, (k, n) -> n % 9); // the rest becomes melons
         if (ordered(t, Material.HAY_BLOCK, radius) > 0) totals.computeIfPresent(Material.WHEAT, (k, n) -> n % 9); // the rest becomes hay
-        if (compost(wp) != Compost.OFF) {
+        if (compost(wp) != Compost.OFF && wp.loc.getBlock().getType() == Material.COMPOSTER && !w.isSkipped(wp.loc.getBlock())) {
             for (Material m : COMPOST.keySet()) {
                 int s = surplus(w, t, radius, m);
                 if (s > 0) totals.computeIfPresent(m, (k, n) -> Math.max(0, n - s)); // goes into the composter
@@ -544,32 +565,58 @@ final class FarmerJob {
     }
 
     private static boolean needsDeposit(Worker w, Town t, Town.Workplace wp, boolean anything) {
-        return !excess(w, t, wp).isEmpty(); // what it harvested goes to storage right away
+        Map<Material, Integer> ex = excess(w, t, wp);
+        if (ex.isEmpty()) return false;
+        if (anything) return true;
+        return ex.values().stream().mapToInt(Integer::intValue).sum() >= 48 || w.pockets.firstEmpty() == -1;
     }
 
     private static Activity deposit(Worker w, Town t, Town.Workplace wp) {
         if (Bukkit.getCurrentTick() < w.storageFullUntil) return null;
         int radius = w.plugin.settings().townRadius();
         Map<Material, Integer> ex = excess(w, t, wp);
-        Material first = ex.entrySet().stream().max(Map.Entry.comparingByValue()).map(Map.Entry::getKey).orElse(null);
-        if (first == null) return null;
-        Block chest = t.storeChest(first, w.body.getLocation(), radius, w);
+        if (ex.isEmpty()) return null;
+        Material first = null;
+        Block chest = null;
+        boolean waiting = false;
+        List<Map.Entry<Material, Integer>> order = new ArrayList<>(ex.entrySet());
+        order.sort(Map.Entry.<Material, Integer>comparingByValue().reversed());
+        for (Map.Entry<Material, Integer> e : order) { // the biggest load that has a chest to go to
+            Block c = t.storeChest(e.getKey(), w.body.getLocation(), radius, w);
+            if (c != null) {
+                first = e.getKey();
+                chest = c;
+                break;
+            }
+            if (t.waitsForOwnChest(e.getKey(), w.body.getLocation(), radius, w)) waiting = true;
+        }
         if (chest == null) {
+            if (waiting) { // its chest is just held up: it waits (not "storage full")
+                w.workStatus = "Waiting to get to the chest";
+                if (w.pockets.firstEmpty() == -1) w.storageFullUntil = Bukkit.getCurrentTick() + 100; // full: no more work meanwhile
+                return null;
+            }
             w.storageFullUntil = Bukkit.getCurrentTick() + 400;
-            w.warnStorageFull(first);
+            w.workStatus = "No room in storage";
+            w.warnStorageFull(order.get(0).getKey());
             return null;
         }
         w.workStatus = "Bringing the harvest to storage";
+        Material firstF = first;
         return new GoAndDo(w, chest, 2.0, "Bringing the harvest to storage", b -> Town.isStorage(b) && t.rule(b)[0], b -> {
             Inventory inv = Town.inventory(b);
             if (inv == null) return;
             Map<Material, Integer> here = new HashMap<>();
             for (Map.Entry<Material, Integer> e : excess(w, t, wp).entrySet()) {
                 Block to = t.storeChest(e.getKey(), b.getLocation(), radius, w);
-                if (e.getKey() == first || (to != null && Town.halves(to).contains(b))) here.put(e.getKey(), e.getValue()); // the rest belongs elsewhere
+                if (e.getKey() == firstF || (to != null && Town.halves(to).contains(b))) here.put(e.getKey(), e.getValue()); // the rest belongs elsewhere
             }
             Map<Material, Integer> moved = Work.store(w, inv, here); // the real stacks, nothing made up
-            for (Map.Entry<Material, Integer> e : moved.entrySet()) w.harvested.computeIfPresent(e.getKey(), (k, v) -> Math.max(0, v - e.getValue()));
+            Map<Material, Integer> fc = forCompost.get(w.body.getUniqueId());
+            for (Map.Entry<Material, Integer> e : moved.entrySet()) {
+                w.harvested.computeIfPresent(e.getKey(), (k, v) -> Math.max(0, v - e.getValue()));
+                if (fc != null) fc.computeIfPresent(e.getKey(), (k, v) -> v - e.getValue() > 0 ? v - e.getValue() : null); // went back: not for compost any more
+            }
             if (moved.isEmpty()) w.storageFullUntil = Bukkit.getCurrentTick() + 400; // nothing went in: wait a bit
             w.savePockets();
             t.countsChanged();
