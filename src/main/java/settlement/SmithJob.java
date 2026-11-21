@@ -84,6 +84,7 @@ final class SmithJob {
             Plan plan = plan(w, t, product);
             if (plan == null) {
                 if (waiting == null) waiting = lastMissing + " for " + Work.nice(product).toLowerCase(java.util.Locale.ROOT);
+                if ("stick".equals(lastMissing)) t.stickDemandUntil = org.bukkit.Bukkit.getCurrentTick() + 2400; // the lumberjack makes some
                 continue;
             }
             // Fetch what it doesn't carry yet, then work at the table.

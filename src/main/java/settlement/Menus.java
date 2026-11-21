@@ -830,6 +830,9 @@ final class Menus {
         body.add(DialogBody.plainMessage(Component.text(w.title() + " — " + w.doing() + "   ", NamedTextColor.GRAY)
                 .append(Component.text(w.healthText(), w.hurtBelow(50) ? NamedTextColor.RED : NamedTextColor.GRAY))));
         if (w.guard && w.unarmed()) body.add(line("No weapon in storage!", NamedTextColor.RED));
+        // Its work: what it's busy with, or why there's nothing to do (waiting for something, storage full...).
+        if (!w.guard && w.job() != Worker.Job.NONE && w.workStatus != null && !w.workStatus.isEmpty())
+            body.add(line("Work: " + w.workStatus, NamedTextColor.WHITE));
 
         int width = 150;
         List<ActionButton> buttons = new ArrayList<>();

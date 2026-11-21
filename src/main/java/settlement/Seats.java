@@ -24,7 +24,32 @@ final class Seats {
     private static final Map<String, Location> gatherSpot = new HashMap<>();
     private static final Map<String, Integer> gatherAt = new HashMap<>();
 
+    /** Cushions are entities (they lie on the floor): which block each one is in. */
+    private static final Map<Block, org.bukkit.entity.Cushion> cushions = new HashMap<>();
+
+    /** The cushion in this block, or null. */
+    static org.bukkit.entity.Cushion cushionAt(Block b) {
+        org.bukkit.entity.Cushion c = cushions.get(b);
+        if (c != null && (!c.isValid() || !c.getLocation().getBlock().equals(b))) {
+            cushions.remove(b);
+            c = null;
+        }
+        return c;
+    }
+
+    /** Remember the cushions around here (one look for entities, not one per block). */
+    private static java.util.Collection<org.bukkit.entity.Cushion> findCushions(World world, Location near, double rx, double ry, double rz) {
+        java.util.Collection<org.bukkit.entity.Cushion> found = world.getNearbyEntitiesByType(org.bukkit.entity.Cushion.class, near, rx, ry, rz);
+        if (cushions.size() > 2000) cushions.clear();
+        for (org.bukkit.entity.Cushion c : found) cushions.put(c.getLocation().getBlock(), c);
+        return found;
+    }
+
     static boolean isSeat(Block b) {
+        if (cushionAt(b) != null) { // a cushion on the floor: room for someone sitting on it
+            Block above = b.getRelative(BlockFace.UP);
+            return PathFinder.passable(b) && PathFinder.passable(above);
+        }
         Material m = b.getType();
         boolean ok;
         if (Tag.STAIRS.isTagged(m)) {
@@ -32,7 +57,7 @@ final class Seats {
         } else if (Tag.SLABS.isTagged(m)) {
             ok = b.getBlockData() instanceof Slab s && s.getType() == Slab.Type.BOTTOM;
         } else {
-            ok = m.name().contains("CUSHION") || Tag.WOOL_CARPETS.isTagged(m);
+            ok = Tag.WOOL_CARPETS.isTagged(m);
         }
         if (!ok) return false;
         if (b.getBlockData() instanceof org.bukkit.block.data.Waterlogged wl && wl.isWaterlogged()) return false; // not a wet seat
@@ -46,6 +71,8 @@ final class Seats {
 
     /** Top of the seat (where you sit). */
     static double surface(Block b) {
+        org.bukkit.entity.Cushion c = cushionAt(b);
+        if (c != null) return c.getBoundingBox().getMaxY(); // on the cushion
         if (b.getBlockData() instanceof Stairs) return b.getY() + 0.5; // on the step, not on top of its back
         double top = b.getBoundingBox().getMaxY();
         return top > b.getY() ? top : b.getY() + 0.5;
@@ -78,6 +105,16 @@ final class Seats {
                 }
             }
         }
+        // Cushions (entities, so looked for once).
+        for (org.bukkit.entity.Cushion c : findCushions(world, near, r, 4, r)) {
+            Block b = c.getLocation().getBlock();
+            if (!free(b) || (w != null && w.isSkipped(b)) || !isSeat(b)) continue;
+            double d = b.getLocation().distanceSquared(near);
+            if (d < bestD) {
+                bestD = d;
+                best = b;
+            }
+        }
         return best;
     }
 
@@ -100,12 +137,17 @@ final class Seats {
                 for (int y = by - 10; y <= by + 10; y++) {
                     Material m = w.getType(x, y, z);
                     if (m == Material.CAMPFIRE || m == Material.SOUL_CAMPFIRE) fires.add(w.getBlockAt(x, y, z));
-                    else if (Tag.STAIRS.isTagged(m) || Tag.SLABS.isTagged(m) || m.name().contains("CUSHION")) {
+                    else if (Tag.STAIRS.isTagged(m) || Tag.SLABS.isTagged(m)) {
                         Block b = w.getBlockAt(x, y, z);
                         if (t.contains(b.getLocation(), radius) && isSeat(b)) seats.add(b);
                     }
                 }
             }
+        }
+        Location mid = new Location(w, (box[0] + box[1] + 1) / 2.0, by, (box[2] + box[3] + 1) / 2.0);
+        for (org.bukkit.entity.Cushion c : findCushions(w, mid, (box[1] - box[0]) / 2.0 + 1, 10, (box[3] - box[2]) / 2.0 + 1)) {
+            Block b = c.getLocation().getBlock();
+            if (t.contains(b.getLocation(), radius) && isSeat(b)) seats.add(b);
         }
         Location best = t.bell.clone().add(0.5, 0, 0.5);
         int bestScore = 0;

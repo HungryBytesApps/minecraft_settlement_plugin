@@ -315,6 +315,9 @@ final class Town {
     /** Settlers asking each other for things (not saved: a restart forgets them). */
     final List<Requests.Request> requests = new ArrayList<>();
 
+    /** The smith needs sticks (none in storage): until then the lumberjack makes some, target or not. */
+    int stickDemandUntil;
+
     /** Per chest (both halves of a double chest share one). */
     final Map<String, Filter> chestFilters = new HashMap<>();
 

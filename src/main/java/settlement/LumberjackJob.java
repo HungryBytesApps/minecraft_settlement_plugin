@@ -105,7 +105,11 @@ final class LumberjackJob {
     /** How many sticks the storage target still wants (0: none, or no target set). */
     private static int sticksNeeded(Worker w, Town t) {
         Integer target = t.targets.get(Material.STICK);
-        if (target == null || target <= 0) return 0;
+        if (target == null || target <= 0) {
+            // No target, but the smith is waiting for sticks: a few (16).
+            if (org.bukkit.Bukkit.getCurrentTick() >= t.stickDemandUntil) return 0;
+            target = 16;
+        }
         return Math.max(0, target - t.count(Material.STICK, w.plugin.settings().townRadius()) - w.count(Material.STICK));
     }
 

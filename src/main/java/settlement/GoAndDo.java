@@ -132,22 +132,32 @@ final class GoAndDo implements Activity {
     }
 
     /**
-     * Like a player: from this spot (eye height) the chest is within reach (4.5) and the first thing in sight, for
-     * at least one of its sides (or its middle). So never through a wall, but a chest up high or under a counter is fine.
+     * Like a player: from this spot (eye height) one open side of the chest (the block next to it there is not
+     * solid) faces it, is within reach, and nothing solid is between the eyes and that open side. So never through a
+     * wall, but a chest up high, low, or under a counter is fine.
      */
     static boolean seesChest(Location feet, Block chest) {
         Location eye = feet.clone().add(0, 1.62, 0);
-        Location mid = chest.getLocation().add(0.5, 0.5, 0.5);
-        if (eye.distanceSquared(mid) > 4.5 * 4.5) return false;
         java.util.List<Block> mine = Town.halves(chest);
-        double[][] aims = {{0.5, 0.5, 0.5}, {0.5, 0.95, 0.5}, {0.5, 0.05, 0.5}, {0.05, 0.5, 0.5}, {0.95, 0.5, 0.5}, {0.5, 0.5, 0.05}, {0.5, 0.5, 0.95}};
-        for (double[] a : aims) {
-            org.bukkit.util.Vector to = chest.getLocation().add(a[0], a[1], a[2]).toVector().subtract(eye.toVector());
-            double dist = to.length();
-            if (dist < 0.01) return true;
-            org.bukkit.util.RayTraceResult r = chest.getWorld().rayTraceBlocks(eye, to.normalize(), dist + 0.3,
-                    org.bukkit.FluidCollisionMode.NEVER, true);
-            if (r != null && r.getHitBlock() != null && mine.contains(r.getHitBlock())) return true;
+        for (Block part : mine) {
+            Location c = part.getLocation().add(0.5, 0.5, 0.5);
+            for (org.bukkit.block.BlockFace f : new org.bukkit.block.BlockFace[]{org.bukkit.block.BlockFace.UP, org.bukkit.block.BlockFace.DOWN,
+                    org.bukkit.block.BlockFace.NORTH, org.bukkit.block.BlockFace.SOUTH, org.bukkit.block.BlockFace.EAST, org.bukkit.block.BlockFace.WEST}) {
+                Block n = part.getRelative(f);
+                if (mine.contains(n) || n.getType().isOccluding() || (n.getType().isSolid() && !PathFinder.passable(n))) continue; // that side is closed
+                // The eyes are on that side of the chest.
+                double side = (eye.getX() - c.getX()) * f.getModX() + (eye.getY() - c.getY()) * f.getModY() + (eye.getZ() - c.getZ()) * f.getModZ();
+                if (side <= 0.4) continue;
+                // A point just outside that side; nothing solid on the way there.
+                Location at = c.clone().add(f.getModX() * 0.6, f.getModY() * 0.6, f.getModZ() * 0.6);
+                org.bukkit.util.Vector to = at.toVector().subtract(eye.toVector());
+                double dist = to.length();
+                if (dist > 4.5) continue;
+                if (dist < 0.2) return true;
+                org.bukkit.util.RayTraceResult r = chest.getWorld().rayTraceBlocks(eye, to.normalize(), dist,
+                        org.bukkit.FluidCollisionMode.NEVER, true);
+                if (r == null || r.getHitBlock() == null || mine.contains(r.getHitBlock()) || r.getHitBlock().equals(n)) return true;
+            }
         }
         return false;
     }

@@ -432,6 +432,7 @@ final class Worker {
         pauseUntil = Bukkit.getCurrentTick() + ticks;
         mover.stop();
         if (activity != null) { // pick the work up again afterwards (fresh, so nothing gets stuck half-way)
+            wasDoing = activity.label();
             activity.stop();
             activity = null;
         }
@@ -636,6 +637,7 @@ final class Worker {
         if (job() != Job.NONE) {
             Activity a = jobNext(t);
             if (a != null) {
+                busyUntil = Bukkit.getCurrentTick() + 200; // working: others don't pull it into a chat between steps
                 start(a);
                 return;
             }
@@ -709,8 +711,12 @@ final class Worker {
         savePockets();
     }
 
+    /** What it was doing when someone stopped it to talk (shown in its menu meanwhile). */
+    String wasDoing;
+
     String doing() {
         if (activity != null) return activity.label();
+        if (pausedFor != null && wasDoing != null) return wasDoing;
         return "Standing around";
     }
 
@@ -720,8 +726,12 @@ final class Worker {
     }
 
     /** Free for a chat, music, etc. */
+    /** Had work to do a moment ago: not free for a chat or music (it's between two steps of its work). */
+    int busyUntil;
+
     boolean available() {
         if (downedUntil > 0 || guard || pausedFor != null || leaving) return false;
+        if (Bukkit.getCurrentTick() < busyUntil) return false;
         return activity == null || activity.interruptible();
     }
 
